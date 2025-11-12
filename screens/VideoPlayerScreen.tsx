@@ -140,6 +140,8 @@ const VideoPlayer: React.FC<{ src: string, poster: string }> = ({ src, poster })
         return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
     }, []);
 
+    const playbackControlSize = "w-10 h-10 sm:w-12 sm:h-12";
+    const seekControlSize = "w-6 h-6 sm:w-8 sm:h-8";
 
     return (
         <div ref={containerRef} className="relative w-full aspect-video bg-black group overflow-hidden">
@@ -147,25 +149,25 @@ const VideoPlayer: React.FC<{ src: string, poster: string }> = ({ src, poster })
             <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between">
                 <div>{/* Top controls if any */}</div>
                 
-                <div className="flex-1 flex items-center justify-center space-x-4 md:space-x-8">
-                    <button onClick={handleRewind} className="text-white p-2 md:p-4 bg-black/50 rounded-full transition-transform hover:scale-110">
-                        <BackwardIcon className="w-8 h-8 md:w-10 md:h-10" />
+                <div className="flex-1 flex items-center justify-center space-x-4">
+                    <button onClick={handleRewind} className="text-white p-2 bg-black/50 rounded-full transition-transform hover:scale-110">
+                        <BackwardIcon className={seekControlSize} />
                     </button>
-                    <button onClick={togglePlay} className="text-white p-2 md:p-4 bg-black/50 rounded-full transition-transform hover:scale-110">
-                        {isPlaying ? <PauseIcon className="w-12 h-12 md:w-14 md:h-14" /> : <PlayIcon className="w-12 h-12 md:w-14 md:h-14" />}
+                    <button onClick={togglePlay} className="text-white p-2 bg-black/50 rounded-full transition-transform hover:scale-110">
+                        {isPlaying ? <PauseIcon className={playbackControlSize} /> : <PlayIcon className={playbackControlSize} />}
                     </button>
-                    <button onClick={handleFastForward} className="text-white p-2 md:p-4 bg-black/50 rounded-full transition-transform hover:scale-110">
-                        <ForwardPlaybackIcon className="w-8 h-8 md:w-10 md:h-10" />
+                    <button onClick={handleFastForward} className="text-white p-2 bg-black/50 rounded-full transition-transform hover:scale-110">
+                        <ForwardPlaybackIcon className={seekControlSize} />
                     </button>
                 </div>
 
-                <div className="p-4">
+                <div className="p-2 sm:p-4">
                     <div className="space-y-2">
                         <div className="w-full h-1.5 bg-white/30 cursor-pointer rounded-full" onClick={handleSeek}>
                             <div className="h-full bg-amber-500 rounded-full" style={{width: `${progress}%`}} />
                         </div>
                         <div className="flex items-center justify-between text-white text-sm font-medium">
-                            <div className="flex items-center space-x-4">
+                            <div className="flex items-center space-x-2 sm:space-x-4">
                                 <button onClick={togglePlay}>
                                     {isPlaying ? <PauseIcon className="w-6 h-6" /> : <PlayIcon className="w-6 h-6" />}
                                 </button>
@@ -178,19 +180,19 @@ const VideoPlayer: React.FC<{ src: string, poster: string }> = ({ src, poster })
                                         min="0" max="1" step="0.05"
                                         value={isMuted ? 0 : volume}
                                         onChange={handleVolumeChange}
-                                        className="w-16 md:w-24 h-1 accent-amber-500 opacity-0 group-hover/volume:opacity-100 transition-opacity"
+                                        className="w-0 sm:w-16 h-1 accent-amber-500 opacity-0 transition-all duration-300 group-hover/volume:w-16 group-hover/volume:opacity-100"
                                     />
                                 </div>
                                 <span>{formatTime(currentTime)} / {formatTime(duration)}</span>
                             </div>
-                            <div className="flex items-center space-x-4">
+                            <div className="flex items-center space-x-2 sm:space-x-4">
                                 <div className="relative" ref={speedMenuRef}>
                                     <button onClick={() => setIsSpeedMenuOpen(p => !p)}>
                                         <Cog6ToothIcon className="w-6 h-6" />
                                     </button>
                                     {isSpeedMenuOpen && (
-                                        <div className="absolute bottom-full right-1/2 translate-x-1/2 mb-2 w-32 bg-black/80 backdrop-blur-sm rounded-lg py-2 text-center text-white shadow-lg">
-                                            <h4 className="font-semibold text-sm mb-2 px-2 border-b border-white/20 pb-1">{t('playbackSpeed')}</h4>
+                                        <div className="absolute bottom-full right-0 mb-2 w-32 bg-black/80 backdrop-blur-sm rounded-lg py-2 text-white shadow-lg">
+                                            <h4 className="font-semibold text-sm mb-2 px-2 border-b border-white/20 pb-1 text-center">{t('playbackSpeed')}</h4>
                                             <div className="text-left">
                                                 {[0.5, 0.75, 1, 1.25, 1.5, 2].map(rate => (
                                                     <button 
@@ -351,14 +353,18 @@ const VideoPlayerScreen: React.FC<VideoPlayerScreenProps> = ({ item, episode, on
 
     return (
         <div className="bg-[#FBF9F3] dark:bg-black min-h-screen animate-fadeIn">
-            <header className="flex items-center p-2">
-                <button onClick={onBack} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-800">
-                    <ArrowLeftIcon className="w-6 h-6" />
-                </button>
-            </header>
-
-            {/* FIX: Use episode thumbnail if available, otherwise fallback to item image */}
-            <VideoPlayer src="https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" poster={episode?.thumbnailUrl || item.imageUrl} />
+            <div className="relative">
+                <header className="absolute top-0 left-0 z-10 p-2 sm:p-4">
+                    <button 
+                        onClick={onBack} 
+                        className="p-2 rounded-full text-white bg-black/40 hover:bg-black/60 backdrop-blur-sm transition-colors"
+                        aria-label="Go back"
+                    >
+                        <ArrowLeftIcon className="w-6 h-6" />
+                    </button>
+                </header>
+                <VideoPlayer src="https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" poster={episode?.thumbnailUrl || item.imageUrl} />
+            </div>
             
             <div className="p-4 space-y-6">
                 <h1 className="text-3xl font-bold">{playingContent.title}</h1>
