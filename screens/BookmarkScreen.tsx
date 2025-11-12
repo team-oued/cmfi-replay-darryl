@@ -1,7 +1,7 @@
 import React from 'react';
 import Header from '../components/Header';
 import MediaCard from '../components/MediaCard';
-import { bookmarkedContent } from '../data/mockData';
+import { allContent } from '../data/mockData';
 import { MediaContent } from '../types';
 import { useAppContext } from '../context/AppContext';
 
@@ -12,7 +12,8 @@ interface BookmarkScreenProps {
 }
 
 const BookmarkScreen: React.FC<BookmarkScreenProps> = ({ onBack, onSelectMedia, onPlay }) => {
-    const { t } = useAppContext();
+    const { t, bookmarkedIds } = useAppContext();
+    const bookmarkedContent = allContent.filter(item => bookmarkedIds.includes(item.id));
     
     return (
         <div>

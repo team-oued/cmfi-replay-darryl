@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MediaContent } from '../types';
-import { PlayIcon, PlusIcon, PauseIcon, ChevronLeftIcon, ChevronRightIcon } from './icons';
+import { PlayIcon, PlusIcon, PauseIcon, ChevronLeftIcon, ChevronRightIcon, CheckIcon } from './icons';
 import { useAppContext } from '../context/AppContext';
 
 interface HeroProps {
@@ -12,7 +12,7 @@ interface HeroProps {
 const Hero: React.FC<HeroProps> = ({ items, onSelectMedia, onPlay }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
-  const { t } = useAppContext();
+  const { t, bookmarkedIds, toggleBookmark } = useAppContext();
 
   useEffect(() => {
     if (!items || items.length <= 1 || isPaused) return;
@@ -29,6 +29,7 @@ const Hero: React.FC<HeroProps> = ({ items, onSelectMedia, onPlay }) => {
   }
   
   const currentItem = items[currentIndex];
+  const isBookmarked = bookmarkedIds.includes(currentItem.id);
 
   const handlePrev = () => {
     setCurrentIndex((prevIndex) => (prevIndex - 1 + items.length) % items.length);
@@ -66,10 +67,20 @@ const Hero: React.FC<HeroProps> = ({ items, onSelectMedia, onPlay }) => {
               <PlayIcon className="w-5 h-5 mr-2" />
               <span>{t('play')}</span>
             </button>
-            <button className="flex items-center justify-center bg-white/20 text-white font-bold py-2.5 px-6 rounded-lg backdrop-blur-sm hover:bg-white/30 transition-colors duration-200" onClick={(e) => e.stopPropagation()}>
-              <PlusIcon className="w-5 h-5 mr-2" />
-              <span>{t('myList')}</span>
-            </button>
+            <button 
+              onClick={(e) => {
+                  e.stopPropagation();
+                  toggleBookmark(currentItem.id);
+              }}
+              className={`flex items-center justify-center font-bold py-2.5 px-6 rounded-lg backdrop-blur-sm transition-colors duration-200 ${
+                  isBookmarked 
+                      ? 'bg-amber-500 text-gray-900' 
+                      : 'bg-white/20 text-white hover:bg-white/30'
+              }`}
+          >
+              {isBookmarked ? <CheckIcon className="w-5 h-5 mr-2" /> : <PlusIcon className="w-5 h-5 mr-2" />}
+              <span>{isBookmarked ? t('addedToList') : t('myList')}</span>
+          </button>
           </div>
         </div>
       </div>

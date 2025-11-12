@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { MediaContent, MediaType, Episode } from '../types';
 import HeaderMenu from '../components/HeaderMenu';
-import { PlayIcon, PlusIcon, ArrowLeftIcon, ChevronDownIcon, VolumeHighIcon, LikeIcon, CommentIcon } from '../components/icons';
+import { PlayIcon, PlusIcon, ArrowLeftIcon, ChevronDownIcon, VolumeHighIcon, LikeIcon, CommentIcon, CheckIcon } from '../components/icons';
 import { useAppContext } from '../context/AppContext';
 import { allContent } from '../data/mockData';
 import MediaCard from '../components/MediaCard';
@@ -49,13 +49,13 @@ const formatStat = (num: number | undefined): string => {
 
 
 const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onPlay, playingItem, onSelectMedia }) => {
-    const { t } = useAppContext();
+    const { t, bookmarkedIds, toggleBookmark } = useAppContext();
     const { title, imageUrl, author, description, theme, languages, seasons, type } = item;
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
     
     const descriptionThreshold = 150;
     const isLongDescription = description.length > descriptionThreshold;
-
+    const isBookmarked = bookmarkedIds.includes(item.id);
 
     // Find the season of the currently playing episode to initialize state
     let playingEpisodeSeasonNumber: number | undefined;
@@ -155,9 +155,16 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
                         <PlayIcon className="w-6 h-6 mr-2" />
                         <span>{t('play')}</span>
                     </button>
-                    <button className="flex items-center justify-center bg-gray-200/80 dark:bg-gray-800/80 text-gray-900 dark:text-white font-bold py-3 px-6 rounded-lg backdrop-blur-sm hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors duration-200">
-                        <PlusIcon className="w-6 h-6 mr-2" />
-                        <span>{t('myList')}</span>
+                    <button 
+                        onClick={() => toggleBookmark(item.id)}
+                        className={`flex items-center justify-center font-bold py-3 px-6 rounded-lg backdrop-blur-sm transition-colors duration-200 ${
+                            isBookmarked 
+                                ? 'bg-amber-500 text-gray-900' 
+                                : 'bg-gray-200/80 dark:bg-gray-800/80 text-gray-900 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-700'
+                        }`}
+                    >
+                        {isBookmarked ? <CheckIcon className="w-6 h-6 mr-2" /> : <PlusIcon className="w-6 h-6 mr-2" />}
+                        <span>{isBookmarked ? t('addedToList') : t('myList')}</span>
                     </button>
                 </div>
 

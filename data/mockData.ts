@@ -254,15 +254,6 @@ export const allContent: MediaContent[] = [
   ...featuredPodcasts
 ];
 
-export const bookmarkedContent: MediaContent[] = [
-  popularSeries[1],
-  newDocumentaries[0],
-  featuredPodcasts[1],
-  popularSeries[3],
-  continueWatching[1],
-];
-
-
 export const activeUsers: User[] = [
   { id: 'u1', name: 'John D.', avatarUrl: 'https://picsum.photos/seed/user1/100/100', isOnline: true },
   { id: 'u2', name: 'Maria S.', avatarUrl: 'https://picsum.photos/seed/user2/100/100', isOnline: true },

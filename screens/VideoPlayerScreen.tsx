@@ -6,7 +6,7 @@ import {
     PlayIcon, PauseIcon, ArrowLeftIcon, ChevronLeftIcon, ChevronRightIcon,
     LikeIcon, CommentIcon, ShareIcon, DownloadIcon, PlusIcon,
     VolumeHighIcon, VolumeMuteIcon, PipIcon, FullscreenEnterIcon, FullscreenExitIcon, PaperAirplaneIcon,
-    BackwardIcon, ForwardPlaybackIcon
+    BackwardIcon, ForwardPlaybackIcon, CheckIcon
 } from '../components/icons';
 import { useAppContext } from '../context/AppContext';
 import { activeUsers } from '../data/mockData';
@@ -307,9 +307,10 @@ interface VideoPlayerScreenProps {
 }
 
 const VideoPlayerScreen: React.FC<VideoPlayerScreenProps> = ({ item, episode, onBack, onNavigateEpisode }) => {
-    const { t } = useAppContext();
+    const { t, bookmarkedIds, toggleBookmark } = useAppContext();
     const playingContent = episode || item;
     const isSeries = item.type === MediaType.Series && episode;
+    const isBookmarked = bookmarkedIds.includes(item.id);
 
     const allEpisodes = useMemo(() => item.seasons?.flatMap(s => s.episodes) || [], [item.seasons]);
     
@@ -322,8 +323,8 @@ const VideoPlayerScreen: React.FC<VideoPlayerScreenProps> = ({ item, episode, on
     const hasPrevEpisode = currentIndex > 0;
     const hasNextEpisode = currentIndex !== -1 && currentIndex < allEpisodes.length - 1;
 
-    const ActionButton: React.FC<{Icon: React.FC<any>, label: string, value?: string | number}> = ({ Icon, label, value }) => (
-        <button className="flex flex-col items-center space-y-1 text-gray-600 dark:text-gray-400 hover:text-amber-500 dark:hover:text-amber-400">
+    const ActionButton: React.FC<{Icon: React.FC<any>, label: string, value?: string | number, onClick?: () => void}> = ({ Icon, label, value, onClick }) => (
+        <button onClick={onClick} className="flex flex-col items-center space-y-1 text-gray-600 dark:text-gray-400 hover:text-amber-500 dark:hover:text-amber-400">
             <Icon className="w-7 h-7" />
             <span className="text-xs font-semibold">{value ? formatNumber(Number(value)) : label}</span>
         </button>
@@ -354,7 +355,11 @@ const VideoPlayerScreen: React.FC<VideoPlayerScreenProps> = ({ item, episode, on
                 
                 <div className="flex items-center justify-around py-2">
                     <ActionButton Icon={LikeIcon} label={t('like')} value={playingContent.likes} />
-                    <ActionButton Icon={PlusIcon} label={t('myList')} />
+                    <ActionButton 
+                        Icon={isBookmarked ? CheckIcon : PlusIcon} 
+                        label={isBookmarked ? t('addedToList') : t('myList')}
+                        onClick={() => toggleBookmark(item.id)}
+                    />
                     <ActionButton Icon={ShareIcon} label={t('share')} />
                     <ActionButton Icon={DownloadIcon} label={t('download')} />
                 </div>

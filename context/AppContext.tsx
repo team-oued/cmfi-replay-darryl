@@ -11,6 +11,8 @@ interface AppContextType {
   t: (key: TranslationKey, vars?: Record<string, string>) => string;
   isAuthenticated: boolean;
   setIsAuthenticated: (isAuth: boolean) => void;
+  bookmarkedIds: string[];
+  toggleBookmark: (id: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -27,6 +29,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   
   const [language, setLanguage] = useState<Language>('en');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [bookmarkedIds, setBookmarkedIds] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+        const savedBookmarks = window.localStorage.getItem('bookmarkedIds');
+        return savedBookmarks ? JSON.parse(savedBookmarks) : [];
+    }
+    return [];
+  });
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -35,8 +44,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('theme', theme);
   }, [theme]);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+        localStorage.setItem('bookmarkedIds', JSON.stringify(bookmarkedIds));
+    }
+  }, [bookmarkedIds]);
+
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme);
+  };
+
+  const toggleBookmark = (id: string) => {
+    setBookmarkedIds(prev => 
+        prev.includes(id) 
+            ? prev.filter(bookmarkedId => bookmarkedId !== id)
+            : [...prev, id]
+    );
   };
   
   const t = useMemo(() => i18n(language), [language]);
@@ -49,6 +72,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     t,
     isAuthenticated,
     setIsAuthenticated,
+    bookmarkedIds,
+    toggleBookmark,
   };
 
   return (
