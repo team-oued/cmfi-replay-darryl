@@ -234,7 +234,8 @@ export const VolumeMuteIcon: React.FC<IconProps> = ({ className }) => (
 
 export const PipIcon: React.FC<IconProps> = ({ className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-4.5 0V6.75A.75.75 0 0114.25 6h4.5a.75.75 0 01.75.75v4.5a.75.75 0 01-.75.75h-4.5a.75.75 0 01-.75-.75z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M21 15.75V18a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18V6A2.25 2.25 0 015.25 3.75h13.5A2.25 2.25 0 0121 6v2.25" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15 11.25h3.75v3.75H15v-3.75z" />
   </svg>
 );
 

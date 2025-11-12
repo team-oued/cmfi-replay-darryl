@@ -6,7 +6,7 @@ import {
     PlayIcon, PauseIcon, ArrowLeftIcon, ChevronLeftIcon, ChevronRightIcon,
     LikeIcon, CommentIcon, ShareIcon, DownloadIcon, PlusIcon,
     VolumeHighIcon, VolumeMuteIcon, PipIcon, FullscreenEnterIcon, FullscreenExitIcon, PaperAirplaneIcon,
-    BackwardIcon, ForwardPlaybackIcon, Cog6ToothIcon
+    BackwardIcon, ForwardPlaybackIcon
 } from '../components/icons';
 import { useAppContext } from '../context/AppContext';
 import { activeUsers } from '../data/mockData';
@@ -55,21 +55,31 @@ const VideoPlayer: React.FC<{ src: string, poster: string }> = ({ src, poster })
         const handlePlay = () => setIsPlaying(true);
         const handlePause = () => setIsPlaying(false);
         const handleTimeUpdate = () => {
-            setCurrentTime(video.currentTime);
-            setProgress((video.currentTime / video.duration) * 100);
+            if (video.duration) {
+                setCurrentTime(video.currentTime);
+                setProgress((video.currentTime / video.duration) * 100);
+            }
         };
         const handleLoadedMetadata = () => setDuration(video.duration);
+        const handleVolumeChange = () => {
+            setVolume(video.volume);
+            setIsMuted(video.muted);
+        };
 
         video.addEventListener('play', handlePlay);
         video.addEventListener('pause', handlePause);
         video.addEventListener('timeupdate', handleTimeUpdate);
         video.addEventListener('loadedmetadata', handleLoadedMetadata);
+        video.addEventListener('volumechange', handleVolumeChange);
+        
+        handleVolumeChange(); // Initialize state
         
         return () => {
             video.removeEventListener('play', handlePlay);
             video.removeEventListener('pause', handlePause);
             video.removeEventListener('timeupdate', handleTimeUpdate);
             video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+            video.removeEventListener('volumechange', handleVolumeChange);
         };
     }, []);
     
@@ -103,16 +113,10 @@ const VideoPlayer: React.FC<{ src: string, poster: string }> = ({ src, poster })
         video.currentTime = pos * video.duration;
     };
     
-    const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const newVolume = parseFloat(e.target.value);
-        if(videoRef.current) videoRef.current.volume = newVolume;
-        setVolume(newVolume);
-        setIsMuted(newVolume === 0);
-    };
-    
     const toggleMute = () => {
-        if(videoRef.current) videoRef.current.muted = !isMuted;
-        setIsMuted(!isMuted);
+        if(videoRef.current) {
+            videoRef.current.muted = !videoRef.current.muted;
+        }
     }
     
     const togglePip = async () => {
@@ -147,7 +151,29 @@ const VideoPlayer: React.FC<{ src: string, poster: string }> = ({ src, poster })
         <div ref={containerRef} className="relative w-full aspect-video bg-black group overflow-hidden">
             <video ref={videoRef} src={src} poster={poster} className="w-full h-full" onClick={togglePlay} />
             <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between">
-                <div>{/* Top controls if any */}</div>
+                <div className="flex justify-end p-2 sm:p-4">
+                  <div className="relative" ref={speedMenuRef}>
+                    <button onClick={() => setIsSpeedMenuOpen(p => !p)} className="bg-black/60 text-white font-semibold text-sm px-3 py-1.5 rounded-lg backdrop-blur-sm">
+                        {playbackRate}x
+                    </button>
+                    {isSpeedMenuOpen && (
+                        <div className="absolute top-full right-0 mt-2 w-32 bg-black/80 backdrop-blur-sm rounded-lg py-2 text-white shadow-lg">
+                            <h4 className="font-semibold text-sm mb-2 px-2 border-b border-white/20 pb-1 text-center">{t('playbackSpeed')}</h4>
+                            <div className="text-left">
+                                {[0.5, 0.75, 1, 1.25, 1.5, 2].map(rate => (
+                                    <button 
+                                        key={rate} 
+                                        onClick={() => handleSetPlaybackRate(rate)}
+                                        className={`w-full text-sm rounded py-1 px-4 text-left transition-colors ${playbackRate === rate ? 'bg-amber-500 font-bold' : 'hover:bg-white/20'}`}
+                                    >
+                                        {rate === 1 ? 'Normal' : `${rate}x`}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                  </div>
+                </div>
                 
                 <div className="flex-1 flex items-center justify-center space-x-4">
                     <button onClick={handleRewind} className="text-white p-2 bg-black/50 rounded-full transition-transform hover:scale-110">
@@ -171,42 +197,12 @@ const VideoPlayer: React.FC<{ src: string, poster: string }> = ({ src, poster })
                                 <button onClick={togglePlay}>
                                     {isPlaying ? <PauseIcon className="w-6 h-6" /> : <PlayIcon className="w-6 h-6" />}
                                 </button>
-                                <div className="flex items-center space-x-2 group/volume">
-                                    <button onClick={toggleMute}>
-                                        {isMuted || volume === 0 ? <VolumeMuteIcon className="w-6 h-6" /> : <VolumeHighIcon className="w-6 h-6" />}
-                                    </button>
-                                    <input 
-                                        type="range" 
-                                        min="0" max="1" step="0.05"
-                                        value={isMuted ? 0 : volume}
-                                        onChange={handleVolumeChange}
-                                        className="w-0 sm:w-16 h-1 accent-amber-500 opacity-0 transition-all duration-300 group-hover/volume:w-16 group-hover/volume:opacity-100"
-                                    />
-                                </div>
+                                <button onClick={toggleMute}>
+                                    {isMuted ? <VolumeMuteIcon className="w-6 h-6" /> : <VolumeHighIcon className="w-6 h-6" />}
+                                </button>
                                 <span>{formatTime(currentTime)} / {formatTime(duration)}</span>
                             </div>
                             <div className="flex items-center space-x-2 sm:space-x-4">
-                                <div className="relative" ref={speedMenuRef}>
-                                    <button onClick={() => setIsSpeedMenuOpen(p => !p)}>
-                                        <Cog6ToothIcon className="w-6 h-6" />
-                                    </button>
-                                    {isSpeedMenuOpen && (
-                                        <div className="absolute bottom-full right-0 mb-2 w-32 bg-black/80 backdrop-blur-sm rounded-lg py-2 text-white shadow-lg">
-                                            <h4 className="font-semibold text-sm mb-2 px-2 border-b border-white/20 pb-1 text-center">{t('playbackSpeed')}</h4>
-                                            <div className="text-left">
-                                                {[0.5, 0.75, 1, 1.25, 1.5, 2].map(rate => (
-                                                    <button 
-                                                        key={rate} 
-                                                        onClick={() => handleSetPlaybackRate(rate)}
-                                                        className={`w-full text-sm rounded py-1 px-4 text-left transition-colors ${playbackRate === rate ? 'bg-amber-500 font-bold' : 'hover:bg-white/20'}`}
-                                                    >
-                                                        {rate === 1 ? 'Normal' : `${rate}x`}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
                                 <button onClick={togglePip}><PipIcon className="w-6 h-6" /></button>
                                 <button onClick={toggleFullscreen}>
                                     {isFullscreen ? <FullscreenExitIcon className="w-6 h-6" /> : <FullscreenEnterIcon className="w-6 h-6" />}
