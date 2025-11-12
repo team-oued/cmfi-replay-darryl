@@ -6,9 +6,10 @@ import { useAppContext } from '../context/AppContext';
 interface HeroProps {
   items: MediaContent[];
   onSelectMedia: (item: MediaContent) => void;
+  onPlay: (item: MediaContent) => void;
 }
 
-const Hero: React.FC<HeroProps> = ({ items, onSelectMedia }) => {
+const Hero: React.FC<HeroProps> = ({ items, onSelectMedia, onPlay }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const { t } = useAppContext();
@@ -37,6 +38,11 @@ const Hero: React.FC<HeroProps> = ({ items, onSelectMedia }) => {
     setCurrentIndex((prevIndex) => (prevIndex + 1) % items.length);
   };
 
+  const handlePlay = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onPlay(currentItem);
+  };
+
   return (
     <div className="relative w-full h-[55vh] text-white">
       <div className="absolute inset-0 w-full h-full cursor-pointer" onClick={() => onSelectMedia(currentItem)}>
@@ -56,7 +62,7 @@ const Hero: React.FC<HeroProps> = ({ items, onSelectMedia }) => {
           <h1 className="text-3xl md:text-4xl font-extrabold drop-shadow-lg leading-tight">{currentItem.title}</h1>
           <p className="text-sm font-medium text-gray-200">{currentItem.theme}</p>
           <div className="flex items-center space-x-3 pt-2">
-            <button className="flex items-center justify-center bg-white text-gray-900 font-bold py-2.5 px-6 rounded-lg hover:bg-gray-200 transition-colors duration-200 shadow-lg" onClick={(e) => e.stopPropagation()}>
+            <button className="flex items-center justify-center bg-white text-gray-900 font-bold py-2.5 px-6 rounded-lg hover:bg-gray-200 transition-colors duration-200 shadow-lg" onClick={handlePlay}>
               <PlayIcon className="w-5 h-5 mr-2" />
               <span>{t('play')}</span>
             </button>

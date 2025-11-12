@@ -4,7 +4,7 @@ import Hero from '../components/Hero';
 import MediaCard from '../components/MediaCard';
 import UserAvatar from '../components/UserAvatar';
 import { continueWatching, popularSeries, newDocumentaries, featuredPodcasts, activeUsers, featuredContent, mostWatched, mostLiked, history } from '../data/mockData';
-import { MediaContent, User } from '../types';
+import { MediaContent, User, MediaType } from '../types';
 import { useAppContext } from '../context/AppContext';
 
 const MediaRow: React.FC<{ title: string; items: MediaContent[]; onSelectMedia: (item: MediaContent) => void; onPlay: (item: MediaContent) => void; variant?: 'poster' | 'thumbnail' | 'list' }> = ({ title, items, onSelectMedia, onPlay, variant }) => (
@@ -29,19 +29,23 @@ const UserRow: React.FC<{ title: string; users: User[] }> = ({ title, users }) =
     </section>
   );
 
-const NavigationTiles: React.FC = () => {
+const NavigationTiles: React.FC<{ navigateToCategory: (type: MediaType) => void }> = ({ navigateToCategory }) => {
     const { t } = useAppContext();
     const categories = [
-        { titleKey: 'categorySeries', imageUrl: 'https://picsum.photos/seed/series-tile/400/300' },
-        { titleKey: 'categoryDocumentaries', imageUrl: 'https://picsum.photos/seed/docs-tile/400/300' },
-        { titleKey: 'categoryPodcasts', imageUrl: 'https://picsum.photos/seed/pod-tile/400/300' },
+        { titleKey: 'categorySeries', imageUrl: 'https://picsum.photos/seed/series-tile/400/300', type: MediaType.Series },
+        { titleKey: 'categoryDocumentaries', imageUrl: 'https://picsum.photos/seed/docs-tile/400/300', type: MediaType.Documentary },
+        { titleKey: 'categoryPodcasts', imageUrl: 'https://picsum.photos/seed/pod-tile/400/300', type: MediaType.Podcast },
     ];
 
     return (
         <section className="px-4 py-6">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
                 {categories.map((category) => (
-                    <div key={category.titleKey} className="relative aspect-[4/3] rounded-lg overflow-hidden group cursor-pointer shadow-lg">
+                    <div 
+                        key={category.titleKey} 
+                        onClick={() => navigateToCategory(category.type)}
+                        className="relative aspect-[4/3] rounded-lg overflow-hidden group cursor-pointer shadow-lg"
+                    >
                         <img src={category.imageUrl} alt={t(category.titleKey as any)} className="absolute inset-0 w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-300" />
                         <div className="absolute inset-0 bg-black/50 group-hover:bg-black/60 transition-colors duration-300" />
                         <div className="relative h-full flex items-center justify-center p-2">
@@ -60,15 +64,16 @@ const NavigationTiles: React.FC = () => {
 interface HomeScreenProps {
   onSelectMedia: (item: MediaContent) => void;
   onPlay: (item: MediaContent) => void;
+  navigateToCategory: (type: MediaType) => void;
 }
 
-const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay }) => {
+const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigateToCategory }) => {
     const { t } = useAppContext();
   return (
     <div>
       <Header title="CMFI Replay" />
-      <Hero items={featuredContent} onSelectMedia={onSelectMedia}/>
-      <NavigationTiles />
+      <Hero items={featuredContent} onSelectMedia={onSelectMedia} onPlay={onPlay}/>
+      <NavigationTiles navigateToCategory={navigateToCategory} />
       <div className="space-y-4">
         <MediaRow title={t('continueWatching')} items={continueWatching} onSelectMedia={onSelectMedia} onPlay={onPlay} />
         <MediaRow title={t('history')} items={history} variant="poster" onSelectMedia={onSelectMedia} onPlay={onPlay} />

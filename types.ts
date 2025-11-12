@@ -14,6 +14,7 @@ export interface Comment {
   };
   text: string;
   timestamp: string;
+  likes?: number;
 }
 
 export interface Episode {
@@ -60,4 +61,4 @@ export enum ActiveTab {
   Profile = 'Profile',
 }
 
-export type Screen = ActiveTab | 'Bookmarks' | 'Preferences' | 'EditProfile' | 'MediaDetail' | 'VideoPlayer';
+export type Screen = ActiveTab | 'Bookmarks' | 'Preferences' | 'EditProfile' | 'MediaDetail' | 'VideoPlayer' | 'CategoryScreen';

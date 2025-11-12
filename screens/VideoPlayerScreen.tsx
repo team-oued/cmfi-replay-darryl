@@ -1,6 +1,6 @@
 // screens/VideoPlayerScreen.tsx
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { MediaContent, Episode, Comment as CommentType, MediaType, User } from '../types';
 import { 
     PlayIcon, PauseIcon, ArrowLeftIcon, ChevronLeftIcon, ChevronRightIcon,
@@ -236,41 +236,83 @@ const CommentSection: React.FC<{ comments: CommentType[] }> = ({ comments: initi
     const { t } = useAppContext();
     const [comments, setComments] = useState(initialComments);
     const [newComment, setNewComment] = useState('');
+    const [sortBy, setSortBy] = useState<'recent' | 'top'>('recent');
     const currentUser = { name: "Christian User", avatarUrl: "https://picsum.photos/seed/mainuser/200/200" };
+
+    const MAX_COMMENT_LENGTH = 280;
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if(!newComment.trim()) return;
+        if (!newComment.trim() || newComment.length > MAX_COMMENT_LENGTH) return;
         const newCommentObj: CommentType = {
             id: `c${Date.now()}`,
             user: currentUser,
             text: newComment,
-            timestamp: 'Just now'
+            timestamp: 'Just now',
+            likes: 0,
         };
         setComments([newCommentObj, ...comments]);
         setNewComment('');
-    }
+    };
+
+    const sortedComments = useMemo(() => {
+        const sorted = [...comments];
+        if (sortBy === 'top') {
+            sorted.sort((a, b) => (b.likes || 0) - (a.likes || 0));
+        }
+        // 'recent' is the default because new comments are prepended
+        return sorted;
+    }, [comments, sortBy]);
+    
+    const charCountColor = newComment.length > MAX_COMMENT_LENGTH 
+        ? 'text-red-500' 
+        : newComment.length > MAX_COMMENT_LENGTH - 20 
+        ? 'text-yellow-500' 
+        : 'text-gray-500 dark:text-gray-400';
 
     return (
         <div className="space-y-6">
-            <h3 className="text-xl font-bold">{t('comments')} ({comments.length})</h3>
-            <form onSubmit={handleSubmit} className="flex items-center space-x-3">
-                <img src={currentUser.avatarUrl} alt="you" className="w-10 h-10 rounded-full" />
-                <div className="relative flex-1">
-                     <input 
-                        type="text" 
-                        value={newComment}
-                        onChange={(e) => setNewComment(e.target.value)}
-                        placeholder={t('addAComment')}
-                        className="w-full bg-gray-100 dark:bg-gray-800 border-transparent rounded-full py-2.5 pl-4 pr-12 focus:ring-amber-500 focus:border-amber-500"
-                    />
-                    <button type="submit" className="absolute right-1.5 top-1/2 -translate-y-1/2 p-2 bg-amber-500 text-white rounded-full hover:bg-amber-600 disabled:bg-gray-400" disabled={!newComment.trim()}>
-                        <PaperAirplaneIcon className="w-5 h-5" />
+            <div className="flex items-center justify-between">
+                <h3 className="text-xl font-bold">{t('comments')} ({comments.length})</h3>
+                <div className="flex items-center space-x-2 bg-gray-200 dark:bg-gray-800 p-1 rounded-full">
+                    <button 
+                        onClick={() => setSortBy('recent')}
+                        className={`text-sm font-semibold px-3 py-1 rounded-full transition-colors ${sortBy === 'recent' ? 'bg-white dark:bg-gray-700 shadow' : 'text-gray-600 dark:text-gray-300'}`}
+                    >
+                        {t('mostRecent')}
                     </button>
+                    <button 
+                        onClick={() => setSortBy('top')}
+                        className={`text-sm font-semibold px-3 py-1 rounded-full transition-colors ${sortBy === 'top' ? 'bg-white dark:bg-gray-700 shadow' : 'text-gray-600 dark:text-gray-300'}`}
+                    >
+                        {t('topComments')}
+                    </button>
+                </div>
+            </div>
+
+            <form onSubmit={handleSubmit} className="flex items-start space-x-3">
+                <img src={currentUser.avatarUrl} alt="you" className="w-10 h-10 rounded-full flex-shrink-0 mt-1" />
+                <div className="flex-1">
+                    <div className="relative">
+                        <textarea
+                            value={newComment}
+                            onChange={(e) => setNewComment(e.target.value)}
+                            placeholder={t('addAComment')}
+                            className="w-full bg-gray-100 dark:bg-gray-800 border-transparent rounded-xl p-3 pr-12 focus:ring-amber-500 focus:border-amber-500 resize-none transition-shadow"
+                            rows={2}
+                            maxLength={MAX_COMMENT_LENGTH + 1} // Allow one extra char to show red color
+                        />
+                        <button type="submit" className="absolute right-2 top-2 p-2 bg-amber-500 text-white rounded-full hover:bg-amber-600 disabled:bg-gray-400 disabled:cursor-not-allowed" disabled={!newComment.trim() || newComment.length > MAX_COMMENT_LENGTH}>
+                            <PaperAirplaneIcon className="w-5 h-5" />
+                        </button>
+                    </div>
+                    <p className={`text-xs text-right mt-1 pr-2 font-medium ${charCountColor}`}>
+                        {newComment.length}/{MAX_COMMENT_LENGTH}
+                    </p>
                 </div>
             </form>
             <div className="space-y-4">
-                {comments.map(c => <CommentItem key={c.id} comment={c} />)}
+                {sortedComments.map(c => <CommentItem key={c.id} comment={c} />)}
             </div>
         </div>
     )
@@ -288,6 +330,17 @@ const VideoPlayerScreen: React.FC<VideoPlayerScreenProps> = ({ item, episode, on
     const { t } = useAppContext();
     const playingContent = episode || item;
     const isSeries = item.type === MediaType.Series && episode;
+
+    const allEpisodes = useMemo(() => item.seasons?.flatMap(s => s.episodes) || [], [item.seasons]);
+    
+    const currentIndex = useMemo(() => {
+        if (!episode || allEpisodes.length === 0) return -1;
+        // Using title and episode number for a more robust match
+        return allEpisodes.findIndex(e => e.episodeNumber === episode.episodeNumber && e.title === episode.title);
+    }, [allEpisodes, episode]);
+
+    const hasPrevEpisode = currentIndex > 0;
+    const hasNextEpisode = currentIndex !== -1 && currentIndex < allEpisodes.length - 1;
 
     const ActionButton: React.FC<{Icon: React.FC<any>, label: string, value?: string | number}> = ({ Icon, label, value }) => (
         <button className="flex flex-col items-center space-y-1 text-gray-600 dark:text-gray-400 hover:text-amber-500 dark:hover:text-amber-400">
@@ -324,11 +377,19 @@ const VideoPlayerScreen: React.FC<VideoPlayerScreenProps> = ({ item, episode, on
                 
                 {isSeries && (
                     <div className="flex items-center justify-between">
-                        <button onClick={() => onNavigateEpisode('prev')} className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700">
+                        <button 
+                            onClick={() => onNavigateEpisode('prev')}
+                            disabled={!hasPrevEpisode}
+                            className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
                             <ChevronLeftIcon className="w-5 h-5" />
                             <span>{t('prevEpisode')}</span>
                         </button>
-                        <button onClick={() => onNavigateEpisode('next')} className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700">
+                        <button 
+                            onClick={() => onNavigateEpisode('next')} 
+                            disabled={!hasNextEpisode}
+                            className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
                              <span>{t('nextEpisode')}</span>
                             <ChevronRightIcon className="w-5 h-5" />
                         </button>

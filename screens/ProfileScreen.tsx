@@ -1,7 +1,8 @@
 import React from 'react';
 import Header from '../components/Header';
 import UserAvatar from '../components/UserAvatar';
-import { activeUsers } from '../data/mockData';
+import MediaCard from '../components/MediaCard';
+import { activeUsers, history } from '../data/mockData';
 import { 
     BookmarkIcon, 
     ChevronRightIcon, 
@@ -12,7 +13,7 @@ import {
     SettingsIcon, 
     TrashIcon
 } from '../components/icons';
-import { User, Screen } from '../types';
+import { User, Screen, MediaContent } from '../types';
 import { useAppContext } from '../context/AppContext';
 
 const SettingsItem: React.FC<{
@@ -37,9 +38,11 @@ const SettingsItem: React.FC<{
 
 interface ProfileScreenProps {
     navigate: (screen: 'Bookmarks' | 'Preferences' | 'EditProfile') => void;
+    onSelectMedia: (item: MediaContent) => void;
+    onPlay: (item: MediaContent) => void;
 }
 
-const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigate }) => {
+const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigate, onSelectMedia, onPlay }) => {
     const { t, setIsAuthenticated } = useAppContext();
     const currentUser = { name: "Christian User", avatarUrl: "https://picsum.photos/seed/mainuser/200/200" };
     const onlineUsers = activeUsers.filter(u => u.isOnline);
@@ -72,6 +75,21 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigate }) => {
                 <div className="flex space-x-4 overflow-x-auto px-4 scrollbar-hide pb-2">
                     {onlineUsers.map((user: User) => (
                         <UserAvatar key={user.id} user={user} />
+                    ))}
+                </div>
+            </section>
+            
+            <section className="py-4">
+                <h3 className="text-xl font-bold px-4 mb-3">{t('history')}</h3>
+                <div className="flex space-x-4 overflow-x-auto px-4 scrollbar-hide pb-2">
+                    {history.map((item: MediaContent) => (
+                        <MediaCard 
+                            key={item.id} 
+                            item={item} 
+                            variant="poster" 
+                            onSelect={onSelectMedia}
+                            onPlay={onPlay}
+                        />
                     ))}
                 </div>
             </section>
