@@ -147,15 +147,15 @@ const VideoPlayer: React.FC<{ src: string, poster: string }> = ({ src, poster })
             <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between">
                 <div>{/* Top controls if any */}</div>
                 
-                <div className="flex-1 flex items-center justify-center space-x-8">
-                    <button onClick={handleRewind} className="text-white p-4 bg-black/50 rounded-full transition-transform hover:scale-110">
-                        <BackwardIcon className="w-10 h-10" />
+                <div className="flex-1 flex items-center justify-center space-x-4 md:space-x-8">
+                    <button onClick={handleRewind} className="text-white p-2 md:p-4 bg-black/50 rounded-full transition-transform hover:scale-110">
+                        <BackwardIcon className="w-8 h-8 md:w-10 md:h-10" />
                     </button>
-                    <button onClick={togglePlay} className="text-white p-4 bg-black/50 rounded-full transition-transform hover:scale-110">
-                        {isPlaying ? <PauseIcon className="w-14 h-14" /> : <PlayIcon className="w-14 h-14" />}
+                    <button onClick={togglePlay} className="text-white p-2 md:p-4 bg-black/50 rounded-full transition-transform hover:scale-110">
+                        {isPlaying ? <PauseIcon className="w-12 h-12 md:w-14 md:h-14" /> : <PlayIcon className="w-12 h-12 md:w-14 md:h-14" />}
                     </button>
-                    <button onClick={handleFastForward} className="text-white p-4 bg-black/50 rounded-full transition-transform hover:scale-110">
-                        <ForwardPlaybackIcon className="w-10 h-10" />
+                    <button onClick={handleFastForward} className="text-white p-2 md:p-4 bg-black/50 rounded-full transition-transform hover:scale-110">
+                        <ForwardPlaybackIcon className="w-8 h-8 md:w-10 md:h-10" />
                     </button>
                 </div>
 
@@ -178,7 +178,7 @@ const VideoPlayer: React.FC<{ src: string, poster: string }> = ({ src, poster })
                                         min="0" max="1" step="0.05"
                                         value={isMuted ? 0 : volume}
                                         onChange={handleVolumeChange}
-                                        className="w-24 h-1 accent-amber-500 opacity-0 group-hover/volume:opacity-100 transition-opacity"
+                                        className="w-16 md:w-24 h-1 accent-amber-500 opacity-0 group-hover/volume:opacity-100 transition-opacity"
                                     />
                                 </div>
                                 <span>{formatTime(currentTime)} / {formatTime(duration)}</span>
