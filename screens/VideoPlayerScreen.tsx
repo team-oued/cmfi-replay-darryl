@@ -35,7 +35,6 @@ const VideoPlayer: React.FC<{ src: string, poster: string }> = ({ src, poster })
     const { t } = useAppContext();
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-    const speedMenuRef = useRef<HTMLDivElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [progress, setProgress] = useState(0);
     const [duration, setDuration] = useState(0);
@@ -44,7 +43,6 @@ const VideoPlayer: React.FC<{ src: string, poster: string }> = ({ src, poster })
     const [volume, setVolume] = useState(1);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [playbackRate, setPlaybackRate] = useState(1);
-    const [isSpeedMenuOpen, setIsSpeedMenuOpen] = useState(false);
 
     const togglePlay = () => videoRef.current?.paused ? videoRef.current?.play() : videoRef.current?.pause();
     
@@ -83,26 +81,18 @@ const VideoPlayer: React.FC<{ src: string, poster: string }> = ({ src, poster })
         };
     }, []);
     
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (speedMenuRef.current && !speedMenuRef.current.contains(event.target as Node)) {
-                setIsSpeedMenuOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
-
     const handleRewind = () => {
         if (videoRef.current) videoRef.current.currentTime -= 10;
     };
     const handleFastForward = () => {
         if (videoRef.current) videoRef.current.currentTime += 10;
     };
-    const handleSetPlaybackRate = (rate: number) => {
-        if (videoRef.current) videoRef.current.playbackRate = rate;
-        setPlaybackRate(rate);
-        setIsSpeedMenuOpen(false);
+    const handlePlaybackRateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newRate = parseFloat(e.target.value);
+        if (videoRef.current) {
+            videoRef.current.playbackRate = newRate;
+        }
+        setPlaybackRate(newRate);
     };
 
     const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -152,26 +142,18 @@ const VideoPlayer: React.FC<{ src: string, poster: string }> = ({ src, poster })
             <video ref={videoRef} src={src} poster={poster} className="w-full h-full" onClick={togglePlay} />
             <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between">
                 <div className="flex justify-end p-2 sm:p-4">
-                  <div className="relative" ref={speedMenuRef}>
-                    <button onClick={() => setIsSpeedMenuOpen(p => !p)} className="bg-black/60 text-white font-semibold text-sm px-3 py-1.5 rounded-lg backdrop-blur-sm">
-                        {playbackRate}x
-                    </button>
-                    {isSpeedMenuOpen && (
-                        <div className="absolute top-full right-0 mt-2 w-32 bg-black/80 backdrop-blur-sm rounded-lg py-2 text-white shadow-lg">
-                            <h4 className="font-semibold text-sm mb-2 px-2 border-b border-white/20 pb-1 text-center">{t('playbackSpeed')}</h4>
-                            <div className="text-left">
-                                {[0.5, 0.75, 1, 1.25, 1.5, 2].map(rate => (
-                                    <button 
-                                        key={rate} 
-                                        onClick={() => handleSetPlaybackRate(rate)}
-                                        className={`w-full text-sm rounded py-1 px-4 text-left transition-colors ${playbackRate === rate ? 'bg-amber-500 font-bold' : 'hover:bg-white/20'}`}
-                                    >
-                                        {rate === 1 ? 'Normal' : `${rate}x`}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
+                  <div className="flex items-center space-x-2 bg-black/60 p-2 rounded-lg backdrop-blur-sm">
+                    <span className="text-white font-semibold text-sm w-12 text-center">{playbackRate.toFixed(2)}x</span>
+                    <input
+                        type="range"
+                        min="0.5"
+                        max="2"
+                        step="0.25"
+                        value={playbackRate}
+                        onChange={handlePlaybackRateChange}
+                        className="w-24 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 accent-amber-500"
+                        aria-label={t('playbackSpeed')}
+                    />
                   </div>
                 </div>
                 
