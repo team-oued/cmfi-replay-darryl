@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import MediaCard from '../components/MediaCard';
 import { continueWatching, allContent, mostWatched, mostLiked } from '../data/mockData';
 import { MediaContent, MediaType } from '../types';
 import { useAppContext } from '../context/AppContext';
+import { serieService, Serie, movieService, Movie } from '../lib/firestore';
 
 interface CategoryScreenProps {
     mediaType: MediaType;
@@ -29,6 +30,77 @@ const MediaRow: React.FC<{ title: string; items: MediaContent[]; onSelectMedia: 
 
 const CategoryScreen: React.FC<CategoryScreenProps> = ({ mediaType, onBack, onSelectMedia, onPlay }) => {
     const { t } = useAppContext();
+    const [series, setSeries] = useState<MediaContent[]>([]);
+    const [documentaries, setDocumentaries] = useState<MediaContent[]>([]);
+    const [podcasts, setPodcasts] = useState<MediaContent[]>([]);
+    const [loading, setLoading] = useState(true);
+    
+    // Convertir une Serie en MediaContent
+    const convertSerieToMediaContent = (serie: Serie): MediaContent => ({
+        id: serie.id,
+        title: serie.title_serie,
+        type: MediaType.Series,
+        imageUrl: serie.image_path,
+        duration: serie.runtime_h_m || '',
+        theme: '',
+        description: serie.overview_serie,
+        languages: serie.lang ? [serie.lang] : [],
+        progress: undefined
+    });
+    
+    // Convertir un Movie en MediaContent (pour les documentaires)
+    const convertMovieToMediaContent = (movie: Movie): MediaContent => ({
+        id: movie.uid,
+        title: movie.title,
+        type: MediaType.Documentary,
+        imageUrl: movie.picture_path,
+        duration: movie.runtime_h_m || '',
+        theme: '',
+        description: movie.overview,
+        languages: movie.original_language ? [movie.original_language] : [],
+        progress: undefined
+    });
+    
+    // Convertir un Podcast (Serie avec serie_type: 'podcast') en MediaContent
+    const convertPodcastToMediaContent = (podcast: Serie): MediaContent => ({
+        id: podcast.id,
+        title: podcast.title_serie,
+        type: MediaType.Podcast,
+        imageUrl: podcast.image_path,
+        duration: podcast.runtime_h_m || '',
+        theme: '',
+        description: podcast.overview_serie,
+        languages: podcast.lang ? [podcast.lang] : [],
+        progress: undefined
+    });
+    
+    // Charger les données depuis Firestore
+    useEffect(() => {
+        const loadData = async () => {
+            setLoading(true);
+            try {
+                if (mediaType === MediaType.Series) {
+                    const seriesData = await serieService.getAllSeriesOnly();
+                    const mediaContent = seriesData.map(convertSerieToMediaContent);
+                    setSeries(mediaContent);
+                } else if (mediaType === MediaType.Documentary) {
+                    const moviesData = await movieService.getAllMovies();
+                    const mediaContent = moviesData.map(convertMovieToMediaContent);
+                    setDocumentaries(mediaContent);
+                } else if (mediaType === MediaType.Podcast) {
+                    const podcastsData = await serieService.getAllPodcasts();
+                    const mediaContent = podcastsData.map(convertPodcastToMediaContent);
+                    setPodcasts(mediaContent);
+                }
+            } catch (error) {
+                console.error('Error loading data:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        
+        loadData();
+    }, [mediaType]);
     
     const screenTitleMap: Record<MediaType, string> = {
         [MediaType.Series]: t('seriesScreenTitle'),
@@ -55,18 +127,32 @@ const CategoryScreen: React.FC<CategoryScreenProps> = ({ mediaType, onBack, onSe
     };
     
     const continueWatchingForCategory = continueWatching.filter(item => item.type === mediaType);
-    const allForCategory = allContent.filter(item => item.type === mediaType);
+    const allForCategory = mediaType === MediaType.Series ? series : 
+                           mediaType === MediaType.Documentary ? documentaries : 
+                           mediaType === MediaType.Podcast ? podcasts :
+                           allContent.filter(item => item.type === mediaType);
     const mostWatchedForCategory = mostWatched.filter(item => item.type === mediaType);
     const mostLikedForCategory = mostLiked.filter(item => item.type === mediaType);
 
     return (
         <div className="animate-fadeIn">
             <Header title={screenTitleMap[mediaType]} onBack={onBack} />
-            <div className="space-y-4">
-                <MediaRow title={t('continueWatching')} items={continueWatchingForCategory} onSelectMedia={onSelectMedia} onPlay={onPlay} />
-                <MediaRow title={sectionTitleMap.all[mediaType]} items={allForCategory} variant="poster" onSelectMedia={onSelectMedia} onPlay={onPlay} />
-                <MediaRow title={sectionTitleMap.mostWatched[mediaType]} items={mostWatchedForCategory} onSelectMedia={onSelectMedia} onPlay={onPlay} />
-                <MediaRow title={sectionTitleMap.mostLiked[mediaType]} items={mostLikedForCategory} variant="poster" onSelectMedia={onSelectMedia} onPlay={onPlay} />
+            <div className="p-4 space-y-3">
+                {loading && (mediaType === MediaType.Series || mediaType === MediaType.Documentary || mediaType === MediaType.Podcast) ? (
+                    <div className="text-center py-8">
+                        <div className="text-gray-500 dark:text-gray-400">{t('loading') || 'Chargement...'}</div>
+                    </div>
+                ) : (
+                    allForCategory.map((item) => (
+                        <MediaCard 
+                            key={item.id} 
+                            item={item} 
+                            variant="list" 
+                            onSelect={onSelectMedia} 
+                            onPlay={onPlay} 
+                        />
+                    ))
+                )}
             </div>
         </div>
     );

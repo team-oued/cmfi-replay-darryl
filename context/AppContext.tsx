@@ -1,11 +1,14 @@
 import React, { createContext, useContext, useState, useMemo, useEffect } from 'react';
 import { i18n, Language, TranslationKey } from '../lib/i18n';
+import { auth } from '../lib/firebase';
+import { userService, UserProfile } from '../lib/firestore';
+import { onAuthStateChanged, User } from 'firebase/auth';
 
 type Theme = 'light' | 'dark';
 
 interface AppContextType {
-  theme: Theme;
-  setTheme: (theme: Theme) => void;
+  theme: 'light' | 'dark';
+  setTheme: (theme: 'light' | 'dark') => void;
   language: Language;
   setLanguage: (language: Language) => void;
   t: (key: TranslationKey, vars?: Record<string, string>) => string;
@@ -13,14 +16,18 @@ interface AppContextType {
   setIsAuthenticated: (isAuth: boolean) => void;
   bookmarkedIds: string[];
   toggleBookmark: (id: string) => void;
+  user: User | null;
+  userProfile: UserProfile | null;
+  setUserProfile: (profile: UserProfile | null) => void;
+  loading: boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [theme, setThemeState] = useState<Theme>(() => {
+  const [theme, setThemeState] = useState<'light' | 'dark'>(() => {
     if (typeof window !== 'undefined') {
-        const savedTheme = window.localStorage.getItem('theme') as Theme;
+        const savedTheme = window.localStorage.getItem('theme') as 'light' | 'dark';
         if (savedTheme) return savedTheme;
         return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     }
@@ -29,13 +36,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   
   const [language, setLanguage] = useState<Language>('en');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [bookmarkedIds, setBookmarkedIds] = useState<string[]>(() => {
-    if (typeof window !== 'undefined') {
-        const savedBookmarks = window.localStorage.getItem('bookmarkedIds');
-        return savedBookmarks ? JSON.parse(savedBookmarks) : [];
-    }
-    return [];
-  });
+  const [user, setUser] = useState<User | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [bookmarkedIds, setBookmarkedIds] = useState<string[]>([]);
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -45,21 +49,70 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [theme]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-        localStorage.setItem('bookmarkedIds', JSON.stringify(bookmarkedIds));
-    }
-  }, [bookmarkedIds]);
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setUser(user);
+      setIsAuthenticated(!!user);
+      setLoading(true);
+      
+      if (user) {
+        try {
+          const profile = await userService.getUserProfile(user.uid);
+          if (profile) {
+            setUserProfile(profile);
+            setThemeState(profile.theme);
+            setBookmarkedIds(profile.bookmarkedIds || []);
+          } else {
+            await userService.createUserProfile({
+              uid: user.uid,
+              email: user.email || '',
+              theme,
+              language,
+              bookmarkedIds: []
+            });
+          }
+        } catch (error) {
+          console.error('Error loading user profile:', error);
+        }
+      } else {
+        setUserProfile(null);
+        setBookmarkedIds([]);
+      }
+      
+      setLoading(false);
+    });
 
-  const setTheme = (newTheme: Theme) => {
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (userProfile && user) {
+      const updates: Partial<UserProfile> = {};
+      if (theme !== undefined) updates.theme = theme;
+      if (bookmarkedIds !== undefined) updates.bookmarkedIds = bookmarkedIds;
+      
+      if (Object.keys(updates).length > 0) {
+        userService.updateUserProfile(user.uid, updates);
+      }
+    }
+  }, [theme, bookmarkedIds, userProfile, user]);
+
+  const setTheme = (newTheme: 'light' | 'dark') => {
     setThemeState(newTheme);
   };
 
-  const toggleBookmark = (id: string) => {
-    setBookmarkedIds(prev => 
-        prev.includes(id) 
-            ? prev.filter(bookmarkedId => bookmarkedId !== id)
-            : [...prev, id]
-    );
+  const toggleBookmark = async (id: string) => {
+    if (!user) return;
+    
+    try {
+      await userService.toggleBookmark(user.uid, id);
+      setBookmarkedIds(prev => 
+          prev.includes(id) 
+              ? prev.filter(bookmarkedId => bookmarkedId !== id)
+              : [...prev, id]
+      );
+    } catch (error) {
+      console.error('Error toggling bookmark:', error);
+    }
   };
   
   const t = useMemo(() => i18n(language), [language]);
@@ -74,6 +127,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsAuthenticated,
     bookmarkedIds,
     toggleBookmark,
+    user,
+    userProfile,
+    setUserProfile,
+    loading,
   };
 
   return (

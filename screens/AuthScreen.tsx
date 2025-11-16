@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
+import { auth } from '../lib/firebase';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import AuthHeader from '../components/AuthHeader';
 import InputField from '../components/InputField';
 import AuthButton from '../components/AuthButton';
@@ -34,11 +36,39 @@ const OrSeparator: React.FC = () => {
     );
 };
 
-
 const AuthScreen: React.FC = () => {
-    const { t, setIsAuthenticated } = useAppContext();
+    const { t, setIsAuthenticated, loading } = useAppContext();
     const [authMode, setAuthMode] = useState<'login' | 'signup' | 'forgotPassword'>('login');
     const [resetRequested, setResetRequested] = useState(false);
+    const [error, setError] = useState('');
+    const [authLoading, setAuthLoading] = useState(false);
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [fullName, setFullName] = useState('');
+
+    const handleAuth = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!email || !password || (authMode === 'signup' && !fullName)) {
+            setError(t('fillAllFields') || 'Veuillez remplir tous les champs');
+            return;
+        }
+
+        setAuthLoading(true);
+        setError('');
+
+        try {
+            if (authMode === 'signup') {
+                await createUserWithEmailAndPassword(auth, email, password);
+            } else {
+                await signInWithEmailAndPassword(auth, email, password);
+            }
+            setIsAuthenticated(true);
+        } catch (error: any) {
+            setError(error.message || t('authError') || 'Une erreur est survenue');
+        } finally {
+            setAuthLoading(false);
+        }
+    };
 
     const commonLayout = (title: string, subtitle: string | null, formContent: React.ReactNode, showSocial: boolean) => (
         <div className="relative min-h-screen bg-[#FBF9F3] dark:bg-black flex flex-col justify-center py-12 sm:px-6 lg:px-8 animate-fadeIn">
@@ -59,7 +89,12 @@ const AuthScreen: React.FC = () => {
                                 <OrSeparator />
                             </>
                         )}
-                        {formContent}
+                        {error && (
+                        <div className="text-red-500 text-sm text-center mb-4">
+                            {error}
+                        </div>
+                    )}
+                    {formContent}
                     </div>
                 </div>
             </div>
@@ -100,13 +135,13 @@ const AuthScreen: React.FC = () => {
             t('signup'),
             null,
             <>
-                <form className="space-y-8" onSubmit={(e) => { e.preventDefault(); setIsAuthenticated(true); }}>
-                    <InputField label={t('fullName')} id="full-name" name="full-name" type="text" required placeholder="Howard Thurman" />
-                    <InputField label={t('email')} id="email-signup" name="email" type="email" autoComplete="email" required placeholder="e.g. howard.thurman@gmail.com" />
-                    <InputField label={t('password')} id="password-signup" name="password" type="password" autoComplete="new-password" required placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" />
+                <form className="space-y-8" onSubmit={handleAuth}>
+                    <InputField label={t('fullName')} id="full-name" name="full-name" type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} required placeholder="Howard Thurman" />
+                    <InputField label={t('email')} id="email-signup" name="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required placeholder="e.g. howard.thurman@gmail.com" />
+                    <InputField label={t('password')} id="password-signup" name="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" required placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" />
                     <div className="pt-2">
-                        <AuthButton type="submit">
-                            {t('getStarted')}
+                        <AuthButton type="submit" disabled={authLoading}>
+                            {authLoading ? t('loading') || 'Chargement...' : t('getStarted')}
                         </AuthButton>
                     </div>
                 </form>
@@ -128,17 +163,17 @@ const AuthScreen: React.FC = () => {
         t('login'),
         null,
         <>
-            <form className="space-y-8" onSubmit={(e) => { e.preventDefault(); setIsAuthenticated(true); }}>
-                <InputField label={t('email')} id="email-login" name="email" type="email" autoComplete="email" required placeholder="e.g. howard.thurman@gmail.com" />
-                <InputField label={t('password')} id="password-login" name="password" type="password" autoComplete="current-password" required placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" />
+            <form className="space-y-8" onSubmit={handleAuth}>
+                <InputField label={t('email')} id="email-login" name="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required placeholder="e.g. howard.thurman@gmail.com" />
+                <InputField label={t('password')} id="password-login" name="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" />
                 
                 <div className="text-sm text-right -mt-4">
                     <button type="button" onClick={() => setAuthMode('forgotPassword')} className="font-medium text-amber-600 hover:text-amber-500">{t('forgotPassword')}</button>
                 </div>
 
                 <div className="pt-2">
-                    <AuthButton type="submit">
-                        {t('login')}
+                    <AuthButton type="submit" disabled={authLoading}>
+                        {authLoading ? t('loading') || 'Chargement...' : t('login')}
                     </AuthButton>
                 </div>
             </form>

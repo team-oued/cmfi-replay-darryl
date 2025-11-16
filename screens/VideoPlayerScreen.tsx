@@ -342,7 +342,7 @@ const VideoPlayerScreen: React.FC<VideoPlayerScreenProps> = ({ item, episode, on
                         <ArrowLeftIcon className="w-6 h-6" />
                     </button>
                 </header>
-                <VideoPlayer src="https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" poster={episode?.thumbnailUrl || item.imageUrl} />
+                <VideoPlayer src="https://player.vimeo.com/progressive_redirect/playback/377183709/rendition/240p/file.mp4?loc=external&signature=a92b7697da94bae4f9129096723604236fb1b5d04f57e46b69e503d22d7a273f" poster={episode?.thumbnailUrl || item.imageUrl} />
             </div>
             
             <div className="p-4 space-y-6">

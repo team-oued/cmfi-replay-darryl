@@ -42,7 +42,7 @@ const MediaCard: React.FC<MediaCardProps> = ({ item, variant = 'thumbnail', onSe
                 <img src={imageUrl} alt={title} className="w-full h-full object-cover" />
             </div>
             <div className="flex-1 min-w-0">
-                <h3 className="text-gray-900 dark:text-white font-semibold truncate">{title}</h3>
+                <h3 className="text-gray-900 dark:text-white font-semibold">{title}</h3>
                 <p className="text-gray-500 dark:text-gray-400 text-sm truncate">{author || item.theme}</p>
             </div>
             <button className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 z-10" onClick={handlePlay}>

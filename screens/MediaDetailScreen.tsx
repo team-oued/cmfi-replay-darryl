@@ -5,25 +5,31 @@ import { MediaContent, MediaType, Episode } from '../types';
 import HeaderMenu from '../components/HeaderMenu';
 import { PlayIcon, PlusIcon, ArrowLeftIcon, ChevronDownIcon, VolumeHighIcon, LikeIcon, CommentIcon, CheckIcon } from '../components/icons';
 import { useAppContext } from '../context/AppContext';
-import { allContent } from '../data/mockData';
-import MediaCard from '../components/MediaCard';
+import { serieService, Serie, seasonSerieService, SeasonSerie, episodeSerieService, EpisodeSerie } from '../lib/firestore';
 
 interface MediaDetailScreenProps {
     item: MediaContent;
     onBack: () => void;
-    onPlay: (item: MediaContent, episode?: Episode) => void;
-    playingItem?: { media: MediaContent; episode?: Episode } | null;
+    onPlay: (item: MediaContent, episode?: Episode | EpisodeSerie) => void;
+    playingItem?: { media: MediaContent; episode?: Episode | EpisodeSerie } | null;
     onSelectMedia: (item: MediaContent) => void;
 }
 
-const EpisodeListItem: React.FC<{ episode: Episode, onClick: () => void, isPlaying: boolean }> = ({ episode, onClick, isPlaying }) => {
+const EpisodeListItem: React.FC<{ episode: Episode | EpisodeSerie, onClick: () => void, isPlaying: boolean }> = ({ episode, onClick, isPlaying }) => {
     const playingClasses = isPlaying ? 'bg-amber-100 dark:bg-amber-900/40' : 'hover:bg-gray-100/50 dark:hover:bg-gray-800/50';
+
+    // Vérifier si c'est un EpisodeSerie ou un Episode
+    const isEpisodeSerie = 'uid_episode' in episode;
+    const episodeNumber = isEpisodeSerie ? episode.episode_numero : episode.episodeNumber;
+    const episodeTitle = isEpisodeSerie ? episode.title : episode.title;
+    const episodeDuration = isEpisodeSerie ? episode.runtime_h_m : episode.duration;
+    const thumbnailUrl = isEpisodeSerie ? episode.picture_path : episode.thumbnailUrl;
 
     return (
         <div onClick={onClick} className={`flex items-center space-x-4 p-2 rounded-lg ${playingClasses} cursor-pointer transition-all duration-200 relative`}>
             {isPlaying && <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-500 rounded-l-lg"></div>}
             <div className="relative w-32 h-20 bg-gray-300 dark:bg-gray-700 rounded-lg overflow-hidden flex-shrink-0">
-                <img src={episode.thumbnailUrl} alt={episode.title} className="w-full h-full object-cover" />
+                <img src={thumbnailUrl} alt={episodeTitle} className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
                     {isPlaying ? (
                         <VolumeHighIcon className="w-8 h-8 text-white/90" />
@@ -33,8 +39,8 @@ const EpisodeListItem: React.FC<{ episode: Episode, onClick: () => void, isPlayi
                 </div>
             </div>
             <div className="flex-1 min-w-0">
-                <h4 className={`font-semibold truncate ${isPlaying ? 'text-amber-800 dark:text-amber-300' : 'text-gray-900 dark:text-white'}`}>{episode.episodeNumber}. {episode.title}</h4>
-                <p className="text-gray-500 dark:text-gray-400 text-sm">{episode.duration}</p>
+                <h4 className={`font-semibold truncate ${isPlaying ? 'text-amber-800 dark:text-amber-300' : 'text-gray-900 dark:text-white'}`}>{episodeNumber}. {episodeTitle}</h4>
+                <p className="text-gray-500 dark:text-gray-400 text-sm">{episodeDuration}</p>
             </div>
         </div>
     );
@@ -52,18 +58,67 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
     const { t, bookmarkedIds, toggleBookmark } = useAppContext();
     const { title, imageUrl, author, description, theme, languages, seasons, type } = item;
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+    const [firestoreSeasons, setFirestoreSeasons] = useState<SeasonSerie[]>([]);
+    const [seasonEpisodes, setSeasonEpisodes] = useState<{ [key: string]: EpisodeSerie[] }>({});
+    const [loading, setLoading] = useState(false);
     
     const descriptionThreshold = 150;
-    const isLongDescription = description.length > descriptionThreshold;
+    const isLongDescription = description && description.length > descriptionThreshold;
     const isBookmarked = bookmarkedIds.includes(item.id);
+
+    // Charger les données depuis Firestore si c'est une série
+    useEffect(() => {
+        if (type === MediaType.Series && item.id) {
+            loadSeasonsAndEpisodes();
+        }
+    }, [item.id, type]);
+
+    const loadSeasonsAndEpisodes = async () => {
+        setLoading(true);
+        try {
+            // Récupérer la série depuis Firestore
+            const serie = await serieService.getSerieById(item.id);
+            if (serie) {
+                // Récupérer les saisons de la série
+                const seasons = await seasonSerieService.getSeasonsBySerie(serie.uid_serie);
+                setFirestoreSeasons(seasons);
+                
+                // Récupérer les épisodes pour chaque saison
+                const episodesData: { [key: string]: EpisodeSerie[] } = {};
+                for (const season of seasons) {
+                    const episodes = await episodeSerieService.getEpisodesBySeason(season.uid_season);
+                    episodesData[season.uid_season] = episodes;
+                }
+                setSeasonEpisodes(episodesData);
+            }
+        } catch (error) {
+            console.error('Error loading seasons and episodes:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     // Find the season of the currently playing episode to initialize state
     let playingEpisodeSeasonNumber: number | undefined;
-    if (playingItem?.media.id === item.id && playingItem.episode && item.seasons) {
-        for (const season of item.seasons) {
-            if (season.episodes.some(e => e.episodeNumber === playingItem.episode?.episodeNumber && e.title === playingItem.episode.title)) {
-                playingEpisodeSeasonNumber = season.seasonNumber;
-                break;
+    if (playingItem?.media.id === item.id && playingItem.episode) {
+        // Vérifier si c'est un EpisodeSerie ou un Episode
+        const isEpisodeSerie = 'uid_episode' in playingItem.episode;
+        if (isEpisodeSerie) {
+            // Chercher la saison par uid_episode
+            for (const season of firestoreSeasons) {
+                const episodes = seasonEpisodes[season.uid_season] || [];
+                if (episodes.some(e => e.uid_episode === playingItem.episode?.uid_episode)) {
+                    playingEpisodeSeasonNumber = season.season_number;
+                    break;
+                }
+            }
+        } else if (seasons) {
+            // Logique existante pour les épisodes mockés
+            for (const season of seasons) {
+                if (season.episodes.some(e => e.episodeNumber === playingItem.episode?.episodeNumber && e.title === playingItem.episode?.title)) {
+                    playingEpisodeSeasonNumber = season.seasonNumber;
+                    break;
+                }
             }
         }
     }
@@ -71,12 +126,11 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
     const [expandedSeasons, setExpandedSeasons] = useState<number[]>([]);
 
     useEffect(() => {
-        const initialExpandedSeason = playingEpisodeSeasonNumber ?? (item.seasons ? item.seasons[0].seasonNumber : undefined);
+        const initialExpandedSeason = playingEpisodeSeasonNumber ?? (firestoreSeasons.length > 0 ? firestoreSeasons[0].season_number : (seasons ? seasons[0].seasonNumber : undefined));
         if (initialExpandedSeason && !expandedSeasons.includes(initialExpandedSeason)) {
             setExpandedSeasons([initialExpandedSeason]);
         }
-    }, [playingEpisodeSeasonNumber, item.seasons]);
-
+    }, [playingEpisodeSeasonNumber, firestoreSeasons, seasons]);
 
     const toggleSeason = (seasonNumber: number) => {
         setExpandedSeasons(current => 
@@ -87,15 +141,21 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
     };
 
     const handlePlay = () => {
-        const episodeToPlay = type === MediaType.Series ? seasons?.[0]?.episodes[0] : undefined;
+        let episodeToPlay: Episode | EpisodeSerie | undefined;
+        
+        if (type === MediaType.Series) {
+            // Prioriser les données Firestore
+            if (firestoreSeasons.length > 0) {
+                const firstSeason = firestoreSeasons[0];
+                const episodes = seasonEpisodes[firstSeason.uid_season] || [];
+                episodeToPlay = episodes[0]; // Premier épisode de la première saison
+            } else if (seasons && seasons.length > 0) {
+                episodeToPlay = seasons[0].episodes[0]; // Fallback vers les données mockées
+            }
+        }
+        
         onPlay(item, episodeToPlay);
     };
-
-    const relatedContent = allContent.filter(
-        content =>
-            (content.theme === item.theme || content.author === item.author) &&
-            content.id !== item.id
-    ).slice(0, 5);
 
     return (
         <div className="animate-fadeIn pb-8">
@@ -183,33 +243,67 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
                     )}
                 </div>
                 
-                {type === MediaType.Series && seasons && seasons.length > 0 && (
+                {type === MediaType.Series && (
                     <div>
                         <h2 className="text-xl font-bold mb-3">{t('episodes')}</h2>
-                        <div className="space-y-2">
-                            {seasons.map(season => {
-                                const isExpanded = expandedSeasons.includes(season.seasonNumber);
-                                return (
-                                    <div key={season.seasonNumber} className="bg-gray-100/50 dark:bg-gray-800/40 rounded-lg overflow-hidden transition-all duration-300">
-                                        <button 
-                                            onClick={() => toggleSeason(season.seasonNumber)}
-                                            className="w-full flex items-center justify-between p-4 text-left font-semibold hover:bg-gray-200/50 dark:hover:bg-gray-700/50"
-                                        >
-                                            <span className="text-lg">{t('season')} {season.seasonNumber}</span>
-                                            <ChevronDownIcon className={`w-6 h-6 text-gray-500 dark:text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                                        </button>
-                                        {isExpanded && (
-                                            <div className="px-2 pb-2 space-y-1 animate-fadeIn">
-                                                {season.episodes.map(episode => {
-                                                    const isPlaying = season.seasonNumber === playingEpisodeSeasonNumber && episode.episodeNumber === playingItem?.episode?.episodeNumber;
-                                                    return <EpisodeListItem key={episode.episodeNumber} episode={episode} onClick={() => onPlay(item, episode)} isPlaying={isPlaying} />;
-                                                })}
+                        {loading ? (
+                            <div className="text-center py-8">
+                                <div className="text-gray-500 dark:text-gray-400">{t('loading') || 'Chargement...'}</div>
+                            </div>
+                        ) : (
+                            <div className="space-y-2">
+                                {/* Afficher les saisons depuis Firestore si disponibles, sinon fallback vers les données mockées */}
+                                {firestoreSeasons.length > 0 ? (
+                                    firestoreSeasons.map(season => {
+                                        const isExpanded = expandedSeasons.includes(season.season_number);
+                                        const episodes = seasonEpisodes[season.uid_season] || [];
+                                        return (
+                                            <div key={season.uid_season} className="bg-gray-100/50 dark:bg-gray-800/40 rounded-lg overflow-hidden transition-all duration-300">
+                                                <button 
+                                                    onClick={() => toggleSeason(season.season_number)}
+                                                    className="w-full flex items-center justify-between p-4 text-left font-semibold hover:bg-gray-200/50 dark:hover:bg-gray-700/50"
+                                                >
+                                                    <span className="text-lg">{t('season')} {season.season_number}</span>
+                                                    <ChevronDownIcon className={`w-6 h-6 text-gray-500 dark:text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                                </button>
+                                                {isExpanded && (
+                                                    <div className="px-2 pb-2 space-y-1 animate-fadeIn">
+                                                        {episodes.map(episode => {
+                                                            const isPlaying = season.season_number === playingEpisodeSeasonNumber && episode.uid_episode === playingItem?.episode?.uid_episode;
+                                                            return <EpisodeListItem key={episode.uid_episode} episode={episode} onClick={() => onPlay(item, episode)} isPlaying={isPlaying} />;
+                                                        })}
+                                                    </div>
+                                                )}
                                             </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
+                                        );
+                                    })
+                                ) : (
+                                    /* Fallback vers les données mockées seulement si aucune donnée Firestore */
+                                    seasons && seasons.length > 0 && seasons.map(season => {
+                                        const isExpanded = expandedSeasons.includes(season.seasonNumber);
+                                        return (
+                                            <div key={season.seasonNumber} className="bg-gray-100/50 dark:bg-gray-800/40 rounded-lg overflow-hidden transition-all duration-300">
+                                                <button 
+                                                    onClick={() => toggleSeason(season.seasonNumber)}
+                                                    className="w-full flex items-center justify-between p-4 text-left font-semibold hover:bg-gray-200/50 dark:hover:bg-gray-700/50"
+                                                >
+                                                    <span className="text-lg">{t('season')} {season.seasonNumber}</span>
+                                                    <ChevronDownIcon className={`w-6 h-6 text-gray-500 dark:text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                                </button>
+                                                {isExpanded && (
+                                                    <div className="px-2 pb-2 space-y-1 animate-fadeIn">
+                                                        {season.episodes.map(episode => {
+                                                            const isPlaying = season.seasonNumber === playingEpisodeSeasonNumber && episode.episodeNumber === playingItem?.episode?.episodeNumber;
+                                                            return <EpisodeListItem key={episode.episodeNumber} episode={episode} onClick={() => onPlay(item, episode)} isPlaying={isPlaying} />;
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -217,30 +311,13 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
                 <div>
                     <h2 className="text-xl font-bold mb-2">{t('languages')}</h2>
                     <div className="flex flex-wrap gap-2">
-                        {languages.map(lang => (
+                        {languages && languages.map(lang => (
                             <span key={lang} className="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-sm font-medium py-1 px-3 rounded-full">
                                 {lang}
                             </span>
                         ))}
                     </div>
                 </div>
-
-                {relatedContent.length > 0 && (
-                    <div className="pt-4">
-                        <h2 className="text-xl font-bold mb-3">{t('relatedContent')}</h2>
-                        <div className="flex space-x-4 overflow-x-auto scrollbar-hide pb-2 -mx-4 px-4">
-                            {relatedContent.map((relatedItem) => (
-                                <MediaCard
-                                    key={relatedItem.id}
-                                    item={relatedItem}
-                                    variant="poster"
-                                    onSelect={onSelectMedia}
-                                    onPlay={(selectedItem) => onPlay(selectedItem)}
-                                />
-                            ))}
-                        </div>
-                    </div>
-                )}
             </div>
         </div>
     );

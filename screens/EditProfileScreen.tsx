@@ -1,22 +1,90 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import InputField from '../components/InputField';
 import { useAppContext } from '../context/AppContext';
+import { userService, UserProfile } from '../lib/firestore';
 
 interface EditProfileScreenProps {
     onBack: () => void;
 }
 
 const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ onBack }) => {
-    const { t } = useAppContext();
-    const [fullName, setFullName] = useState('Christian User');
-    const [email, setEmail] = useState('user@cmfireplay.com');
-    const [bio, setBio] = useState('Lover of Christ, dedicated to spreading the gospel through media.');
+    const { t, user, userProfile, setUserProfile } = useAppContext();
+    const [fullName, setFullName] = useState('');
+    const [email, setEmail] = useState('');
+    const [photoUrl, setPhotoUrl] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-    const handleSave = () => {
-        // In a real app, you would save the data here.
-        console.log({ fullName, email, bio });
-        onBack(); // Go back after saving
+    // Initialiser les champs avec les données de l'utilisateur
+    useEffect(() => {
+        if (userProfile) {
+            setFullName(userProfile.display_name || '');
+            setEmail(userProfile.email || '');
+            setPhotoUrl(userProfile.photo_url || '');
+        }
+    }, [userProfile]);
+
+    const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        // Valider le type de fichier
+        if (!file.type.startsWith('image/')) {
+            setError(t('invalidFileType') || 'Veuillez sélectionner une image');
+            return;
+        }
+
+        // Valider la taille (max 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            setError(t('fileTooLarge') || 'L\'image ne doit pas dépasser 5MB');
+            return;
+        }
+
+        setLoading(true);
+        setError('');
+
+        try {
+            // Pour l'instant, on utilise une URL de placeholder
+            // Dans une vraie app, vous uploaderiez le fichier vers Firebase Storage
+            const randomSeed = Math.random().toString(36).substring(7);
+            const newPhotoUrl = `https://picsum.photos/seed/${randomSeed}/200/200`;
+            setPhotoUrl(newPhotoUrl);
+        } catch (error) {
+            console.error('Error uploading photo:', error);
+            setError(t('errorUploadingPhoto') || 'Erreur lors du téléchargement de la photo');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSave = async () => {
+        if (!user || !fullName || !email) {
+            setError(t('fillAllFields') || 'Veuillez remplir tous les champs');
+            return;
+        }
+
+        setLoading(true);
+        setError('');
+
+        try {
+            const updatedProfile = await userService.updateUserProfile(user.uid, {
+                display_name: fullName,
+                email: email,
+                photo_url: photoUrl || null
+            });
+            
+            // Mettre à jour le profil dans le contexte
+            setUserProfile(updatedProfile);
+            
+            onBack(); // Retourner après la sauvegarde
+        } catch (error) {
+            console.error('Error updating profile:', error);
+            setError(t('errorUpdatingProfile') || 'Erreur lors de la mise à jour du profil');
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -24,53 +92,66 @@ const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ onBack }) => {
             <Header title={t('editProfileScreenTitle')} onBack={onBack} />
             <div className="p-4 space-y-8 animate-fadeIn">
                 <div className="flex flex-col items-center space-y-4">
-                    <img 
-                        src="https://picsum.photos/seed/mainuser/200/200" 
-                        alt="Your avatar" 
-                        className="w-32 h-32 rounded-full border-4 border-amber-500" 
+                    <div className="relative">
+                        <img 
+                            src={photoUrl || 'https://picsum.photos/seed/defaultuser/200/200'} 
+                            alt="Your avatar" 
+                            className="w-32 h-32 rounded-full border-4 border-amber-500 object-cover"
+                        />
+                        {loading && (
+                            <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center">
+                                <div className="text-white text-sm">{t('loading') || 'Chargement...'}</div>
+                            </div>
+                        )}
+                    </div>
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileSelect}
+                        className="hidden"
                     />
-                    <button className="text-amber-500 font-semibold hover:text-amber-400">
+                    <button 
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={loading}
+                        className="text-amber-500 font-semibold hover:text-amber-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
                         {t('changePhoto')}
                     </button>
                 </div>
 
                 <div className="space-y-6">
+                    {error && (
+                        <div className="bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg">
+                            {error}
+                        </div>
+                    )}
+                    
                     <InputField 
                         label={t('fullName')} 
-                        id="fullName" 
-                        value={fullName} 
+                        id="fullName"
+                        value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
+                        disabled={loading}
                     />
-                     <InputField 
+                    
+                    <InputField 
                         label={t('email')} 
-                        id="email" 
+                        id="email"
                         type="email"
-                        value={email} 
+                        value={email}
                         onChange={(e) => setEmail(e.target.value)}
+                        disabled={loading}
                     />
-                    <div className="relative">
-                        <label 
-                            htmlFor="bio" 
-                            className="absolute -top-2.5 left-3 px-1 bg-[#FBF9F3] dark:bg-black text-sm font-bold text-gray-800 dark:text-gray-200"
-                        >
-                            {t('bio')}
-                        </label>
-                        <textarea
-                            id="bio"
-                            rows={4}
-                            value={bio}
-                            onChange={(e) => setBio(e.target.value)}
-                            className="w-full bg-transparent px-4 py-3.5 border border-gray-400/50 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all duration-200 text-gray-700 dark:text-gray-300 placeholder-gray-500/80"
-                        />
-                    </div>
                 </div>
 
                 <div className="pt-4">
                     <button 
                         onClick={handleSave}
-                        className="w-full bg-amber-500 text-gray-900 font-bold py-3 px-6 rounded-lg hover:bg-amber-400 transition-colors duration-200 shadow-lg"
+                        disabled={loading}
+                        className="w-full bg-amber-500 text-gray-900 font-bold py-3 px-6 rounded-lg hover:bg-amber-400 transition-colors duration-200 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        {t('saveChanges')}
+                        {loading ? (t('saving') || 'Sauvegarde...') : (t('saveChanges') || 'Sauvegarder les modifications')}
                     </button>
                 </div>
             </div>

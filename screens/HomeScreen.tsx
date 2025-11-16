@@ -1,11 +1,12 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import Hero from '../components/Hero';
 import MediaCard from '../components/MediaCard';
 import UserAvatar from '../components/UserAvatar';
-import { continueWatching, popularSeries, newDocumentaries, featuredPodcasts, activeUsers, featuredContent, mostWatched, mostLiked, history } from '../data/mockData';
+import { continueWatching, popularSeries, newDocumentaries, featuredPodcasts, featuredContent, mostWatched, mostLiked, history } from '../data/mockData';
 import { MediaContent, User, MediaType } from '../types';
 import { useAppContext } from '../context/AppContext';
+import { userService, UserProfile, generateDefaultAvatar } from '../lib/firestore';
 
 const MediaRow: React.FC<{ title: string; items: MediaContent[]; onSelectMedia: (item: MediaContent) => void; onPlay: (item: MediaContent) => void; variant?: 'poster' | 'thumbnail' | 'list' }> = ({ title, items, onSelectMedia, onPlay, variant }) => (
   <section className="py-4">
@@ -69,6 +70,31 @@ interface HomeScreenProps {
 
 const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigateToCategory }) => {
     const { t } = useAppContext();
+    const [activeUsers, setActiveUsers] = useState<User[]>([]);
+    const [loadingUsers, setLoadingUsers] = useState(true);
+
+    // Récupérer les utilisateurs actifs depuis Firestore
+    useEffect(() => {
+      const fetchActiveUsers = async () => {
+        try {
+          const activeUserProfiles = await userService.getActiveUsers(50);
+          const formattedUsers: User[] = activeUserProfiles.map(profile => ({
+            id: profile.uid,
+            name: profile.display_name || 'Unknown User',
+            avatarUrl: profile.photo_url || generateDefaultAvatar(profile.display_name),
+            isOnline: profile.presence === 'online' || profile.presence === 'idle'
+          }));
+          setActiveUsers(formattedUsers);
+        } catch (error) {
+          console.error('Error fetching active users:', error);
+        } finally {
+          setLoadingUsers(false);
+        }
+      };
+
+      fetchActiveUsers();
+    }, []);
+
   return (
     <div>
       <Header title="CMFI Replay" />
@@ -79,7 +105,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
         <MediaRow title={t('history')} items={history} variant="poster" onSelectMedia={onSelectMedia} onPlay={onPlay} />
         <MediaRow title={t('mostWatched')} items={mostWatched} onSelectMedia={onSelectMedia} onPlay={onPlay} />
         <MediaRow title={t('mostLiked')} items={mostLiked} variant="poster" onSelectMedia={onSelectMedia} onPlay={onPlay} />
-        <UserRow title={t('activeNow')} users={activeUsers.filter(u => u.isOnline)} />
+        <UserRow title={t('activeNow')} users={activeUsers} />
         <MediaRow title={t('popularSeries')} items={popularSeries} variant="poster" onSelectMedia={onSelectMedia} onPlay={onPlay} />
         <MediaRow title={t('newDocumentaries')} items={newDocumentaries} onSelectMedia={onSelectMedia} onPlay={onPlay} />
         <MediaRow title={t('featuredPodcasts')} items={featuredPodcasts} variant="poster" onSelectMedia={onSelectMedia} onPlay={onPlay} />

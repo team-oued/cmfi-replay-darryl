@@ -2,17 +2,49 @@ import React, { useState, useEffect } from 'react';
 import { MediaContent } from '../types';
 import { PlayIcon, PlusIcon, PauseIcon, ChevronLeftIcon, ChevronRightIcon, CheckIcon } from './icons';
 import { useAppContext } from '../context/AppContext';
+import { movieService, Movie } from '../lib/firestore';
 
 interface HeroProps {
-  items: MediaContent[];
+  items?: MediaContent[];
   onSelectMedia: (item: MediaContent) => void;
   onPlay: (item: MediaContent) => void;
 }
 
-const Hero: React.FC<HeroProps> = ({ items, onSelectMedia, onPlay }) => {
+const Hero: React.FC<HeroProps> = ({ items: propItems, onSelectMedia, onPlay }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  const [movies, setMovies] = useState<Movie[]>([]);
+  const [loading, setLoading] = useState(true);
   const { t, bookmarkedIds, toggleBookmark } = useAppContext();
+
+  // Récupérer les 10 films les plus populaires depuis Firestore
+  useEffect(() => {
+    const fetchPopularMovies = async () => {
+      try {
+        const popularMovies = await movieService.getPopularMovies(10);
+        setMovies(popularMovies);
+      } catch (error) {
+        console.error('Error fetching popular movies:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPopularMovies();
+  }, []);
+
+  // Utiliser les films de Firestore si disponibles, sinon utiliser les props
+  const items = movies.length > 0 ? movies.map(movie => ({
+    id: movie.uid,
+    title: movie.title,
+    theme: movie.original_language,
+    imageUrl: movie.backdrop_path,
+    type: 'movie' as const,
+    duration: movie.runtime_h_m,
+    year: '',
+    rating: 0,
+    description: movie.overview
+  })) : propItems || [];
 
   useEffect(() => {
     if (!items || items.length <= 1 || isPaused) return;
@@ -23,6 +55,14 @@ const Hero: React.FC<HeroProps> = ({ items, onSelectMedia, onPlay }) => {
 
     return () => clearTimeout(timer);
   }, [currentIndex, items, isPaused]);
+
+  if (loading) {
+    return (
+      <div className="relative w-full h-[55vh] bg-gray-300 dark:bg-gray-800 flex items-center justify-center">
+        <div className="text-white text-lg">{t('loading') || 'Chargement...'}</div>
+      </div>
+    );
+  }
 
   if (!items || items.length === 0) {
     return <div className="h-[55vh] bg-gray-300 dark:bg-gray-800" />;
