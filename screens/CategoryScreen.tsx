@@ -31,7 +31,7 @@ const MediaRow: React.FC<{ title: string; items: MediaContent[]; onSelectMedia: 
 const CategoryScreen: React.FC<CategoryScreenProps> = ({ mediaType, onBack, onSelectMedia, onPlay }) => {
     const { t } = useAppContext();
     const [series, setSeries] = useState<MediaContent[]>([]);
-    const [documentaries, setDocumentaries] = useState<MediaContent[]>([]);
+    const [movies, setMovies] = useState<MediaContent[]>([]);
     const [podcasts, setPodcasts] = useState<MediaContent[]>([]);
     const [loading, setLoading] = useState(true);
     
@@ -48,17 +48,18 @@ const CategoryScreen: React.FC<CategoryScreenProps> = ({ mediaType, onBack, onSe
         progress: undefined
     });
     
-    // Convertir un Movie en MediaContent (pour les documentaires)
+    // Convertir un Movie en MediaContent (pour les films)
     const convertMovieToMediaContent = (movie: Movie): MediaContent => ({
         id: movie.uid,
         title: movie.title,
-        type: MediaType.Documentary,
+        type: MediaType.Movie,
         imageUrl: movie.picture_path,
         duration: movie.runtime_h_m || '',
         theme: '',
         description: movie.overview,
         languages: movie.original_language ? [movie.original_language] : [],
-        progress: undefined
+        progress: undefined,
+        video_path_hd: movie.video_path_hd
     });
     
     // Convertir un Podcast (Serie avec serie_type: 'podcast') en MediaContent
@@ -83,10 +84,10 @@ const CategoryScreen: React.FC<CategoryScreenProps> = ({ mediaType, onBack, onSe
                     const seriesData = await serieService.getAllSeriesOnly();
                     const mediaContent = seriesData.map(convertSerieToMediaContent);
                     setSeries(mediaContent);
-                } else if (mediaType === MediaType.Documentary) {
+                } else if (mediaType === MediaType.Movie) {
                     const moviesData = await movieService.getAllMovies();
                     const mediaContent = moviesData.map(convertMovieToMediaContent);
-                    setDocumentaries(mediaContent);
+                    setMovies(mediaContent);
                 } else if (mediaType === MediaType.Podcast) {
                     const podcastsData = await serieService.getAllPodcasts();
                     const mediaContent = podcastsData.map(convertPodcastToMediaContent);
@@ -104,31 +105,31 @@ const CategoryScreen: React.FC<CategoryScreenProps> = ({ mediaType, onBack, onSe
     
     const screenTitleMap: Record<MediaType, string> = {
         [MediaType.Series]: t('seriesScreenTitle'),
-        [MediaType.Documentary]: t('documentariesScreenTitle'),
+        [MediaType.Movie]: t('moviesScreenTitle'),
         [MediaType.Podcast]: t('podcastsScreenTitle'),
     };
     
     const sectionTitleMap = {
         all: {
             [MediaType.Series]: t('allSeries'),
-            [MediaType.Documentary]: t('allDocumentaries'),
+            [MediaType.Movie]: t('allMovies'),
             [MediaType.Podcast]: t('allPodcasts'),
         },
         mostWatched: {
             [MediaType.Series]: t('mostWatchedSeries'),
-            [MediaType.Documentary]: t('mostWatchedDocumentaries'),
+            [MediaType.Movie]: t('mostWatchedMovies'),
             [MediaType.Podcast]: t('mostWatchedPodcasts'),
         },
         mostLiked: {
             [MediaType.Series]: t('mostLikedSeries'),
-            [MediaType.Documentary]: t('mostLikedDocumentaries'),
+            [MediaType.Movie]: t('mostLikedMovies'),
             [MediaType.Podcast]: t('mostLikedPodcasts'),
         }
     };
     
     const continueWatchingForCategory = continueWatching.filter(item => item.type === mediaType);
     const allForCategory = mediaType === MediaType.Series ? series : 
-                           mediaType === MediaType.Documentary ? documentaries : 
+                           mediaType === MediaType.Movie ? movies : 
                            mediaType === MediaType.Podcast ? podcasts :
                            allContent.filter(item => item.type === mediaType);
     const mostWatchedForCategory = mostWatched.filter(item => item.type === mediaType);
@@ -138,7 +139,7 @@ const CategoryScreen: React.FC<CategoryScreenProps> = ({ mediaType, onBack, onSe
         <div className="animate-fadeIn">
             <Header title={screenTitleMap[mediaType]} onBack={onBack} />
             <div className="p-4 space-y-3">
-                {loading && (mediaType === MediaType.Series || mediaType === MediaType.Documentary || mediaType === MediaType.Podcast) ? (
+                {loading && (mediaType === MediaType.Series || mediaType === MediaType.Movie || mediaType === MediaType.Podcast) ? (
                     <div className="text-center py-8">
                         <div className="text-gray-500 dark:text-gray-400">{t('loading') || 'Chargement...'}</div>
                     </div>

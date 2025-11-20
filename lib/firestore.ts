@@ -1,15 +1,15 @@
 import { db } from './firebase';
-import { 
-  collection, 
-  doc, 
-  getDoc, 
-  getDocs, 
-  setDoc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  where, 
-  orderBy, 
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  orderBy,
   limit,
   arrayUnion,
   arrayRemove,
@@ -117,6 +117,15 @@ export interface UserBookmark {
   createdAt: Date | Timestamp;
 }
 
+export interface Like {
+  isliked: boolean;
+  liked_at: string;
+  likedby: string;
+  title: string;
+  uid: string;
+  username: string;
+}
+
 // Constantes pour les collections
 const USERS_COLLECTION = 'users';
 const MOVIES_COLLECTION = 'movies';
@@ -124,6 +133,8 @@ const SERIES_COLLECTION = 'series';
 const SEASONS_SERIES_COLLECTION = 'seasonsSeries';
 const EPISODES_SERIES_COLLECTION = 'episodesSeries';
 const BOOKMARKS_COLLECTION = 'bookmarks';
+const LIKES_COLLECTION = 'like';
+const COMMENTS_COLLECTION = 'comment';
 
 // Fonction utilitaire pour générer un avatar par défaut
 export const generateDefaultAvatar = (name?: string): string => {
@@ -131,6 +142,15 @@ export const generateDefaultAvatar = (name?: string): string => {
   const initial = displayName.charAt(0).toUpperCase();
   return `https://ui-avatars.com/api/?name=${initial}&background=random&color=fff&size=128`;
 };
+
+// Interface pour les commentaires
+export interface Comment {
+  comment: string;
+  created_at: string;
+  created_by: string;
+  uid: string; // uid de l'épisode ou du film
+  user_photo_url?: string;
+}
 
 // Services pour les utilisateurs
 export const userService = {
@@ -168,7 +188,7 @@ export const userService = {
         ...updates,
         updatedAt: new Date()
       });
-      
+
       // Récupérer le document mis à jour pour le retourner
       const updatedDoc = await getDoc(userRef);
       return updatedDoc.data() as UserProfile;
@@ -182,14 +202,14 @@ export const userService = {
     try {
       const userRef = doc(db, USERS_COLLECTION, uid);
       const userDoc = await getDoc(userRef);
-      
+
       if (!userDoc.exists()) {
         throw new Error('User profile not found');
       }
-      
+
       const userData = userDoc.data() as UserProfile;
       const bookmarkedIds = userData.bookmarkedIds || [];
-      
+
       if (bookmarkedIds.includes(movieId)) {
         await updateDoc(userRef, {
           bookmarkedIds: arrayRemove(movieId),
@@ -249,6 +269,40 @@ export const userService = {
       return [];
     }
   }
+};
+
+// Services pour les commentaires
+export const commentService = {
+  async getComments(itemUid: string): Promise<Comment[]> {
+    try {
+      const q = query(
+        collection(db, COMMENTS_COLLECTION),
+        where('uid', '==', itemUid)
+      );
+      const querySnapshot = await getDocs(q);
+      return querySnapshot.docs.map(doc => doc.data() as Comment);
+    } catch (error) {
+      console.error('Error getting comments:', error);
+      return [];
+    }
+  },
+
+  async addComment(itemUid: string, text: string, user: UserProfile): Promise<Comment | null> {
+    try {
+      const newComment: Comment = {
+        comment: text,
+        created_at: new Date().toLocaleString('fr-FR', { timeZoneName: 'short' }),
+        created_by: user.display_name || user.email.split('@')[0],
+        uid: itemUid,
+        user_photo_url: user.photo_url,
+      };
+      await setDoc(doc(collection(db, COMMENTS_COLLECTION)), newComment);
+      return newComment;
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      return null;
+    }
+  },
 };
 
 // Services pour les films
@@ -327,8 +381,8 @@ export const movieService = {
     try {
       const moviesSnapshot = await getDocs(collection(db, MOVIES_COLLECTION));
       const allMovies = moviesSnapshot.docs.map(doc => doc.data() as Movie);
-      
-      return allMovies.filter(movie => 
+
+      return allMovies.filter(movie =>
         movie.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         movie.original_title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         movie.overview.toLowerCase().includes(searchTerm.toLowerCase())
@@ -342,7 +396,7 @@ export const movieService = {
   async getBookmarkedMovies(movieIds: string[]): Promise<Movie[]> {
     try {
       if (movieIds.length === 0) return [];
-      
+
       const movies: Movie[] = [];
       for (const id of movieIds) {
         const movie = await this.getMovieById(id);
@@ -664,8 +718,8 @@ export const episodeSerieService = {
     try {
       const episodesSnapshot = await getDocs(collection(db, EPISODES_SERIES_COLLECTION));
       const allEpisodes = episodesSnapshot.docs.map(doc => doc.data() as EpisodeSerie);
-      
-      return allEpisodes.filter(episode => 
+
+      return allEpisodes.filter(episode =>
         episode.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         episode.original_title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         episode.overview.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -677,4 +731,81 @@ export const episodeSerieService = {
       return [];
     }
   },
+};
+
+// Services pour les likes
+export const likeService = {
+  async toggleLike(itemUid: string, itemTitle: string, user: UserProfile): Promise<boolean> {
+    try {
+      // Chercher si un like existe déjà pour cet utilisateur et cet item
+      const q = query(
+        collection(db, LIKES_COLLECTION),
+        where('uid', '==', itemUid),
+        where('likedby', '==', user.email)
+      );
+
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        // Le like existe, on le toggle ou on le supprime
+        // Ici, on va supposer qu'on supprime le document si on "unlike" pour simplifier le comptage,
+        // OU on met isliked à false. Le user a montré "isliked: true".
+        // On va supprimer le document pour faire simple et propre, ou mettre à jour.
+        // Si on suit le schéma strict "isliked: true", on peut imaginer qu'il peut être false.
+        // Mais pour l'instant, si on re-clique, on veut probablement enlever le like.
+        // On va supprimer le document.
+        const likeDoc = querySnapshot.docs[0];
+        await deleteDoc(doc(db, LIKES_COLLECTION, likeDoc.id));
+        return false; // Unliked
+      } else {
+        // Créer un nouveau like
+        const newLike: Like = {
+          isliked: true,
+          liked_at: new Date().toLocaleString('fr-FR', { timeZoneName: 'short' }), // Format approximatif
+          likedby: user.email,
+          title: itemTitle,
+          uid: itemUid,
+          username: user.display_name || user.email.split('@')[0]
+        };
+
+        // On utilise un ID généré auto ou composite
+        await setDoc(doc(collection(db, LIKES_COLLECTION)), newLike);
+        return true; // Liked
+      }
+    } catch (error) {
+      console.error('Error toggling like:', error);
+      throw error;
+    }
+  },
+
+  async getLikeCount(itemUid: string): Promise<number> {
+    try {
+      const q = query(
+        collection(db, LIKES_COLLECTION),
+        where('uid', '==', itemUid),
+        where('isliked', '==', true)
+      );
+      const querySnapshot = await getDocs(q);
+      return querySnapshot.size;
+    } catch (error) {
+      console.error('Error getting like count:', error);
+      return 0;
+    }
+  },
+
+  async hasUserLiked(itemUid: string, userEmail: string): Promise<boolean> {
+    try {
+      const q = query(
+        collection(db, LIKES_COLLECTION),
+        where('uid', '==', itemUid),
+        where('likedby', '==', userEmail),
+        where('isliked', '==', true)
+      );
+      const querySnapshot = await getDocs(q);
+      return !querySnapshot.empty;
+    } catch (error) {
+      console.error('Error checking if user liked:', error);
+      return false;
+    }
+  }
 };

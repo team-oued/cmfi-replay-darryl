@@ -43,7 +43,8 @@ const Hero: React.FC<HeroProps> = ({ items: propItems, onSelectMedia, onPlay }) 
     duration: movie.runtime_h_m,
     year: '',
     rating: 0,
-    description: movie.overview
+    description: movie.overview,
+    video_path_hd: movie.video_path_hd,
   })) : propItems || [];
 
   useEffect(() => {

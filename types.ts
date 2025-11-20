@@ -2,7 +2,7 @@
 
 export enum MediaType {
   Series = 'Series',
-  Documentary = 'Documentary',
+  Movie = 'Movie',
   Podcast = 'Podcast',
 }
 
@@ -46,6 +46,7 @@ export interface MediaContent {
   views?: number;
   likes?: number;
   comments?: Comment[];
+  video_path_hd?: string;
 }
 
 export interface User {

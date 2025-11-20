@@ -50,7 +50,7 @@ export const continueWatching: MediaContent[] = [
   },
   {
     id: 'cw2',
-    type: MediaType.Documentary,
+    type: MediaType.Movie,
     title: 'The Rise of Christianity',
     theme: 'Church History',
     imageUrl: 'https://picsum.photos/seed/christianity/400/225',
@@ -152,10 +152,10 @@ export const popularSeries: MediaContent[] = [
   },
 ];
 
-export const newDocumentaries: MediaContent[] = [
+export const newMovies: MediaContent[] = [
   {
     id: 'd1',
-    type: MediaType.Documentary,
+    type: MediaType.Movie,
     title: 'In His Steps: A Journey Through Israel',
     theme: 'Biblical Archaeology',
     imageUrl: 'https://picsum.photos/seed/israel/600/338',
@@ -168,7 +168,7 @@ export const newDocumentaries: MediaContent[] = [
   },
   {
     id: 'd2',
-    type: MediaType.Documentary,
+    type: MediaType.Movie,
     title: 'The Reformation Story',
     theme: 'Church History',
     imageUrl: 'https://picsum.photos/seed/reformation/600/338',
@@ -222,20 +222,20 @@ export const featuredPodcasts: MediaContent[] = [
 ];
 
 export const featuredContent: MediaContent[] = [
-  newDocumentaries[0],
+  newMovies[0],
   popularSeries[0],
-  newDocumentaries[1],
+  newMovies[1],
 ];
 
 export const mostWatched: MediaContent[] = [
   popularSeries[0],
-  newDocumentaries[1],
+  newMovies[1],
   popularSeries[2],
   featuredPodcasts[1],
 ];
 
 export const mostLiked: MediaContent[] = [
-  newDocumentaries[0],
+  newMovies[0],
   popularSeries[1],
   popularSeries[3],
   featuredPodcasts[2],
@@ -250,7 +250,7 @@ export const history: MediaContent[] = [
 export const allContent: MediaContent[] = [
   ...continueWatching,
   ...popularSeries,
-  ...newDocumentaries,
+  ...newMovies,
   ...featuredPodcasts
 ];
 

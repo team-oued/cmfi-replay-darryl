@@ -3,6 +3,8 @@ import Header from '../components/Header';
 import InputField from '../components/InputField';
 import { useAppContext } from '../context/AppContext';
 import { userService, UserProfile } from '../lib/firestore';
+import { storage } from '../lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 interface EditProfileScreenProps {
     onBack: () => void;
@@ -32,13 +34,13 @@ const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ onBack }) => {
 
         // Valider le type de fichier
         if (!file.type.startsWith('image/')) {
-            setError(t('invalidFileType') || 'Veuillez sélectionner une image');
+            setError('Veuillez sélectionner une image');
             return;
         }
 
         // Valider la taille (max 5MB)
         if (file.size > 5 * 1024 * 1024) {
-            setError(t('fileTooLarge') || 'L\'image ne doit pas dépasser 5MB');
+            setError("L'image ne doit pas dépasser 5MB");
             return;
         }
 
@@ -46,14 +48,18 @@ const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ onBack }) => {
         setError('');
 
         try {
-            // Pour l'instant, on utilise une URL de placeholder
-            // Dans une vraie app, vous uploaderiez le fichier vers Firebase Storage
-            const randomSeed = Math.random().toString(36).substring(7);
-            const newPhotoUrl = `https://picsum.photos/seed/${randomSeed}/200/200`;
-            setPhotoUrl(newPhotoUrl);
+            // Upload vers Firebase Storage
+            if (!user) {
+                throw new Error('Not authenticated');
+            }
+            const filePath = `avatars/${user.uid}/${Date.now()}_${file.name}`;
+            const storageRef = ref(storage, filePath);
+            await uploadBytes(storageRef, file);
+            const downloadUrl = await getDownloadURL(storageRef);
+            setPhotoUrl(downloadUrl);
         } catch (error) {
             console.error('Error uploading photo:', error);
-            setError(t('errorUploadingPhoto') || 'Erreur lors du téléchargement de la photo');
+            setError('Erreur lors du téléchargement de la photo');
         } finally {
             setLoading(false);
         }
@@ -61,7 +67,7 @@ const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ onBack }) => {
 
     const handleSave = async () => {
         if (!user || !fullName || !email) {
-            setError(t('fillAllFields') || 'Veuillez remplir tous les champs');
+            setError('Veuillez remplir tous les champs');
             return;
         }
 
@@ -81,7 +87,7 @@ const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ onBack }) => {
             onBack(); // Retourner après la sauvegarde
         } catch (error) {
             console.error('Error updating profile:', error);
-            setError(t('errorUpdatingProfile') || 'Erreur lors de la mise à jour du profil');
+            setError('Erreur lors de la mise à jour du profil');
         } finally {
             setLoading(false);
         }
@@ -151,7 +157,7 @@ const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ onBack }) => {
                         disabled={loading}
                         className="w-full bg-amber-500 text-gray-900 font-bold py-3 px-6 rounded-lg hover:bg-amber-400 transition-colors duration-200 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        {loading ? (t('saving') || 'Sauvegarde...') : (t('saveChanges') || 'Sauvegarder les modifications')}
+                        {loading ? 'Sauvegarde...' : (t('saveChanges') || 'Sauvegarder les modifications')}
                     </button>
                 </div>
             </div>

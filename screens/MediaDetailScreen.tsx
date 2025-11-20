@@ -6,6 +6,9 @@ import HeaderMenu from '../components/HeaderMenu';
 import { PlayIcon, PlusIcon, ArrowLeftIcon, ChevronDownIcon, VolumeHighIcon, LikeIcon, CommentIcon, CheckIcon } from '../components/icons';
 import { useAppContext } from '../context/AppContext';
 import { serieService, Serie, seasonSerieService, SeasonSerie, episodeSerieService, EpisodeSerie } from '../lib/firestore';
+import { Movie, movieService, likeService, commentService, Comment as FirestoreComment } from '../lib/firestore';
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 interface MediaDetailScreenProps {
     item: MediaContent;
@@ -55,18 +58,73 @@ const formatStat = (num: number | undefined): string => {
 
 
 const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onPlay, playingItem, onSelectMedia }) => {
-    const { t, bookmarkedIds, toggleBookmark } = useAppContext();
+    const { t, bookmarkedIds, toggleBookmark, userProfile } = useAppContext();
     const { title, imageUrl, author, description, theme, languages, seasons, type } = item;
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
     const [firestoreSeasons, setFirestoreSeasons] = useState<SeasonSerie[]>([]);
     const [seasonEpisodes, setSeasonEpisodes] = useState<{ [key: string]: EpisodeSerie[] }>({});
-    const [loading, setLoading] = useState(false);
-    
+    const [isLoading, setIsLoading] = useState(false);
+    const [movieData, setMovieData] = useState<Movie | null>(null);
+    const [likeCount, setLikeCount] = useState(item.likes || 0);
+    const [hasLiked, setHasLiked] = useState(false);
+    const [comments, setComments] = useState<FirestoreComment[]>([]);
+    const [isLoadingLikes, setIsLoadingLikes] = useState(false);
+    const [isLoadingComments, setIsLoadingComments] = useState(false);
     const descriptionThreshold = 150;
     const isLongDescription = description && description.length > descriptionThreshold;
     const isBookmarked = bookmarkedIds.includes(item.id);
 
     // Charger les données depuis Firestore si c'est une série
+    useEffect(() => {
+        loadMovieData();
+        loadLikesAndComments();
+    }, [item.id]);
+
+    const loadLikesAndComments = async () => {
+        if (!userProfile) return;
+        
+        try {
+            setIsLoadingLikes(true);
+            setIsLoadingComments(true);
+            
+            // Récupérer les likes
+            const itemUid = movieData?.uid || item.id;
+            const [count, userLiked] = await Promise.all([
+                likeService.getLikeCount(itemUid),
+                likeService.hasUserLiked(itemUid, userProfile.email || '')
+            ]);
+            
+            setLikeCount(count);
+            setHasLiked(userLiked);
+            
+            // Récupérer les commentaires
+            const fetchedComments = await commentService.getComments(itemUid);
+            // Map Firestore comments to the expected format if needed
+            const mappedComments = fetchedComments.map(comment => ({
+                ...comment,
+                // Add any necessary transformations here
+            }));
+            setComments(mappedComments);
+        } finally {
+            setIsLoadingLikes(false);
+            setIsLoadingComments(false);
+        }
+    };
+
+    const loadMovieData = async () => {
+        if (type === MediaType.Movie && item.id) {
+            try {
+                setIsLoading(true);
+                const movie = await movieService.getMovieById(item.id);
+                setMovieData(movie);
+            } catch (error) {
+                console.error('Error loading movie data:', error);
+            } finally {
+                setIsLoading(false);
+            }
+        }
+    };
+
     useEffect(() => {
         if (type === MediaType.Series && item.id) {
             loadSeasonsAndEpisodes();
@@ -74,7 +132,7 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
     }, [item.id, type]);
 
     const loadSeasonsAndEpisodes = async () => {
-        setLoading(true);
+        setIsLoading(true);
         try {
             // Récupérer la série depuis Firestore
             const serie = await serieService.getSerieById(item.id);
@@ -94,7 +152,7 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
         } catch (error) {
             console.error('Error loading seasons and episodes:', error);
         } finally {
-            setLoading(false);
+            setIsLoading(false);
         }
     };
 
@@ -157,6 +215,37 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
         onPlay(item, episodeToPlay);
     };
 
+    const handleLike = async () => {
+        if (!userProfile) {
+            toast.error('Vous devez être connecté pour aimer', {
+                position: 'bottom-center',
+                autoClose: 2000,
+            });
+            return;
+        }
+
+        try {
+            setIsLoading(true);
+            const itemUid = movieData?.uid || item.id;
+            const itemTitle = movieData?.title || item.title;
+            const isLiked = await likeService.toggleLike(itemUid, itemTitle, userProfile);
+            
+            setHasLiked(isLiked);
+            setLikeCount(prev => isLiked ? prev + 1 : Math.max(0, prev - 1));
+            
+            const message = isLiked ? 'Contenu aimé avec succès!' : 'Like retiré';
+            toast.success(message, { position: 'bottom-center', autoClose: 2000 });
+        } catch (error) {
+            console.error('Error toggling like:', error);
+            toast.error('Erreur lors du like', {
+                position: 'bottom-center',
+                autoClose: 2000,
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     return (
         <div className="animate-fadeIn pb-8">
             <div className="relative h-[60vh]">
@@ -182,33 +271,35 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
                 <h1 className="text-4xl font-extrabold text-gray-900 dark:text-white drop-shadow-lg">{title}</h1>
                 
                 <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
-                    <span>{theme}</span>
-                    <span className="w-1 h-1 bg-gray-400 rounded-full" />
-                    {author && <span>{author}</span>}
+                    
                      {item.duration && (
                         <>
-                         <span className="w-1 h-1 bg-gray-400 rounded-full" />
                          <span>{item.duration}</span>
                         </>
                      )}
                 </div>
+                
 
-                {(item.likes || item.comments) && (
-                    <div className="flex items-center space-x-6 text-gray-600 dark:text-gray-400">
-                        {item.likes !== undefined && (
-                            <div className="flex items-center space-x-1.5">
-                                <LikeIcon className="w-5 h-5 text-red-500/80" />
-                                <span className="font-semibold">{formatStat(item.likes)}</span>
-                            </div>
-                        )}
-                        {item.comments !== undefined && (
-                            <div className="flex items-center space-x-1.5">
+                <div className="flex items-center space-x-6 mt-4 text-sm">
+                    {isLoadingLikes ? (
+                        <span className="text-gray-500">Chargement...</span>
+                    ) : (
+                        <>
+                            <span className="flex items-center space-x-1">
+                                <LikeIcon className={`w-5 h-5 ${hasLiked ? 'text-red-500/80' : 'text-gray-600 dark:text-gray-400'}`} />
+                                <span className={hasLiked ? 'text-red-500 font-medium' : 'text-gray-600 dark:text-gray-400'}>
+                                    {likeCount} {t('likes')}
+                                </span>
+                            </span>
+                            <span className="flex items-center space-x-1">
                                 <CommentIcon className="w-5 h-5 text-sky-500/80" />
-                                <span className="font-semibold">{formatStat(item.comments.length)}</span>
-                            </div>
-                        )}
-                    </div>
-                )}
+                                <span className="text-gray-600 dark:text-gray-400">
+                                    {comments.length} {t(comments.length !== 1 ? 'comments' : 'comment')}
+                                </span>
+                            </span>
+                        </>
+                    )}
+                </div>
 
                 <div className="flex items-center space-x-3 pt-2">
                     <button onClick={handlePlay} className="flex items-center justify-center bg-amber-500 text-gray-900 font-bold py-3 px-8 rounded-lg hover:bg-amber-400 transition-colors duration-200 shadow-lg">
@@ -246,7 +337,7 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
                 {type === MediaType.Series && (
                     <div>
                         <h2 className="text-xl font-bold mb-3">{t('episodes')}</h2>
-                        {loading ? (
+                        {isLoading ? (
                             <div className="text-center py-8">
                                 <div className="text-gray-500 dark:text-gray-400">{t('loading') || 'Chargement...'}</div>
                             </div>
