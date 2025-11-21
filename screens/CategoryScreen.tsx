@@ -37,7 +37,7 @@ const CategoryScreen: React.FC<CategoryScreenProps> = ({ mediaType, onBack, onSe
     
     // Convertir une Serie en MediaContent
     const convertSerieToMediaContent = (serie: Serie): MediaContent => ({
-        id: serie.id,
+        id: serie.uid_serie,
         title: serie.title_serie,
         type: MediaType.Series,
         imageUrl: serie.image_path,
@@ -64,7 +64,7 @@ const CategoryScreen: React.FC<CategoryScreenProps> = ({ mediaType, onBack, onSe
     
     // Convertir un Podcast (Serie avec serie_type: 'podcast') en MediaContent
     const convertPodcastToMediaContent = (podcast: Serie): MediaContent => ({
-        id: podcast.id,
+        id: podcast.uid_serie,
         title: podcast.title_serie,
         type: MediaType.Podcast,
         imageUrl: podcast.image_path,

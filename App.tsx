@@ -39,13 +39,13 @@ const AppContent: React.FC = () => {
 
     const handlePlay = async (media: MediaContent, episode?: EpisodeSerie) => {
         let episodeToPlay = episode;
-        if (media.type === MediaType.Series && !episodeToPlay) {
+        if ((media.type === MediaType.Series || media.type === MediaType.Podcast) && !episodeToPlay) {
             // Try mock data first if present
             const mockFirst = media.seasons?.[0]?.episodes?.[0];
             if (mockFirst) {
                 // Fallback: we will try to resolve a matching EpisodeSerie from Firestore by serie id
                 try {
-                    const serie = await serieService.getSerieById(media.id);
+                    const serie = await serieService.getSerieByUid(media.id);
                     if (serie) {
                         const seasons = await seasonSerieService.getSeasonsBySerie(serie.uid_serie);
                         if (seasons.length > 0) {
@@ -65,7 +65,7 @@ const AppContent: React.FC = () => {
             } else {
                 // MediaContent has no seasons; resolve directly from Firestore
                 try {
-                    const serie = await serieService.getSerieById(media.id);
+                    const serie = await serieService.getSerieByUid(media.id);
                     if (serie) {
                         const seasons = await seasonSerieService.getSeasonsBySerie(serie.uid_serie);
                         if (seasons.length > 0) {
@@ -106,7 +106,7 @@ const AppContent: React.FC = () => {
             let allEpisodesFs: EpisodeSerie[] | null = null;
 
             // Use cache if available and for the same serie
-            const serie = await serieService.getSerieById(media.id);
+            const serie = await serieService.getSerieByUid(media.id);
             if (!serie) return;
             if (episodesCache && episodesCache.serieId === serie.uid_serie) {
                 allEpisodesFs = episodesCache.episodes;

@@ -30,7 +30,7 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ onSelectMedia, onPlay }) =>
     );
     setResults(filtered);
   };
-  
+
   const handleThemeClick = (theme: string) => {
     handleSearch(theme);
   };
@@ -53,7 +53,7 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ onSelectMedia, onPlay }) =>
           </div>
         </div>
       </div>
-      
+
       <div className="px-4 py-4">
         <h3 className="text-lg font-semibold mb-3">{t('browseByTheme')}</h3>
         <div className="flex flex-wrap gap-2">

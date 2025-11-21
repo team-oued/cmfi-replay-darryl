@@ -433,7 +433,7 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
     useEffect(() => {
         const fetchEpisodes = async () => {
             try {
-                const serie = await serieService.getSerieById(item.id);
+                const serie = await serieService.getSerieByUid(item.id);
                 if (!serie) { setEpisodesInSerie([]); return; }
                 const seasons = await seasonSerieService.getSeasonsBySerie(serie.uid_serie);
                 if (seasons.length === 0) { setEpisodesInSerie([]); return; }

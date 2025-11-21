@@ -13,8 +13,8 @@ const MediaCard: React.FC<MediaCardProps> = ({ item, variant = 'thumbnail', onSe
   const { title, imageUrl, author, progress, type } = item;
   const handleSelect = () => onSelect && onSelect(item);
   const handlePlay = (e: React.MouseEvent) => {
-      e.stopPropagation();
-      onPlay && onPlay(item);
+    e.stopPropagation();
+    onPlay && onPlay(item);
   };
 
   if (variant === 'poster') {
@@ -22,7 +22,7 @@ const MediaCard: React.FC<MediaCardProps> = ({ item, variant = 'thumbnail', onSe
       <div onClick={handleSelect} className="flex-shrink-0 w-36 md:w-48 space-y-2 cursor-pointer group">
         <div className="relative aspect-[2/3] bg-gray-200 dark:bg-gray-700 rounded-lg overflow-hidden shadow-lg transform group-hover:scale-105 transition-transform duration-300">
           <img src={imageUrl} alt={title} className="w-full h-full object-cover" />
-           <div 
+          <div
             onClick={handlePlay}
             className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300"
           >
@@ -37,18 +37,18 @@ const MediaCard: React.FC<MediaCardProps> = ({ item, variant = 'thumbnail', onSe
 
   if (variant === 'list') {
     return (
-        <div onClick={handleSelect} className="flex items-center space-x-4 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-200 cursor-pointer">
-            <div className="w-16 h-16 bg-gray-300 dark:bg-gray-700 rounded-lg overflow-hidden flex-shrink-0">
-                <img src={imageUrl} alt={title} className="w-full h-full object-cover" />
-            </div>
-            <div className="flex-1 min-w-0">
-                <h3 className="text-gray-900 dark:text-white font-semibold">{title}</h3>
-                <p className="text-gray-500 dark:text-gray-400 text-sm truncate">{author || item.theme}</p>
-            </div>
-            <button className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 z-10" onClick={handlePlay}>
-                <PlayIcon className="w-7 h-7 text-gray-800 dark:text-white"/>
-            </button>
+      <div onClick={handleSelect} className="flex items-center space-x-4 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-200 cursor-pointer">
+        <div className="w-16 h-16 bg-gray-300 dark:bg-gray-700 rounded-lg overflow-hidden flex-shrink-0">
+          <img src={imageUrl} alt={title} className="w-full h-full object-cover" />
         </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="text-gray-900 dark:text-white font-semibold">{title}</h3>
+          <p className="text-gray-500 dark:text-gray-400 text-sm truncate">{author || item.theme}</p>
+        </div>
+        <button className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 z-10" onClick={handlePlay}>
+          <PlayIcon className="w-7 h-7 text-gray-800 dark:text-white" />
+        </button>
+      </div>
     );
   }
 
@@ -57,7 +57,7 @@ const MediaCard: React.FC<MediaCardProps> = ({ item, variant = 'thumbnail', onSe
     <div onClick={handleSelect} className="flex-shrink-0 w-64 md:w-80 space-y-2 cursor-pointer">
       <div className="relative aspect-video bg-gray-300 dark:bg-gray-700 rounded-lg overflow-hidden shadow-lg group">
         <img src={imageUrl} alt={title} className="w-full h-full object-cover" />
-        <div 
+        <div
           onClick={handlePlay}
           className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300"
         >

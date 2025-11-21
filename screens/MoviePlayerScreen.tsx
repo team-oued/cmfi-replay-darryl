@@ -246,7 +246,7 @@ const VideoPlayer: React.FC<{ src: string, poster: string }> = ({ src, poster })
 // --- Comments Section ---
 const formatDate = (timestamp: any) => {
     if (!timestamp) return '';
-    
+
     // Handle Firestore Timestamp
     if (typeof timestamp.toDate === 'function') {
         return timestamp.toDate().toLocaleString('fr-FR', {
@@ -257,12 +257,12 @@ const formatDate = (timestamp: any) => {
             minute: '2-digit'
         });
     }
-    
+
     // Handle string timestamps
     if (typeof timestamp === 'string') {
         return timestamp;
     }
-    
+
     // Handle raw timestamp objects (if needed)
     if (timestamp.seconds) {
         return new Date(timestamp.seconds * 1000).toLocaleString('fr-FR', {
@@ -273,7 +273,7 @@ const formatDate = (timestamp: any) => {
             minute: '2-digit'
         });
     }
-    
+
     return '';
 };
 
@@ -423,7 +423,7 @@ const MoviePlayerScreen: React.FC<MoviePlayerScreenProps> = ({ item, onBack }) =
                 console.error('Error fetching movie data:', error);
             }
         };
-        
+
 
         if (item.type === MediaType.Movie) {
             fetchMovieData();

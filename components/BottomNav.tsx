@@ -1,57 +1,105 @@
 import React from 'react';
 import { ActiveTab } from '../types';
-import { HomeIcon, SearchIcon, UserIcon } from './icons';
 import { useAppContext } from '../context/AppContext';
 
 interface BottomNavProps {
-  activeTab: ActiveTab;
-  setActiveTab: (tab: ActiveTab) => void;
+    activeTab: ActiveTab;
+    setActiveTab: (tab: ActiveTab) => void;
 }
 
-const NavItem: React.FC<{
-    label: string;
-    Icon: React.FC<{className?: string}>;
-    isActive: boolean;
-    onClick: () => void;
-}> = ({ label, Icon, isActive, onClick }) => {
-  const activeClasses = 'text-amber-500';
-  const inactiveClasses = 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white';
-  
-  return (
-    <button onClick={onClick} className={`flex flex-col items-center justify-center w-full pt-2 pb-1 transition-colors duration-200 ${isActive ? activeClasses : inactiveClasses}`}>
-      <Icon className="w-6 h-6 mb-1" />
-      <span className="text-xs">{label}</span>
-    </button>
-  );
-};
-
 const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab }) => {
-  const { t } = useAppContext();
-  
-  return (
-    <nav className="bg-[#FBF9F3]/80 dark:bg-black/80 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 shadow-lg">
-      <div className="flex justify-around">
-        <NavItem
-          label={t('home')}
-          Icon={HomeIcon}
-          isActive={activeTab === ActiveTab.Home}
-          onClick={() => setActiveTab(ActiveTab.Home)}
-        />
-        <NavItem
-          label={t('search')}
-          Icon={SearchIcon}
-          isActive={activeTab === ActiveTab.Search}
-          onClick={() => setActiveTab(ActiveTab.Search)}
-        />
-        <NavItem
-          label={t('profile')}
-          Icon={UserIcon}
-          isActive={activeTab === ActiveTab.Profile}
-          onClick={() => setActiveTab(ActiveTab.Profile)}
-        />
-      </div>
-    </nav>
-  );
+    const { t } = useAppContext();
+
+    const tabs = [
+        {
+            id: ActiveTab.Home,
+            label: t('home'),
+            icon: (isActive: boolean) => (
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className={`h-6 w-6 ${isActive ? 'text-amber-500' : 'text-gray-500 dark:text-gray-400'}`}
+                    fill={isActive ? 'currentColor' : 'none'}
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                >
+                    <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                    />
+                </svg>
+            ),
+        },
+        {
+            id: ActiveTab.Search,
+            label: t('search'),
+            icon: (isActive: boolean) => (
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className={`h-6 w-6 ${isActive ? 'text-amber-500' : 'text-gray-500 dark:text-gray-400'}`}
+                    fill={isActive ? 'currentColor' : 'none'}
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                >
+                    <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
+                </svg>
+            ),
+        },
+        {
+            id: ActiveTab.Profile,
+            label: t('profile'),
+            icon: (isActive: boolean) => (
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className={`h-6 w-6 ${isActive ? 'text-amber-500' : 'text-gray-500 dark:text-gray-400'}`}
+                    fill={isActive ? 'currentColor' : 'none'}
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                >
+                    <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                    />
+                </svg>
+            ),
+        },
+    ];
+
+    return (
+        <nav className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-lg">
+            <div className="flex justify-around items-center h-16">
+                {tabs.map((tab) => {
+                    const isActive = activeTab === tab.id;
+                    return (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors duration-200 ${isActive ? 'bg-amber-50 dark:bg-gray-700' : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+                                }`}
+                            aria-label={tab.label}
+                            aria-current={isActive ? 'page' : undefined}
+                        >
+                            {tab.icon(isActive)}
+                            <span
+                                className={`text-xs mt-1 font-medium ${isActive ? 'text-amber-500' : 'text-gray-500 dark:text-gray-400'
+                                    }`}
+                            >
+                                {tab.label}
+                            </span>
+                        </button>
+                    );
+                })}
+            </div>
+        </nav>
+    );
 };
 
 export default BottomNav;

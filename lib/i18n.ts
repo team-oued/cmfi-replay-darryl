@@ -115,6 +115,8 @@ const translations = {
         mostLikedSeries: 'Most Liked Series',
         mostWatchedMovies: 'Most Watched Movies',
         mostLikedMovies: 'Most Liked Movies',
+        browseCategories: 'Browse Categories',
+        clickToExplore: 'Click to explore',
         mostWatchedPodcasts: 'Most Watched Podcasts',
         mostLikedPodcasts: 'Most Liked Podcasts',
         relatedContent: 'Related Content',
@@ -122,6 +124,9 @@ const translations = {
         topComments: 'Top',
         readMore: 'Read More',
         showLess: 'Show Less',
+        categorySeriesDescription: 'Discover our inspiring and edifying series',
+        categoryMoviesDescription: 'Films that build and inspire your faith',
+        categoryPodcastsDescription: 'Listen to our teachings wherever you are',
     },
     fr: {
         home: 'Accueil',
@@ -237,6 +242,8 @@ const translations = {
         mostLikedSeries: 'Séries les plus aimées',
         mostWatchedMovies: 'Films les plus vus',
         mostLikedMovies: 'Films les plus aimés',
+        browseCategories: 'Parcourir les catégories',
+        clickToExplore: 'Cliquez pour explorer',
         mostWatchedPodcasts: 'Podcasts les plus vus',
         mostLikedPodcasts: 'Podcasts les plus aimés',
         relatedContent: 'Contenu Similaire',
@@ -244,6 +251,9 @@ const translations = {
         topComments: 'Top',
         readMore: 'Lire la suite',
         showLess: 'Voir moins',
+        categorySeriesDescription: 'Découvrez nos séries inspirantes et édifiantes',
+        categoryMoviesDescription: 'Des films qui édifient et inspirent votre foi',
+        categoryPodcastsDescription: 'Écoutez nos enseignements où que vous soyez',
     }
 };
 

@@ -82,21 +82,21 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
 
     const loadLikesAndComments = async () => {
         if (!userProfile) return;
-        
+
         try {
             setIsLoadingLikes(true);
             setIsLoadingComments(true);
-            
+
             // Récupérer les likes
             const itemUid = movieData?.uid || item.id;
             const [count, userLiked] = await Promise.all([
                 likeService.getLikeCount(itemUid),
                 likeService.hasUserLiked(itemUid, userProfile.email || '')
             ]);
-            
+
             setLikeCount(count);
             setHasLiked(userLiked);
-            
+
             // Récupérer les commentaires
             const fetchedComments = await commentService.getComments(itemUid);
             // Map Firestore comments to the expected format if needed
@@ -126,7 +126,7 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
     };
 
     useEffect(() => {
-        if (type === MediaType.Series && item.id) {
+        if ((type === MediaType.Series || type === MediaType.Podcast) && item.id) {
             loadSeasonsAndEpisodes();
         }
     }, [item.id, type]);
@@ -135,12 +135,12 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
         setIsLoading(true);
         try {
             // Récupérer la série depuis Firestore
-            const serie = await serieService.getSerieById(item.id);
+            const serie = await serieService.getSerieByUid(item.id);
             if (serie) {
                 // Récupérer les saisons de la série
                 const seasons = await seasonSerieService.getSeasonsBySerie(serie.uid_serie);
                 setFirestoreSeasons(seasons);
-                
+
                 // Récupérer les épisodes pour chaque saison
                 const episodesData: { [key: string]: EpisodeSerie[] } = {};
                 for (const season of seasons) {
@@ -180,7 +180,7 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
             }
         }
     }
-    
+
     const [expandedSeasons, setExpandedSeasons] = useState<number[]>([]);
 
     useEffect(() => {
@@ -191,8 +191,8 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
     }, [playingEpisodeSeasonNumber, firestoreSeasons, seasons]);
 
     const toggleSeason = (seasonNumber: number) => {
-        setExpandedSeasons(current => 
-            current.includes(seasonNumber) 
+        setExpandedSeasons(current =>
+            current.includes(seasonNumber)
                 ? current.filter(s => s !== seasonNumber)
                 : [...current, seasonNumber]
         );
@@ -200,8 +200,8 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
 
     const handlePlay = () => {
         let episodeToPlay: Episode | EpisodeSerie | undefined;
-        
-        if (type === MediaType.Series) {
+
+        if (type === MediaType.Series || type === MediaType.Podcast) {
             // Prioriser les données Firestore
             if (firestoreSeasons.length > 0) {
                 const firstSeason = firestoreSeasons[0];
@@ -211,7 +211,7 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
                 episodeToPlay = seasons[0].episodes[0]; // Fallback vers les données mockées
             }
         }
-        
+
         onPlay(item, episodeToPlay);
     };
 
@@ -229,10 +229,10 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
             const itemUid = movieData?.uid || item.id;
             const itemTitle = movieData?.title || item.title;
             const isLiked = await likeService.toggleLike(itemUid, itemTitle, userProfile);
-            
+
             setHasLiked(isLiked);
             setLikeCount(prev => isLiked ? prev + 1 : Math.max(0, prev - 1));
-            
+
             const message = isLiked ? 'Contenu aimé avec succès!' : 'Like retiré';
             toast.success(message, { position: 'bottom-center', autoClose: 2000 });
         } catch (error) {
@@ -253,12 +253,12 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
                 <div className="absolute inset-0 bg-gradient-to-t from-[#FBF9F3] via-[#FBF9F3]/70 to-transparent dark:from-black dark:via-black/70" />
                 <header className="absolute top-0 left-0 right-0 z-10">
                     <div className="flex items-center justify-between h-16 px-4">
-                        <button 
-                        onClick={onBack} 
-                        className="p-2 rounded-full text-white bg-black/40 hover:bg-black/60 backdrop-blur-sm transition-colors"
-                        aria-label="Go back"
+                        <button
+                            onClick={onBack}
+                            className="p-2 rounded-full text-white bg-black/40 hover:bg-black/60 backdrop-blur-sm transition-colors"
+                            aria-label="Go back"
                         >
-                        <ArrowLeftIcon className="w-6 h-6" />
+                            <ArrowLeftIcon className="w-6 h-6" />
                         </button>
                         <div className="p-1 rounded-full bg-black/40 backdrop-blur-sm">
                             <HeaderMenu variant="light" />
@@ -269,16 +269,16 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
 
             <div className="p-4 -mt-32 relative z-10 space-y-6">
                 <h1 className="text-4xl font-extrabold text-gray-900 dark:text-white drop-shadow-lg">{title}</h1>
-                
+
                 <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
-                    
-                     {item.duration && (
+
+                    {item.duration && (
                         <>
-                         <span>{item.duration}</span>
+                            <span>{item.duration}</span>
                         </>
-                     )}
+                    )}
                 </div>
-                
+
 
                 <div className="flex items-center space-x-6 mt-4 text-sm">
                     {isLoadingLikes ? (
@@ -306,13 +306,12 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
                         <PlayIcon className="w-6 h-6 mr-2" />
                         <span>{t('play')}</span>
                     </button>
-                    <button 
+                    <button
                         onClick={() => toggleBookmark(item.id)}
-                        className={`flex items-center justify-center font-bold py-3 px-6 rounded-lg backdrop-blur-sm transition-colors duration-200 ${
-                            isBookmarked 
-                                ? 'bg-amber-500 text-gray-900' 
+                        className={`flex items-center justify-center font-bold py-3 px-6 rounded-lg backdrop-blur-sm transition-colors duration-200 ${isBookmarked
+                                ? 'bg-amber-500 text-gray-900'
                                 : 'bg-gray-200/80 dark:bg-gray-800/80 text-gray-900 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-700'
-                        }`}
+                            }`}
                     >
                         {isBookmarked ? <CheckIcon className="w-6 h-6 mr-2" /> : <PlusIcon className="w-6 h-6 mr-2" />}
                         <span>{isBookmarked ? t('addedToList') : t('myList')}</span>
@@ -325,7 +324,7 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
                         {description}
                     </p>
                     {isLongDescription && (
-                        <button 
+                        <button
                             onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
                             className="text-amber-500 font-semibold mt-1 hover:text-amber-600 dark:hover:text-amber-400"
                         >
@@ -333,8 +332,8 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
                         </button>
                     )}
                 </div>
-                
-                {type === MediaType.Series && (
+
+                {(type === MediaType.Series || type === MediaType.Podcast) && (
                     <div>
                         <h2 className="text-xl font-bold mb-3">{t('episodes')}</h2>
                         {isLoading ? (
@@ -350,7 +349,7 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
                                         const episodes = seasonEpisodes[season.uid_season] || [];
                                         return (
                                             <div key={season.uid_season} className="bg-gray-100/50 dark:bg-gray-800/40 rounded-lg overflow-hidden transition-all duration-300">
-                                                <button 
+                                                <button
                                                     onClick={() => toggleSeason(season.season_number)}
                                                     className="w-full flex items-center justify-between p-4 text-left font-semibold hover:bg-gray-200/50 dark:hover:bg-gray-700/50"
                                                 >
@@ -374,7 +373,7 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
                                         const isExpanded = expandedSeasons.includes(season.seasonNumber);
                                         return (
                                             <div key={season.seasonNumber} className="bg-gray-100/50 dark:bg-gray-800/40 rounded-lg overflow-hidden transition-all duration-300">
-                                                <button 
+                                                <button
                                                     onClick={() => toggleSeason(season.seasonNumber)}
                                                     className="w-full flex items-center justify-between p-4 text-left font-semibold hover:bg-gray-200/50 dark:hover:bg-gray-700/50"
                                                 >

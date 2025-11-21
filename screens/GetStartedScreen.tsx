@@ -15,7 +15,7 @@ const GetStartedScreen: React.FC<GetStartedScreenProps> = ({ onGetStarted }) => 
             
             {/* Background Image */}
             <img
-                src="/zacharias-tanee-fomum.jpg"
+                src="https://firebasestorage.googleapis.com/v0/b/c-m-f-i-replay-f-63xui3.appspot.com/o/zacharias-tanee-fomum.jpg?alt=media&token=f85b8398-39ea-4d72-897a-ada8fb709196"
                 alt="Community"
                 className="absolute inset-0 w-full h-full object-cover"
             />

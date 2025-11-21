@@ -3,14 +3,14 @@ import Header from '../components/Header';
 import UserAvatar from '../components/UserAvatar';
 import MediaCard from '../components/MediaCard';
 import { history } from '../data/mockData';
-import { 
-    BookmarkIcon, 
-    ChevronRightIcon, 
-    CreditCardIcon, 
+import {
+    BookmarkIcon,
+    ChevronRightIcon,
+    CreditCardIcon,
     KeyIcon,
     TicketIcon,
-    LogoutIcon, 
-    SettingsIcon, 
+    LogoutIcon,
+    SettingsIcon,
     TrashIcon
 } from '../components/icons';
 import { User, Screen, MediaContent } from '../types';
@@ -18,7 +18,7 @@ import { useAppContext } from '../context/AppContext';
 import { userService, UserProfile, generateDefaultAvatar } from '../lib/firestore';
 
 const SettingsItem: React.FC<{
-    Icon: React.FC<{className?: string}>;
+    Icon: React.FC<{ className?: string }>;
     label: string;
     isDestructive?: boolean;
     onClick?: () => void;
@@ -50,48 +50,48 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigate, onSelectMedia, 
 
     // Récupérer les utilisateurs actifs depuis Firestore
     useEffect(() => {
-      const fetchActiveUsers = async () => {
-        try {
-          const activeUserProfiles = await userService.getActiveUsers(50);
-          const formattedUsers: User[] = activeUserProfiles.map(profile => ({
-            id: profile.uid,
-            name: profile.display_name || 'Unknown User',
-            avatarUrl: profile.photo_url || generateDefaultAvatar(profile.display_name),
-            isOnline: profile.presence === 'online' || profile.presence === 'idle'
-          }));
-          setOnlineUsers(formattedUsers);
-        } catch (error) {
-          console.error('Error fetching active users:', error);
-        } finally {
-          setLoadingUsers(false);
-        }
-      };
+        const fetchActiveUsers = async () => {
+            try {
+                const activeUserProfiles = await userService.getActiveUsers(50);
+                const formattedUsers: User[] = activeUserProfiles.map(profile => ({
+                    id: profile.uid,
+                    name: profile.display_name || 'Unknown User',
+                    avatarUrl: profile.photo_url || generateDefaultAvatar(profile.display_name),
+                    isOnline: profile.presence === 'online' || profile.presence === 'idle'
+                }));
+                setOnlineUsers(formattedUsers);
+            } catch (error) {
+                console.error('Error fetching active users:', error);
+            } finally {
+                setLoadingUsers(false);
+            }
+        };
 
-      fetchActiveUsers();
+        fetchActiveUsers();
     }, []);
 
     const settingsItems = [
-      { icon: BookmarkIcon, label: t('myFavorites'), action: () => navigate('Bookmarks') },
-      { icon: SettingsIcon, label: t('preferences'), action: () => navigate('Preferences') },
-      { icon: KeyIcon, label: t('changePassword') },
-      { icon: CreditCardIcon, label: t('manageSubscription') },
-      { icon: TicketIcon, label: t('redeemVoucher') },
+        { icon: BookmarkIcon, label: t('myFavorites'), action: () => navigate('Bookmarks') },
+        { icon: SettingsIcon, label: t('preferences'), action: () => navigate('Preferences') },
+        { icon: KeyIcon, label: t('changePassword') },
+        { icon: CreditCardIcon, label: t('manageSubscription') },
+        { icon: TicketIcon, label: t('redeemVoucher') },
     ];
 
     return (
         <div>
             <Header title={t('profileScreenTitle')} />
-            
+
             <div className="flex flex-col items-center p-6 space-y-3 border-b border-gray-200 dark:border-gray-800">
-                <img 
-                    src={userProfile?.photo_url || 'https://picsum.photos/seed/defaultuser/200/200'} 
-                    alt="Your avatar" 
+                <img
+                    src={userProfile?.photo_url || 'https://picsum.photos/seed/defaultuser/200/200'}
+                    alt="Your avatar"
                     className="w-24 h-24 rounded-full border-4 border-amber-500 object-cover"
                 />
                 <h2 className="text-2xl font-bold">{userProfile?.display_name || 'User'}</h2>
-                <button 
-                  onClick={() => navigate('EditProfile')}
-                  className="bg-transparent border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 font-semibold py-2 px-6 rounded-full transition-colors duration-200"
+                <button
+                    onClick={() => navigate('EditProfile')}
+                    className="bg-transparent border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 font-semibold py-2 px-6 rounded-full transition-colors duration-200"
                 >
                     {t('editProfile')}
                 </button>
@@ -105,22 +105,22 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigate, onSelectMedia, 
                     ))}
                 </div>
             </section>
-            
+
             <section className="py-4">
                 <h3 className="text-xl font-bold px-4 mb-3">{t('history')}</h3>
                 <div className="flex space-x-4 overflow-x-auto px-4 scrollbar-hide pb-2">
                     {history.map((item: MediaContent) => (
-                        <MediaCard 
-                            key={item.id} 
-                            item={item} 
-                            variant="poster" 
+                        <MediaCard
+                            key={item.id}
+                            item={item}
+                            variant="poster"
                             onSelect={onSelectMedia}
                             onPlay={onPlay}
                         />
                     ))}
                 </div>
             </section>
-            
+
             <section className="px-4 py-4">
                 <h3 className="text-xl font-bold mb-3">{t('accountSettings')}</h3>
                 <div className="border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden divide-y divide-gray-200 dark:divide-gray-800">

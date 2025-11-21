@@ -108,26 +108,12 @@ const Hero: React.FC<HeroProps> = ({ items: propItems, onSelectMedia, onPlay }) 
               <PlayIcon className="w-5 h-5 mr-2" />
               <span>{t('play')}</span>
             </button>
-            <button 
-              onClick={(e) => {
-                  e.stopPropagation();
-                  toggleBookmark(currentItem.id);
-              }}
-              className={`flex items-center justify-center font-bold py-2.5 px-6 rounded-lg backdrop-blur-sm transition-colors duration-200 ${
-                  isBookmarked 
-                      ? 'bg-amber-500 text-gray-900' 
-                      : 'bg-white/20 text-white hover:bg-white/30'
-              }`}
-          >
-              {isBookmarked ? <CheckIcon className="w-5 h-5 mr-2" /> : <PlusIcon className="w-5 h-5 mr-2" />}
-              <span>{isBookmarked ? t('addedToList') : t('myList')}</span>
-          </button>
           </div>
         </div>
       </div>
 
       {items.length > 1 && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center space-x-3 bg-black/40 backdrop-blur-sm rounded-full px-3 py-2">
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center space-x-3 bg-black/40 backdrop-blur-sm rounded-full px-8 py-2">
             <button onClick={handlePrev} className="p-1 text-white rounded-full hover:bg-white/20" aria-label={t('previousSlide')}>
                 <ChevronLeftIcon className="w-5 h-5" />
             </button>

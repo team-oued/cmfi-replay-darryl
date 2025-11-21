@@ -43,9 +43,6 @@ const HeaderMenu: React.FC<HeaderMenuProps> = ({ variant = 'dark' }) => {
     return (
         <div className="relative" ref={menuRef}>
             <div className="flex items-center space-x-2">
-                <button className={`p-2 rounded-full transition-colors ${iconColor} ${hoverBg}`}>
-                    <BellAlertIcon className="w-6 h-6" />
-                </button>
                 <button 
                     onClick={() => setIsOpen(!isOpen)}
                     className={`p-2 rounded-full transition-colors ${iconColor} ${hoverBg}`}
@@ -54,7 +51,7 @@ const HeaderMenu: React.FC<HeaderMenuProps> = ({ variant = 'dark' }) => {
                 </button>
             </div>
             {isOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 ring-1 ring-black ring-opacity-5 z-20">
+                <div className="absolute right-0 mt-2 w-48 bg-[#FBF9F3] dark:bg-gray-800 rounded-md shadow-lg py-1 ring-1 ring-black ring-opacity-5 z-20">
                     <button onClick={toggleTheme} className="w-full text-left flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
                         {theme === 'dark' ? <SunIcon className="w-5 h-5 mr-3" /> : <MoonIcon className="w-5 h-5 mr-3" />}
                         {t('theme')}

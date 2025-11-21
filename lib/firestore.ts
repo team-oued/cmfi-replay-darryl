@@ -330,6 +330,25 @@ export const movieService = {
     }
   },
 
+  async getMovieByUid(uid: string): Promise<Movie | null> {
+    try {
+      const q = query(
+        collection(db, MOVIES_COLLECTION),
+        where('uid', '==', uid),
+        limit(1)
+      );
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        return querySnapshot.docs[0].data() as Movie;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error getting movie by UID:', error);
+      return null;
+    }
+  },
+
   async getPopularMovies(limitCount: number = 10): Promise<Movie[]> {
     try {
       const q = query(
@@ -433,6 +452,25 @@ export const serieService = {
       return null;
     } catch (error) {
       console.error('Error getting serie by ID:', error);
+      return null;
+    }
+  },
+
+  async getSerieByUid(uid_serie: string): Promise<Serie | null> {
+    try {
+      const q = query(
+        collection(db, SERIES_COLLECTION),
+        where('uid_serie', '==', uid_serie),
+        limit(1)
+      );
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        return querySnapshot.docs[0].data() as Serie;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error getting serie by UID:', error);
       return null;
     }
   },
@@ -663,6 +701,25 @@ export const episodeSerieService = {
     }
   },
 
+  async getEpisodeByUid(uid_episode: string): Promise<EpisodeSerie | null> {
+    try {
+      const q = query(
+        collection(db, EPISODES_SERIES_COLLECTION),
+        where('uid_episode', '==', uid_episode),
+        limit(1)
+      );
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        return querySnapshot.docs[0].data() as EpisodeSerie;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error getting episode by UID:', error);
+      return null;
+    }
+  },
+
   async getEpisodesBySeason(uid_season: string): Promise<EpisodeSerie[]> {
     try {
       const q = query(
@@ -806,6 +863,44 @@ export const likeService = {
     } catch (error) {
       console.error('Error checking if user liked:', error);
       return false;
+    }
+  },
+
+  async getMostLikedItems(limitCount: number = 10): Promise<Array<{ uid: string; likeCount: number; title: string }>> {
+    try {
+      const q = query(
+        collection(db, LIKES_COLLECTION),
+        where('uid', '!=', ''),
+      );
+      const querySnapshot = await getDocs(q);
+
+      // Compter les likes par uid
+      const likesMap = new Map<string, { count: number; title: string }>();
+
+      querySnapshot.docs.forEach(doc => {
+        const like = doc.data() as Like;
+        const current = likesMap.get(like.uid);
+        if (current) {
+          current.count++;
+        } else {
+          likesMap.set(like.uid, { count: 1, title: like.title });
+        }
+      });
+
+      // Convertir en tableau et trier par nombre de likes décroissant
+      const sortedItems = Array.from(likesMap.entries())
+        .map(([uid, data]) => ({
+          uid,
+          likeCount: data.count,
+          title: data.title
+        }))
+        .sort((a, b) => b.likeCount - a.likeCount)
+        .slice(0, limitCount);
+
+      return sortedItems;
+    } catch (error) {
+      console.error('Error getting most liked items:', error);
+      return [];
     }
   }
 };
