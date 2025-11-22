@@ -309,8 +309,8 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
                     <button
                         onClick={() => toggleBookmark(item.id)}
                         className={`flex items-center justify-center font-bold py-3 px-6 rounded-lg backdrop-blur-sm transition-colors duration-200 ${isBookmarked
-                                ? 'bg-amber-500 text-gray-900'
-                                : 'bg-gray-200/80 dark:bg-gray-800/80 text-gray-900 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-700'
+                            ? 'bg-amber-500 text-gray-900'
+                            : 'bg-gray-200/80 dark:bg-gray-800/80 text-gray-900 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-700'
                             }`}
                     >
                         {isBookmarked ? <CheckIcon className="w-6 h-6 mr-2" /> : <PlusIcon className="w-6 h-6 mr-2" />}

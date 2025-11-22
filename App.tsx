@@ -7,7 +7,7 @@ import GetStartedScreen from './screens/GetStartedScreen';
 import HomeScreen from './screens/HomeScreen';
 import SearchScreen from './screens/SearchScreen';
 import ProfileScreen from './screens/ProfileScreen';
-import BookmarkScreen from './screens/BookmarkScreen';
+import BookmarksScreen from './screens/BookmarksScreen';
 import PreferencesScreen from './screens/PreferencesScreen';
 import EditProfileScreen from './screens/EditProfileScreen';
 import MediaDetailScreen from './screens/MediaDetailScreen';
@@ -40,10 +40,8 @@ const AppContent: React.FC = () => {
     const handlePlay = async (media: MediaContent, episode?: EpisodeSerie) => {
         let episodeToPlay = episode;
         if ((media.type === MediaType.Series || media.type === MediaType.Podcast) && !episodeToPlay) {
-            // Try mock data first if present
             const mockFirst = media.seasons?.[0]?.episodes?.[0];
             if (mockFirst) {
-                // Fallback: we will try to resolve a matching EpisodeSerie from Firestore by serie id
                 try {
                     const serie = await serieService.getSerieByUid(media.id);
                     if (serie) {
@@ -60,10 +58,9 @@ const AppContent: React.FC = () => {
                         }
                     }
                 } catch (e) {
-                    // Silent failover to not block playback routing
+                    // Silent failover
                 }
             } else {
-                // MediaContent has no seasons; resolve directly from Firestore
                 try {
                     const serie = await serieService.getSerieByUid(media.id);
                     if (serie) {
@@ -80,7 +77,7 @@ const AppContent: React.FC = () => {
                         }
                     }
                 } catch (e) {
-                    // Ignore; no episode found
+                    // Ignore
                 }
             }
         }
@@ -91,7 +88,6 @@ const AppContent: React.FC = () => {
     const handleBackFromPlayer = () => {
         if (playingItem) {
             handleSelectMedia(playingItem.media);
-            // Do not set playingItem to null, so the detail screen can highlight the last played item.
         } else {
             handleBack();
         }
@@ -105,7 +101,6 @@ const AppContent: React.FC = () => {
         try {
             let allEpisodesFs: EpisodeSerie[] | null = null;
 
-            // Use cache if available and for the same serie
             const serie = await serieService.getSerieByUid(media.id);
             if (!serie) return;
             if (episodesCache && episodesCache.serieId === serie.uid_serie) {
@@ -174,7 +169,7 @@ const AppContent: React.FC = () => {
             case ActiveTab.Profile:
                 return <ProfileScreen navigate={navigate} onSelectMedia={handleSelectMedia} onPlay={handlePlay} />;
             case 'Bookmarks':
-                return <BookmarkScreen onBack={handleBack} onSelectMedia={handleSelectMedia} onPlay={handlePlay} />;
+                return <BookmarksScreen onSelectMedia={handleSelectMedia} onPlay={handlePlay} onBack={handleBack} />;
             case 'Preferences':
                 return <PreferencesScreen onBack={handleBack} />;
             case 'EditProfile':
@@ -202,7 +197,7 @@ const AppContent: React.FC = () => {
     const showBottomNav = !['MediaDetail', 'VideoPlayer', 'CategoryScreen'].includes(currentScreen);
 
     return (
-        <div className="min-h-screen bg-[#FBF9F3] dark:bg-gray-900 text-gray-900 dark:text-white transition-colors duration-200">
+        <div className="min-h-screen bg-[#FBF9F3] dark:bg-black text-gray-900 dark:text-white transition-colors duration-200">
             <ToastContainer
                 position="bottom-center"
                 autoClose={3000}

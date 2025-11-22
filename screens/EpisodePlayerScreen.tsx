@@ -32,7 +32,7 @@ const formatTime = (seconds: number) => {
 };
 
 // --- Video Player Component ---
-const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () => void }> = ({ src, poster, onUnavailable }) => {
+const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () => void, onEnded?: () => void }> = ({ src, poster, onUnavailable, onEnded }) => {
     const { t } = useAppContext();
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -44,8 +44,9 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
     const [volume, setVolume] = useState(1);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [playbackRate, setPlaybackRate] = useState(1);
-    const [isSeeking, setIsSeeking] = useState(false);
-    const [buffered, setBuffered] = useState(0); // percentage
+    const [buffered, setBuffered] = useState(0);
+    const [isScrubbing, setIsScrubbing] = useState(false);
+    const wasPlayingRef = useRef(false);
     const [unavailable, setUnavailable] = useState(false);
 
     const togglePlay = () => videoRef.current?.paused ? videoRef.current?.play() : videoRef.current?.pause();
@@ -59,7 +60,9 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
         const handleTimeUpdate = () => {
             if (video.duration) {
                 setCurrentTime(video.currentTime);
-                setProgress((video.currentTime / video.duration) * 100);
+                if (!isScrubbing) {
+                    setProgress((video.currentTime / video.duration) * 100);
+                }
             }
             try {
                 if (video.buffered && video.buffered.length > 0 && video.duration) {
@@ -73,12 +76,17 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
             setVolume(video.volume);
             setIsMuted(video.muted);
         };
+        const handleEnded = () => {
+            setIsPlaying(false);
+            if (onEnded) onEnded();
+        };
 
         video.addEventListener('play', handlePlay);
         video.addEventListener('pause', handlePause);
         video.addEventListener('timeupdate', handleTimeUpdate);
         video.addEventListener('loadedmetadata', handleLoadedMetadata);
         video.addEventListener('volumechange', handleVolumeChange);
+        video.addEventListener('ended', handleEnded);
 
         handleVolumeChange(); // Initialize state
 
@@ -88,8 +96,9 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
             video.removeEventListener('timeupdate', handleTimeUpdate);
             video.removeEventListener('loadedmetadata', handleLoadedMetadata);
             video.removeEventListener('volumechange', handleVolumeChange);
+            video.removeEventListener('ended', handleEnded);
         };
-    }, []);
+    }, [onEnded, isScrubbing]);
 
     useEffect(() => {
         if (!src || !src.trim()) {
@@ -143,15 +152,23 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
         if (!video || !video.duration) return;
         const pct = parseFloat(e.target.value);
         setProgress(pct);
-        const t = (pct / 100) * video.duration;
-        video.currentTime = t;
+        video.currentTime = (pct / 100) * video.duration;
     };
 
-    const handleSliderMouseDown = () => setIsSeeking(true);
+    const handleSliderMouseDown = () => {
+        setIsScrubbing(true);
+        if (videoRef.current && !videoRef.current.paused) {
+            wasPlayingRef.current = true;
+            videoRef.current.pause();
+        } else {
+            wasPlayingRef.current = false;
+        }
+    };
+
     const handleSliderMouseUp = () => {
-        setIsSeeking(false);
-        if (videoRef.current && videoRef.current.paused && isPlaying) {
-            videoRef.current.play().catch(() => { });
+        setIsScrubbing(false);
+        if (wasPlayingRef.current && videoRef.current) {
+            videoRef.current.play();
         }
     };
 
@@ -259,9 +276,17 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
 
                 <div className="p-2 sm:p-4">
                     <div className="space-y-2">
-                        <div className="relative w-full h-3 bg-white/20 rounded-full cursor-pointer accent-amber-500" onClick={handleSeek}>
-                            <div className="absolute inset-y-0 left-0 bg-white/30 rounded-full accent-amber-500" style={{ width: `${buffered}%` }} />
-                            <div className="absolute inset-y-0 left-0 bg-amber-500 rounded-full accent-amber-500" style={{ width: `${progress}%` }} />
+                        <div className="relative w-full h-1.5 hover:h-2.5 transition-all duration-200 bg-white/20 rounded-full cursor-pointer group" onClick={handleSeek}>
+                            {/* Buffered Bar */}
+                            <div className="absolute inset-y-0 left-0 bg-white/30 rounded-full transition-all duration-200" style={{ width: `${buffered}%` }} />
+
+                            {/* Progress Bar with Gradient and Glow */}
+                            <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-amber-500 to-orange-600 rounded-full shadow-[0_0_12px_rgba(245,158,11,0.6)] transition-all duration-100" style={{ width: `${progress}%` }}>
+                                {/* Thumb / Handle */}
+                                <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3.5 h-3.5 bg-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 scale-0 group-hover:scale-100 ring-2 ring-amber-500/50" />
+                            </div>
+
+                            {/* Invisible Input for Interaction */}
                             <input
                                 type="range"
                                 min={0}
@@ -271,7 +296,9 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
                                 onChange={handleSliderChange}
                                 onMouseDown={handleSliderMouseDown}
                                 onMouseUp={handleSliderMouseUp}
-                                className="absolute -top-1 w-full h-5 appearance-none bg-transparent cursor-pointer"
+                                onTouchStart={handleSliderMouseDown}
+                                onTouchEnd={handleSliderMouseUp}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                                 aria-label="Seek"
                             />
                         </div>
@@ -324,7 +351,7 @@ const CommentSection: React.FC<{ itemUid: string }> = ({ itemUid }) => {
         const fetchComments = async () => {
             if (!itemUid) return;
             const fetchedComments = await commentService.getComments(itemUid);
-            setComments(fetchedComments.reverse()); 
+            setComments(fetchedComments.reverse());
         };
         fetchComments();
     }, [itemUid]);
@@ -332,7 +359,7 @@ const CommentSection: React.FC<{ itemUid: string }> = ({ itemUid }) => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newComment.trim() || newComment.length > MAX_COMMENT_LENGTH) return;
-        
+
         if (!userProfile) {
             toast.error('Vous devez être connecté pour commenter', {
                 position: 'bottom-center',
@@ -425,7 +452,7 @@ interface EpisodePlayerScreenProps {
 }
 
 const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode, onBack, onNavigateEpisode, onReturnHome }) => {
-    const { t, bookmarkedIds, toggleBookmark, userProfile } = useAppContext();
+    const { t, bookmarkedIds, toggleSeriesBookmark, userProfile, autoplay } = useAppContext();
     const [episodesInSerie, setEpisodesInSerie] = useState<EpisodeSerie[]>([]);
     const [likeCount, setLikeCount] = useState(0);
     const [hasLiked, setHasLiked] = useState(false);
@@ -546,8 +573,14 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
     const hasPrevEpisode = currentIndex > 0;
     const hasNextEpisode = currentIndex !== -1 && currentIndex < episodesInSerie.length - 1;
 
-    const ActionButton: React.FC<{ Icon: React.FC<any>, label: string, value?: string | number, onClick?: () => void }> = ({ Icon, label, value, onClick }) => (
-        <button onClick={onClick} className="flex flex-col items-center space-y-1 text-gray-600 dark:text-gray-400 hover:text-amber-500 dark:hover:text-amber-400">
+    const handleVideoEnded = () => {
+        if (autoplay && hasNextEpisode) {
+            onNavigateEpisode('next');
+        }
+    };
+
+    const ActionButton: React.FC<{ Icon: React.FC<any>, label: string, value?: string | number, onClick?: () => void, isActive?: boolean }> = ({ Icon, label, value, onClick, isActive }) => (
+        <button onClick={onClick} className={`flex flex-col items-center space-y-1 hover:text-amber-500 dark:hover:text-amber-400 ${isActive ? 'text-amber-500 dark:text-amber-400' : 'text-gray-600 dark:text-gray-400'}`}>
             <Icon className="w-7 h-7" />
             <span className="text-xs font-semibold">{value ? formatNumber(Number(value)) : label}</span>
         </button>
@@ -565,7 +598,13 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
                         <ArrowLeftIcon className="w-6 h-6" />
                     </button>
                 </header>
-                <VideoPlayer key={episode.uid_episode || episode.title} src={episode.video_path_hd?.trim() ? episode.video_path_hd : episode.video_path_sd} poster={episode.picture_path || item.imageUrl} onUnavailable={onReturnHome} />
+                <VideoPlayer
+                    key={episode.uid_episode || episode.title}
+                    src={episode.video_path_hd?.trim() ? episode.video_path_hd : episode.video_path_sd}
+                    poster={episode.picture_path || item.imageUrl}
+                    onUnavailable={onReturnHome}
+                    onEnded={handleVideoEnded}
+                />
             </div>
 
             <div className="p-4 space-y-6">
@@ -581,11 +620,20 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
                         label={hasLiked ? t('liked') : t('like')}
                         value={likeCount}
                         onClick={handleLike}
+                        isActive={hasLiked}
                     />
                     <ActionButton
                         Icon={isBookmarked ? CheckIcon : PlusIcon}
                         label={isBookmarked ? t('addedToList') : t('myList')}
-                        onClick={() => toggleBookmark(item.id)}
+                        onClick={() => toggleSeriesBookmark(
+                            item.id,
+                            episode.title,
+                            episode.overview || episode.overviewFr || '',
+                            episode.backdrop_path || episode.picture_path || '',
+                            episode.video_path_hd || episode.video_path_sd || '',
+                            episode.runtime_h_m || ''
+                        )}
+                        isActive={isBookmarked}
                     />
                     <ActionButton
                         Icon={ShareIcon}

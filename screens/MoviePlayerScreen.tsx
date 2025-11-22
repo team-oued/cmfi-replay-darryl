@@ -45,6 +45,8 @@ const VideoPlayer: React.FC<{ src: string, poster: string }> = ({ src, poster })
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [playbackRate, setPlaybackRate] = useState(1);
     const [buffered, setBuffered] = useState(0);
+    const [isScrubbing, setIsScrubbing] = useState(false);
+    const wasPlayingRef = useRef(false);
 
     const togglePlay = () => videoRef.current?.paused ? videoRef.current?.play() : videoRef.current?.pause();
 
@@ -57,7 +59,9 @@ const VideoPlayer: React.FC<{ src: string, poster: string }> = ({ src, poster })
         const handleTimeUpdate = () => {
             if (video.duration) {
                 setCurrentTime(video.currentTime);
-                setProgress((video.currentTime / video.duration) * 100);
+                if (!isScrubbing) {
+                    setProgress((video.currentTime / video.duration) * 100);
+                }
             }
             try {
                 if (video.buffered && video.buffered.length > 0 && video.duration) {
@@ -87,7 +91,7 @@ const VideoPlayer: React.FC<{ src: string, poster: string }> = ({ src, poster })
             video.removeEventListener('loadedmetadata', handleLoadedMetadata);
             video.removeEventListener('volumechange', handleVolumeChange);
         };
-    }, []);
+    }, [isScrubbing]);
 
     const handleRewind = () => {
         if (videoRef.current) videoRef.current.currentTime -= 10;
@@ -117,6 +121,23 @@ const VideoPlayer: React.FC<{ src: string, poster: string }> = ({ src, poster })
         const pct = parseFloat(e.target.value);
         setProgress(pct);
         video.currentTime = (pct / 100) * video.duration;
+    };
+
+    const handleSliderMouseDown = () => {
+        setIsScrubbing(true);
+        if (videoRef.current && !videoRef.current.paused) {
+            wasPlayingRef.current = true;
+            videoRef.current.pause();
+        } else {
+            wasPlayingRef.current = false;
+        }
+    };
+
+    const handleSliderMouseUp = () => {
+        setIsScrubbing(false);
+        if (wasPlayingRef.current && videoRef.current) {
+            videoRef.current.play();
+        }
     };
 
     // Keyboard shortcuts
@@ -205,9 +226,17 @@ const VideoPlayer: React.FC<{ src: string, poster: string }> = ({ src, poster })
 
                 <div className="p-2 sm:p-4">
                     <div className="space-y-2">
-                        <div className="relative w-full h-3 bg-white/20 rounded-full cursor-pointer accent-amber-500" onClick={handleSeek}>
-                            <div className="absolute inset-y-0 left-0 bg-white/30 rounded-full" style={{ width: `${buffered}%` }} />
-                            <div className="absolute inset-y-0 left-0 bg-amber-500 rounded-full" style={{ width: `${progress}%` }} />
+                        <div className="relative w-full h-1.5 hover:h-2.5 transition-all duration-200 bg-white/20 rounded-full cursor-pointer group" onClick={handleSeek}>
+                            {/* Buffered Bar */}
+                            <div className="absolute inset-y-0 left-0 bg-white/30 rounded-full transition-all duration-200" style={{ width: `${buffered}%` }} />
+
+                            {/* Progress Bar with Gradient and Glow */}
+                            <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-amber-500 to-orange-600 rounded-full shadow-[0_0_12px_rgba(245,158,11,0.6)] transition-all duration-100" style={{ width: `${progress}%` }}>
+                                {/* Thumb / Handle */}
+                                <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3.5 h-3.5 bg-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 scale-0 group-hover:scale-100 ring-2 ring-amber-500/50" />
+                            </div>
+
+                            {/* Invisible Input for Interaction */}
                             <input
                                 type="range"
                                 min={0}
@@ -215,7 +244,11 @@ const VideoPlayer: React.FC<{ src: string, poster: string }> = ({ src, poster })
                                 step={0.1}
                                 value={progress}
                                 onChange={handleSliderChange}
-                                className="absolute -top-1 w-full h-5 appearance-none bg-transparent cursor-pointer"
+                                onMouseDown={handleSliderMouseDown}
+                                onMouseUp={handleSliderMouseUp}
+                                onTouchStart={handleSliderMouseDown}
+                                onTouchEnd={handleSliderMouseUp}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                                 aria-label="Seek"
                             />
                         </div>
@@ -540,8 +573,8 @@ const MoviePlayerScreen: React.FC<MoviePlayerScreenProps> = ({ item, onBack }) =
 
     const isBookmarked = bookmarkedIds.includes(movieData ? movieData.uid : item.id);
 
-    const ActionButton: React.FC<{ Icon: React.FC<any>, label: string, value?: string | number, onClick?: () => void }> = ({ Icon, label, value, onClick }) => (
-        <button onClick={onClick} className="flex flex-col items-center space-y-1 text-gray-600 dark:text-gray-400 hover:text-amber-500 dark:hover:text-amber-400">
+    const ActionButton: React.FC<{ Icon: React.FC<any>, label: string, value?: string | number, onClick?: () => void, isActive?: boolean }> = ({ Icon, label, value, onClick, isActive }) => (
+        <button onClick={onClick} className={`flex flex-col items-center space-y-1 hover:text-amber-500 dark:hover:text-amber-400 ${isActive ? 'text-amber-500 dark:text-amber-400' : 'text-gray-600 dark:text-gray-400'}`}>
             <Icon className="w-7 h-7" />
             <span className="text-xs font-semibold">{value ? formatNumber(Number(value)) : label}</span>
         </button>
@@ -575,11 +608,19 @@ const MoviePlayerScreen: React.FC<MoviePlayerScreenProps> = ({ item, onBack }) =
                         label={hasLiked ? t('liked') : t('like')}
                         value={likeCount}
                         onClick={handleLike}
+                        isActive={hasLiked}
                     />
                     <ActionButton
                         Icon={isBookmarked ? CheckIcon : PlusIcon}
                         label={isBookmarked ? t('addedToList') : t('myList')}
-                        onClick={() => toggleBookmark(movieData ? movieData.uid : item.id)}
+                        onClick={() => toggleBookmark(
+                            movieData ? movieData.uid : item.id,
+                            movieData?.title || item.title,
+                            movieData?.overview || '',
+                            movieData?.backdrop_path || item.imageUrl || '',
+                            false
+                        )}
+                        isActive={isBookmarked}
                     />
                     <ActionButton
                         Icon={ShareIcon}

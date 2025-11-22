@@ -74,7 +74,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab }) => {
     ];
 
     return (
-        <nav className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-lg">
+        <nav className="bg-[#FBF9F3] dark:bg-black border-t border-gray-200 dark:border-gray-800 shadow-lg">
             <div className="flex justify-around items-center h-16">
                 {tabs.map((tab) => {
                     const isActive = activeTab === tab.id;
@@ -82,7 +82,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab }) => {
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
-                            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors duration-200 ${isActive ? 'bg-amber-50 dark:bg-gray-700' : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+                            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors duration-200 ${isActive ? 'bg-amber-50 dark:bg-gray-900' : 'hover:bg-gray-50 dark:hover:bg-gray-900'
                                 }`}
                             aria-label={tab.label}
                             aria-current={isActive ? 'page' : undefined}
