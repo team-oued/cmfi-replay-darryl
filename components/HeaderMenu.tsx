@@ -57,7 +57,7 @@ const HeaderMenu: React.FC<HeaderMenuProps> = ({ variant = 'dark' }) => {
                 </button>
             </div>
             {isOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-[#FBF9F3] dark:bg-gray-800 rounded-md shadow-lg py-1 ring-1 ring-black ring-opacity-5 z-20">
+                <div className="absolute right-0 mt-2 w-48 bg-[#FBF9F3] dark:bg-black rounded-md shadow-lg py-1 ring-1 ring-black ring-opacity-5 z-20">
                     <div className="flex items-center px-4 pt-2 pb-1 text-sm text-gray-700 dark:text-gray-200">
                         <GlobeIcon className="w-5 h-5 mr-3 text-gray-400" />
                         <span>{t('language')}</span>
