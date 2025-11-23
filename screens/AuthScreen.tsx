@@ -1,12 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { auth } from '../lib/firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { authService } from '../lib/authService';
+import { userService } from '../lib/firestore';
 import AuthHeader from '../components/AuthHeader';
 import InputField from '../components/InputField';
 import AuthButton from '../components/AuthButton';
 import { GoogleIcon } from '../components/icons';
+
+// Fonction utilitaire pour formater la date au format demandé
+const formatCreatedTime = (date: Date): string => {
+    const months = [
+        'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+        'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'
+    ];
+
+    const day = date.getDate();
+    const month = months[date.getMonth()];
+    const year = date.getFullYear();
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+
+    // Obtenir le décalage UTC
+    const offset = -date.getTimezoneOffset();
+    const offsetHours = Math.floor(Math.abs(offset) / 60);
+    const offsetSign = offset >= 0 ? '+' : '-';
+
+    return `${day} ${month} ${year} à ${hours}:${minutes}:${seconds} UTC${offsetSign}${offsetHours}`;
+};
 
 const SocialLoginButton: React.FC<{ onClick: () => void; disabled?: boolean }> = ({ onClick, disabled }) => {
     const { t } = useAppContext();
@@ -39,7 +62,7 @@ const OrSeparator: React.FC = () => {
 };
 
 const AuthScreen: React.FC = () => {
-    const { t, setIsAuthenticated, loading } = useAppContext();
+    const { t, setIsAuthenticated, loading, language } = useAppContext();
     const [authMode, setAuthMode] = useState<'login' | 'signup' | 'forgotPassword'>('login');
     const [resetRequested, setResetRequested] = useState(false);
     const [error, setError] = useState('');
@@ -48,6 +71,7 @@ const AuthScreen: React.FC = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [fullName, setFullName] = useState('');
+    const [resetEmail, setResetEmail] = useState('');
 
     // Vérifier le résultat de la redirection Google au chargement
     useEffect(() => {
@@ -102,6 +126,44 @@ const AuthScreen: React.FC = () => {
         }
     };
 
+    const handleForgotPassword = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (!resetEmail) {
+            setError(t('fillAllFields') || 'Veuillez entrer votre adresse email');
+            return;
+        }
+
+        setAuthLoading(true);
+        setError('');
+
+        try {
+            await sendPasswordResetEmail(auth, resetEmail);
+            setResetRequested(true);
+        } catch (error: any) {
+            console.error('Erreur lors de l\'envoi de l\'email de réinitialisation:', error);
+
+            // Messages d'erreur personnalisés
+            let errorMessage = 'Une erreur est survenue lors de l\'envoi de l\'email';
+
+            if (error.code === 'auth/user-not-found') {
+                // Pour des raisons de sécurité, on affiche le même message que si l'email existait
+                setResetRequested(true);
+                return;
+            } else if (error.code === 'auth/invalid-email') {
+                errorMessage = 'Adresse email invalide';
+            } else if (error.code === 'auth/too-many-requests') {
+                errorMessage = 'Trop de tentatives. Veuillez réessayer plus tard.';
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
+
+            setError(errorMessage);
+        } finally {
+            setAuthLoading(false);
+        }
+    };
+
     const handleAuth = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!email || !password || (authMode === 'signup' && !fullName)) {
@@ -114,7 +176,30 @@ const AuthScreen: React.FC = () => {
 
         try {
             if (authMode === 'signup') {
-                await createUserWithEmailAndPassword(auth, email, password);
+                // Créer l'utilisateur dans Firebase Auth
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+
+                // Créer immédiatement le profil utilisateur dans Firestore avec le format demandé
+                const createdTime = formatCreatedTime(new Date());
+
+                await userService.createUserProfile({
+                    uid: user.uid,
+                    email: user.email || email,
+                    display_name: fullName,
+                    presence: 'offline',
+                    hasAcceptedPrivacyPolicy: false,
+                    created_time: createdTime,
+                    theme: 'dark',
+                    language: language,
+                    bookmarkedIds: []
+                });
+
+                console.log('Profil utilisateur créé:', {
+                    uid: user.uid,
+                    email: user.email,
+                    created_time: createdTime
+                });
             } else {
                 await signInWithEmailAndPassword(auth, email, password);
             }
@@ -166,16 +251,26 @@ const AuthScreen: React.FC = () => {
             resetRequested ? t('resetLinkSentInstruction') : t('forgotPasswordInstruction'),
             resetRequested ? (
                 <div className="space-y-6">
-                    <AuthButton onClick={() => { setAuthMode('login'); setResetRequested(false); }}>
+                    <AuthButton onClick={() => { setAuthMode('login'); setResetRequested(false); setResetEmail(''); }}>
                         {t('backToLogin')}
                     </AuthButton>
                 </div>
             ) : (
                 <>
-                    <form className="space-y-8" onSubmit={(e) => { e.preventDefault(); setResetRequested(true); }}>
-                        <InputField label={t('email')} id="email" name="email" type="email" autoComplete="email" required placeholder="e.g. howard.thurman@gmail.com" />
-                        <AuthButton type="submit">
-                            {t('sendResetLink')}
+                    <form className="space-y-8" onSubmit={handleForgotPassword}>
+                        <InputField
+                            label={t('email')}
+                            id="email-reset"
+                            name="email"
+                            type="email"
+                            value={resetEmail}
+                            onChange={(e) => setResetEmail(e.target.value)}
+                            autoComplete="email"
+                            required
+                            placeholder="e.g. howard.thurman@gmail.com"
+                        />
+                        <AuthButton type="submit" disabled={authLoading}>
+                            {authLoading ? t('loading') || 'Envoi...' : t('sendResetLink')}
                         </AuthButton>
                     </form>
                     <div className="mt-6 text-center text-sm">
