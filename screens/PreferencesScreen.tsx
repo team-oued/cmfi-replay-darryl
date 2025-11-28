@@ -11,9 +11,9 @@ const ToggleSwitch: React.FC<{ enabled: boolean; onChange: (enabled: boolean) =>
     return (
         <button
             onClick={() => onChange(!enabled)}
-            className={`relative inline-flex items-center h-7 rounded-full w-12 transition-all duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-transparent shadow-inner ${enabled
+            className={`relative inline-flex items-center h-7 rounded-full w-12 transition-all duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-black shadow-inner ${enabled
                 ? 'bg-gradient-to-r from-amber-500 to-amber-600 shadow-amber-500/30'
-                : 'bg-gray-300 dark:bg-gray-700/50 hover:bg-gray-400 dark:hover:bg-gray-700/70'
+                : 'bg-gray-300 dark:bg-black/60 hover:bg-gray-400 dark:hover:bg-black/70 border border-gray-400 dark:border-gray-600'
                 }`}
         >
             <span
@@ -30,7 +30,7 @@ const SegmentedControl: React.FC<{
     onChange: (value: any) => void;
 }> = ({ options, value, onChange }) => {
     return (
-        <div className="flex bg-gray-200 dark:bg-gray-800/40 backdrop-blur-sm p-1 rounded-xl border border-gray-300 dark:border-gray-700/50 shadow-inner">
+        <div className="flex bg-gray-200 dark:bg-black/60 backdrop-blur-sm p-1 rounded-xl border border-gray-300 dark:border-gray-700/50 shadow-inner">
             {options.map((option) => (
                 <button
                     key={option.value}

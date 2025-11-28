@@ -71,7 +71,24 @@ const MediaDetailWrapper: React.FC<MediaDetailWrapperProps> = ({ onPlay, playing
     }, [uid, navigate]);
 
     const handleBack = () => {
-        navigate(-1);
+        // Rediriger vers la liste appropriée en fonction du type de contenu
+        if (media) {
+            switch (media.type) {
+                case MediaType.Series:
+                    navigate('/series');
+                    break;
+                case MediaType.Movie:
+                    navigate('/movies');
+                    break;
+                case MediaType.Podcast:
+                    navigate('/podcasts');
+                    break;
+                default:
+                    navigate(-1); // Fallback à la navigation arrière par défaut
+            }
+        } else {
+            navigate(-1); // Fallback si le média n'est pas chargé
+        }
     };
 
     const handleSelectMedia = (media: MediaContent) => {

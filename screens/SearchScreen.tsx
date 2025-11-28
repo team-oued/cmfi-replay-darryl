@@ -46,7 +46,7 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ onSelectMedia, onPlay }) =>
             placeholder={t('searchPlaceholder')}
             value={searchTerm}
             onChange={(e) => handleSearch(e.target.value)}
-            className="w-full bg-gray-200 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-full py-3 pl-12 pr-4 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
+            className="w-full bg-gray-200 dark:bg-black/80 border border-gray-300 dark:border-gray-700 rounded-full py-3 pl-12 pr-4 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
           />
           <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
             <SearchIcon className="w-5 h-5 text-gray-500" />
@@ -61,7 +61,7 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ onSelectMedia, onPlay }) =>
             <button
               key={theme}
               onClick={() => handleThemeClick(theme)}
-              className="bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-sm font-medium py-1.5 px-3 rounded-full transition-colors duration-200"
+              className="bg-gray-200 dark:bg-black/80 hover:bg-gray-300 dark:hover:bg-black/60 text-gray-700 dark:text-gray-200 text-sm font-medium py-1.5 px-3 rounded-full transition-colors duration-200 border border-gray-300 dark:border-gray-700"
             >
               {theme}
             </button>

@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import Header from '../components/Header';
 import Hero from '../components/Hero';
 import MediaCard from '../components/MediaCard';
 import RankedMediaCard from '../components/RankedMediaCard';
@@ -328,9 +327,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
     };
 
     return (
-        <div>
-            <Header title="CMFI Replay" />
-
+        <div className="min-h-screen bg-[#FBF9F3] dark:bg-black">
             {/* Hero Section avec Skeleton */}
             {loadingHero ? (
                 <HeroSkeleton />

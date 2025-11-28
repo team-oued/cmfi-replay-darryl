@@ -11,8 +11,10 @@
     ],
     "skipLibCheck": true,
     "types": [
-      "node"
+      "node",
+      "react"
     ],
+    "jsxImportSource": "react",
     "moduleResolution": "bundler",
     "isolatedModules": true,
     "moduleDetection": "force",

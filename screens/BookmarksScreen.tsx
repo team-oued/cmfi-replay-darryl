@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import Header from '../components/Header';
 import MediaCard from '../components/MediaCard';
@@ -141,17 +141,6 @@ const BookmarksScreen: React.FC<BookmarksScreenProps> = ({ onSelectMedia, onPlay
         fetchBookmarks();
     }, [user]);
 
-    const getFilteredContent = () => {
-        switch (activeTab) {
-            case 'movies':
-                return bookmarkedMovies;
-            case 'series':
-                return bookmarkedEpisodes;
-            default:
-                return [...bookmarkedMovies, ...bookmarkedEpisodes];
-        }
-    };
-
     const handleRemoveBookmark = async (e: React.MouseEvent, item: MediaContent) => {
         e.stopPropagation();
         if (!user || !user.email) return;
@@ -183,15 +172,41 @@ const BookmarksScreen: React.FC<BookmarksScreenProps> = ({ onSelectMedia, onPlay
         }
     };
 
-    const filteredContent = getFilteredContent();
+    // Éviter les doublons dans les favoris
+    const uniqueEpisodes = useMemo(() => 
+        bookmarkedEpisodes.reduce((acc: MediaContent[], current) => {
+            const x = acc.find(item => item.id === current.id);
+            return x ? acc : [...acc, current];
+        }, []),
+        [bookmarkedEpisodes]
+    );
+
+    const getFilteredContent = useCallback(() => {
+        switch (activeTab) {
+            case 'movies':
+                return bookmarkedMovies;
+            case 'series':
+                return uniqueEpisodes;
+            default:
+                return [...bookmarkedMovies, ...uniqueEpisodes];
+        }
+    }, [activeTab, bookmarkedMovies, uniqueEpisodes]);
+
+    const filteredContent = useMemo(() => getFilteredContent(), [getFilteredContent]);
 
     return (
         <div className="min-h-screen bg-[#FBF9F3] dark:bg-black">
-            <Header title={t('myFavorites')} onBack={onBack} />
-
             <div className="p-4 md:p-6 lg:p-8 space-y-6">
+                {/* En-tête avec titre */}
+                <div className="pt-2">
+                    <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-2">
+                        {t('myFavorites')}
+                    </h1>
+                    <div className="h-1 w-16 bg-amber-500 rounded-full"></div>
+                </div>
+
                 {/* Tabs avec design amélioré */}
-                <div className="flex items-center justify-center md:justify-start">
+                <div className="flex items-center justify-center md:justify-start pt-4">
                     <div className="inline-flex items-center space-x-2 bg-white dark:bg-gray-800 p-1.5 rounded-full shadow-lg">
                         <button
                             onClick={() => setActiveTab('all')}
@@ -200,7 +215,7 @@ const BookmarksScreen: React.FC<BookmarksScreenProps> = ({ onSelectMedia, onPlay
                                 : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                                 }`}
                         >
-                            {t('categorySeries') || 'Tous'} ({bookmarkedMovies.length + bookmarkedEpisodes.length})
+                            {t('all') || 'Tous'} ({bookmarkedMovies.length + uniqueEpisodes.length})
                         </button>
                         <button
                             onClick={() => setActiveTab('movies')}
@@ -282,26 +297,22 @@ const BookmarksScreen: React.FC<BookmarksScreenProps> = ({ onSelectMedia, onPlay
                 {/* Content Grid amélioré */}
                 {!loading && filteredContent.length > 0 && (
                     <div className="space-y-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
-                                    {activeTab === 'all' && (t('myFavorites'))}
-                                    {activeTab === 'movies' && (t('categoryMovies'))}
-                                    {activeTab === 'series' && (t('categorySeries'))}
-                                </h2>
-                                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                    {filteredContent.length} {filteredContent.length === 1 ? t('episode') : t('episodes')}
-                                </p>
-                            </div>
+                        <div className="mb-6 pt-2">
+                            <p className="text-gray-600 dark:text-gray-400">
+                                {filteredContent.length} {filteredContent.length === 1 ? t('episode') : t('episodes')}
+                                {activeTab !== 'all' && (
+                                    <span className="ml-2 px-3 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 text-sm rounded-full">
+                                        {activeTab === 'movies' ? t('categoryMovies') : t('categorySeries')}
+                                    </span>
+                                )}
+                            </p>
                         </div>
 
                         {/* Liste de cartes horizontales */}
                         <div className="space-y-4">
                             {filteredContent.map((item) => (
                                 <div key={item.id} className="relative group">
-                                    <div
-                                        className="transform transition-all duration-300 hover:scale-[1.02] hover:shadow-xl pr-12"
-                                    >
+                                    <div className="transform transition-all duration-300 hover:scale-[1.02] hover:shadow-xl">
                                         <MediaCard
                                             item={item}
                                             variant="list"
@@ -309,13 +320,6 @@ const BookmarksScreen: React.FC<BookmarksScreenProps> = ({ onSelectMedia, onPlay
                                             onPlay={onPlay}
                                         />
                                     </div>
-                                    <button
-                                        onClick={(e) => handleRemoveBookmark(e, item)}
-                                        className="absolute top-1/2 -translate-y-1/2 right-4 p-2 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-red-200 dark:hover:bg-red-900/50 z-20"
-                                        title="Remove from list"
-                                    >
-                                        <TrashIcon className="w-5 h-5" />
-                                    </button>
                                 </div>
                             ))}
                         </div>

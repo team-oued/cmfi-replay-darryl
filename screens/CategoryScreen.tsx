@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import Header from '../components/Header';
 import MediaCard from '../components/MediaCard';
 import { continueWatching, allContent, mostWatched, mostLiked } from '../data/mockData';
 import { MediaContent, MediaType } from '../types';
@@ -136,9 +135,23 @@ const CategoryScreen: React.FC<CategoryScreenProps> = ({ mediaType, onBack, onSe
     const mostLikedForCategory = mostLiked.filter(item => item.type === mediaType);
 
     return (
-        <div className="animate-fadeIn">
-            <Header title={screenTitleMap[mediaType]} onBack={onBack} />
-            <div className="p-4 space-y-3">
+        <div className="animate-fadeIn pt-4">
+            <div className="px-6 mb-6 flex items-center justify-between">
+                <button
+                    onClick={onBack}
+                    className="p-2 rounded-full text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                    aria-label="Retour à l'accueil"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                </button>
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {screenTitleMap[mediaType]}
+                </h1>
+                <div className="w-10"></div> {/* Pour équilibrer la mise en page */}
+            </div>
+            <div className="px-4 space-y-3">
                 {loading && (mediaType === MediaType.Series || mediaType === MediaType.Movie || mediaType === MediaType.Podcast) ? (
                     <div className="text-center py-8">
                         <div className="text-gray-500 dark:text-gray-400">{t('loading') || 'Chargement...'}</div>

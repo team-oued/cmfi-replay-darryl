@@ -129,7 +129,8 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigate, onSelectMedia, 
                     languages: [],
                     video_path_hd: episode.video_path_hd
                 };
-                onPlay(mediaContent, episode);
+                // On passe uniquement le mediaContent, pas l'épisode
+                onPlay(mediaContent);
             }
         }
     };
@@ -147,9 +148,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigate, onSelectMedia, 
     ];
 
     return (
-        <div>
-            <Header title={t('profileScreenTitle')} />
-
+        <div className="pt-4">
             <div className="flex flex-col items-center p-6 space-y-3 border-b border-gray-200 dark:border-gray-800">
                 <img
                     src={userProfile?.photo_url || 'https://picsum.photos/seed/defaultuser/200/200'}
@@ -179,7 +178,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigate, onSelectMedia, 
                     <h3 className="text-xl font-bold px-4 mb-3">{t('history')}</h3>
                     <div className="flex space-x-4 overflow-x-auto px-4 scrollbar-hide pb-2">
                         {[...Array(5)].map((_, i) => (
-                            <div key={i} className="flex-none w-48 bg-gray-200 dark:bg-gray-800 rounded-lg aspect-video animate-pulse" />
+                            <div key={i} className="flex-none w-48 bg-gray-200 dark:bg-black/80 rounded-lg aspect-video animate-pulse" />
                         ))}
                     </div>
                 </section>

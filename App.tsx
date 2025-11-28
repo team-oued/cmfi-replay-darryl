@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AppProvider, useAppContext } from './context/AppContext';
+import { ThemeProvider } from './components/ThemeProvider';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './transitions.css';
@@ -32,7 +33,8 @@ import WatchScreen from './screens/WatchScreen';
 
 // Components
 import BottomNav from './components/BottomNav';
-import Breadcrumbs from './components/Breadcrumbs';
+import Sidebar from './components/Sidebar';
+import HamburgerMenu from './components/HamburgerMenu';
 import { ActiveTab, MediaContent, MediaType } from './types';
 import { serieService, seasonSerieService, episodeSerieService, EpisodeSerie } from './lib/firestore';
 
@@ -48,6 +50,7 @@ const AppContent: React.FC = () => {
     });
 
     const [activeTab, setActiveTab] = useState<ActiveTab>(ActiveTab.Home);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [playingItem, setPlayingItem] = useState<{ media: MediaContent; episode?: EpisodeSerie } | null>(null);
     const [episodesCache, setEpisodesCache] = useState<{ serieId: string; episodes: EpisodeSerie[] } | null>(null);
 
@@ -131,7 +134,12 @@ const AppContent: React.FC = () => {
     };
 
     const handleNavigateToScreen = (screen: string) => {
-        navigate(`/${screen.toLowerCase()}`);
+        // Gérer le cas spécial pour les favoris
+        if (screen.toLowerCase() === 'bookmarks') {
+            navigate('/bookmarks');
+        } else {
+            navigate(`/${screen.toLowerCase()}`);
+        }
     };
 
     const handleBack = () => {
@@ -156,9 +164,8 @@ const AppContent: React.FC = () => {
         );
     }
 
-    // Déterminer si on doit afficher les breadcrumbs et la bottom nav
-    const showBreadcrumbs = !['/home', '/search', '/profile', '/login', '/register', '/forgot-password'].includes(location.pathname) && !isWatchRoute;
-    const showBottomNav = ['/home', '/search', '/profile'].includes(location.pathname) && isAuthenticated;
+    // Déterminer si on doit afficher la bottom nav
+    const showBottomNav = isAuthenticated && !location.pathname.startsWith('/watch/') && !['/login', '/register', '/forgot-password'].includes(location.pathname);
 
     return (
         <div className="min-h-screen bg-[#FBF9F3] dark:bg-black text-gray-900 dark:text-white">
@@ -180,9 +187,24 @@ const AppContent: React.FC = () => {
                 }}
             />
 
-            {showBreadcrumbs && <Breadcrumbs />}
+            <Sidebar
+                isOpen={isSidebarOpen}
+                onClose={() => setIsSidebarOpen(false)}
+                activeTab={activeTab}
+                setActiveTab={(tab) => setActiveTab(tab as ActiveTab)}
+            />
 
-            <div className={`page-transition fadeIn ${showBottomNav ? 'pb-20' : ''}`}>
+            {!isWatchRoute && (
+                <div className="fixed top-0 left-0 right-0 z-20 bg-[#FBF9F3] dark:bg-black p-4 flex justify-between items-center border-b border-gray-200 dark:border-gray-800 md:hidden">
+                    <h1 className="text-xl font-bold">CMFI Replay</h1>
+                    <HamburgerMenu
+                        isOpen={isSidebarOpen}
+                        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                    />
+                </div>
+            )}
+
+            <div className={`page-transition fadeIn ${showBottomNav ? 'pb-20' : ''} ${!isWatchRoute ? 'pt-16' : ''} md:pt-0`}>
                 <Routes>
                     {/* Watch Route - Accessible sans authentification */}
                     <Route path="/watch/:uid" element={
@@ -211,6 +233,14 @@ const AppContent: React.FC = () => {
                             <Route path="/profile" element={
                                 <ProfileScreen
                                     navigate={handleNavigateToScreen}
+                                    onSelectMedia={handleSelectMedia}
+                                    onPlay={handlePlay}
+                                />
+                            } />
+
+                            <Route path="/bookmarks" element={
+                                <BookmarksScreen
+                                    onBack={() => navigate('/profile')}
                                     onSelectMedia={handleSelectMedia}
                                     onPlay={handlePlay}
                                 />
@@ -311,7 +341,9 @@ const App: React.FC = () => {
     return (
         <BrowserRouter>
             <AppProvider>
-                <AppContent />
+                <ThemeProvider>
+                    <AppContent />
+                </ThemeProvider>
             </AppProvider>
         </BrowserRouter>
     );
