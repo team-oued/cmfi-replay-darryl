@@ -353,7 +353,14 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
                                                     onClick={() => toggleSeason(season.season_number)}
                                                     className="w-full flex items-center justify-between p-4 text-left font-semibold hover:bg-gray-200/50 dark:hover:bg-gray-700/50"
                                                 >
-                                                    <span className="text-lg">{t('season')} {season.season_number}</span>
+                                                    <span className="text-lg">
+                                                        {t('season')} {season.season_number}
+                                                        {season.title_season && (
+                                                            <span className="ml-2 text-base font-normal text-gray-600 dark:text-gray-400">
+                                                                - {season.title_season}
+                                                            </span>
+                                                        )}
+                                                    </span>
                                                     <ChevronDownIcon className={`w-6 h-6 text-gray-500 dark:text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                                                 </button>
                                                 {isExpanded && (

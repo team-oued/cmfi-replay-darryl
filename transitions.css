@@ -1,0 +1,193 @@
+/* Page Transitions */
+.page-transition {
+    animation-duration: 300ms;
+    animation-fill-mode: both;
+}
+
+.page-transition.fadeIn {
+    animation-name: fadeIn;
+}
+
+.page-transition.fadeOut {
+    animation-name: fadeOut;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+}
+
+/* Styles personnalisés pour le défilement */
+.scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(156, 163, 175, 0.3) transparent;
+}
+
+/* Pour Webkit (Chrome, Safari, etc.) */
+.scrollbar-thin::-webkit-scrollbar {
+    height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+    margin: 0 2rem;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: rgba(156, 163, 175, 0.3);
+    border-radius: 10px;
+    transition: background-color 0.3s ease;
+}
+
+.scrollbar-thin:hover::-webkit-scrollbar-thumb {
+    background-color: rgba(156, 163, 175, 0.5);
+}
+
+/* Pour Firefox */
+.scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(156, 163, 175, 0.3) transparent;
+}
+
+.scrollbar-thin:hover {
+    scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+}
+
+/* Slide Transitions */
+.slide-enter {
+    animation: slideIn 300ms ease-out;
+}
+
+.slide-exit {
+    animation: slideOut 300ms ease-in;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes slideOut {
+    from {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+}
+
+/* Scale Transitions */
+.scale-enter {
+    animation: scaleIn 300ms ease-out;
+}
+
+@keyframes scaleIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Smooth transitions for all interactive elements */
+* {
+    transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+}
+
+/* Disable transitions for elements that shouldn't animate */
+.no-transition,
+.no-transition * {
+    transition: none !important;
+    animation: none !important;
+}
+
+/* Route change loading indicator */
+.route-loading {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #F59E0B 0%, #D97706 100%);
+    animation: routeLoading 1s ease-in-out infinite;
+    z-index: 9999;
+}
+
+@keyframes routeLoading {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+/* Like Button Animations */
+@keyframes particleFloat {
+    0% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1) rotate(0deg);
+    }
+    100% {
+        opacity: 0;
+        transform: translate(
+            calc(-50% + var(--random-x, 0) * var(--distance, 50px)),
+            calc(-50% + var(--random-y, -1) * var(--distance, 50px))
+        ) scale(0) rotate(360deg);
+    }
+}
+
+@keyframes likeBounce {
+    0%, 100% {
+        transform: scale(1);
+    }
+    25% {
+        transform: scale(1.3) rotate(-5deg);
+    }
+    50% {
+        transform: scale(1.5) rotate(5deg);
+    }
+    75% {
+        transform: scale(1.2) rotate(-3deg);
+    }
+}
+
+@keyframes heartPulse {
+    0%, 100% {
+        transform: scale(1);
+        filter: drop-shadow(0 0 0 rgba(239, 68, 68, 0));
+    }
+    50% {
+        transform: scale(1.2);
+        filter: drop-shadow(0 0 12px rgba(239, 68, 68, 0.8));
+    }
+}

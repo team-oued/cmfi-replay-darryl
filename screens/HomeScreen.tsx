@@ -5,12 +5,13 @@ import MediaCard from '../components/MediaCard';
 import RankedMediaCard from '../components/RankedMediaCard';
 import UserAvatar from '../components/UserAvatar';
 import CategoryTiles from '../components/CategoryTiles';
-import { MediaCardSkeleton, UserAvatarSkeleton } from '../components/Skeleton';
+import { MediaCardSkeleton, UserAvatarSkeleton, HeroSkeleton, ContinueWatchingSkeleton, CategoryTilesSkeleton, MostLikedSkeleton } from '../components/Skeleton';
 import { featuredContent } from '../data/mockData';
 
 import { MediaContent, User, MediaType } from '../types';
 import { useAppContext } from '../context/AppContext';
-import { userService, generateDefaultAvatar, likeService, movieService, episodeSerieService } from '../lib/firestore';
+import { userService, generateDefaultAvatar, likeService, movieService, episodeSerieService, statsVuesService, ContinueWatchingItem } from '../lib/firestore';
+import ContinueWatchingSection from '../components/ContinueWatchingSection';
 
 const MediaRow: React.FC<{ title: string; items: MediaContent[]; onSelectMedia: (item: MediaContent) => void; onPlay: (item: MediaContent) => void; variant?: 'poster' | 'thumbnail' | 'list' }> = ({ title, items, onSelectMedia, onPlay, variant }) => (
     <section className="py-4">
@@ -133,16 +134,36 @@ const UserRow: React.FC<{ title: string; users: User[] }> = ({ title, users }) =
 
 interface HomeScreenProps {
     onSelectMedia: (item: MediaContent) => void;
-    onPlay: (item: MediaContent) => void;
+    onPlay: (item: MediaContent, episode?: any) => void;
     navigateToCategory: (type: MediaType) => void;
 }
 
 const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigateToCategory }) => {
-    const { t } = useAppContext();
+    const { t, user } = useAppContext();
     const [activeUsers, setActiveUsers] = useState<User[]>([]);
     const [loadingUsers, setLoadingUsers] = useState(true);
     const [mostLikedItems, setMostLikedItems] = useState<Array<{ content: MediaContent; likeCount: number }>>([]);
     const [loadingMostLiked, setLoadingMostLiked] = useState(true);
+    const [continueWatchingItems, setContinueWatchingItems] = useState<ContinueWatchingItem[]>([]);
+    const [loadingContinueWatching, setLoadingContinueWatching] = useState(true);
+    const [loadingHero, setLoadingHero] = useState(true);
+    const [loadingCategories, setLoadingCategories] = useState(true);
+
+    // Simuler le chargement du Hero
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setLoadingHero(false);
+        }, 1500);
+        return () => clearTimeout(timer);
+    }, []);
+
+    // Simuler le chargement des catégories
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setLoadingCategories(false);
+        }, 1000);
+        return () => clearTimeout(timer);
+    }, []);
 
     useEffect(() => {
         const fetchActiveUsers = async () => {
@@ -226,23 +247,117 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
         fetchMostLikedItems();
     }, []);
 
+    // Récupérer les éléments "Continuer la lecture"
+    useEffect(() => {
+        const fetchContinueWatching = async () => {
+            if (!user) {
+                setLoadingContinueWatching(false);
+                return;
+            }
+
+            try {
+                const items = await statsVuesService.getContinueWatching(user.uid, 10);
+                setContinueWatchingItems(items);
+            } catch (error) {
+                console.error('Error fetching continue watching items:', error);
+            } finally {
+                setLoadingContinueWatching(false);
+            }
+        };
+
+        fetchContinueWatching();
+    }, [user]);
+
+    const handleContinueWatchingClick = async (item: ContinueWatchingItem) => {
+        if (item.type === 'movie') {
+            // C'est un film
+            const movie = await movieService.getMovieByUid(item.uid);
+            if (movie) {
+                const mediaContent: MediaContent = {
+                    id: movie.uid,
+                    type: MediaType.Movie,
+                    title: movie.title,
+                    author: movie.original_title,
+                    theme: '',
+                    imageUrl: movie.backdrop_path || movie.picture_path || movie.poster_path,
+                    duration: movie.runtime_h_m,
+                    description: movie.overview,
+                    languages: [movie.original_language],
+                    video_path_hd: movie.video_path_hd
+                };
+                onPlay(mediaContent);
+            }
+        } else {
+            // C'est un épisode - utiliser uid_episode en priorité, sinon uid
+            const episodeUid = item.uid_episode || item.uid;
+            let episode = null;
+
+            // Essayer de récupérer par UID
+            if (episodeUid) {
+                episode = await episodeSerieService.getEpisodeByUid(episodeUid);
+            }
+
+            // Si pas trouvé et qu'on a un ID de document (fallback legacy)
+            if (!episode && item.episodeId) {
+                episode = await episodeSerieService.getEpisodeById(item.episodeId);
+            }
+
+            if (episode) {
+                // S'assurer que l'épisode a un uid_episode pour la navigation
+                if (!episode.uid_episode && item.episodeId) {
+                    episode.uid_episode = item.episodeId;
+                }
+
+                const mediaContent: MediaContent = {
+                    id: episode.uid_episode,
+                    type: MediaType.Series,
+                    title: episode.title_serie,
+                    author: episode.title_serie,
+                    theme: '',
+                    imageUrl: episode.backdrop_path || episode.picture_path,
+                    duration: episode.runtime_h_m,
+                    description: episode.overviewFr || episode.overview,
+                    languages: [],
+                    video_path_hd: episode.video_path_hd
+                };
+
+                // Passer l'épisode directement à onPlay
+                onPlay(mediaContent, episode);
+            }
+        }
+    };
+
     return (
         <div>
             <Header title="CMFI Replay" />
-            <Hero items={featuredContent} onSelectMedia={onSelectMedia} onPlay={onPlay} />
-            <CategoryTiles navigateToCategory={navigateToCategory} />
+
+            {/* Hero Section avec Skeleton */}
+            {loadingHero ? (
+                <HeroSkeleton />
+            ) : (
+                <Hero items={featuredContent} onSelectMedia={onSelectMedia} onPlay={onPlay} />
+            )}
+
+            {/* Catégories avec Skeleton */}
+            {loadingCategories ? (
+                <CategoryTilesSkeleton />
+            ) : (
+                <CategoryTiles navigateToCategory={navigateToCategory} />
+            )}
+
+            {/* Section Continuer la lecture avec Skeleton */}
+            {loadingContinueWatching ? (
+                <ContinueWatchingSkeleton />
+            ) : continueWatchingItems.length > 0 ? (
+                <ContinueWatchingSection
+                    items={continueWatchingItems}
+                    onItemClick={handleContinueWatchingClick}
+                    title={t('continueWatching') || 'Continuer la lecture'}
+                />
+            ) : null}
 
             {loadingMostLiked ? (
-                <section className="py-4">
-                    <div className="flex items-center justify-between px-4 mb-3">
-                        <h3 className="text-xl font-bold">{t('mostLiked') || 'Most Liked'}</h3>
-                    </div>
-                    <div className="flex space-x-4 overflow-x-auto px-4 scrollbar-hide pb-2">
-                        {[...Array(5)].map((_, i) => (
-                            <MediaCardSkeleton key={i} variant="poster" />
-                        ))}
-                    </div>
-                </section>
+                <MostLikedSkeleton />
             ) : mostLikedItems.length > 0 && (
                 <RankedMediaRow
                     title={t('mostLiked') || 'Most Liked'}

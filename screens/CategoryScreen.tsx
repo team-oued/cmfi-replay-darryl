@@ -19,9 +19,9 @@ const MediaRow: React.FC<{ title: string; items: MediaContent[]; onSelectMedia: 
         <section className="py-4">
             <h3 className="text-xl font-bold px-4 mb-3">{title}</h3>
             <div className="flex space-x-4 overflow-x-auto px-4 scrollbar-hide pb-2">
-            {items.map((item) => (
-                <MediaCard key={item.id} item={item} variant={variant} onSelect={onSelectMedia} onPlay={onPlay} />
-            ))}
+                {items.map((item) => (
+                    <MediaCard key={item.id} item={item} variant={variant} onSelect={onSelectMedia} onPlay={onPlay} />
+                ))}
             </div>
         </section>
     );
@@ -34,7 +34,7 @@ const CategoryScreen: React.FC<CategoryScreenProps> = ({ mediaType, onBack, onSe
     const [movies, setMovies] = useState<MediaContent[]>([]);
     const [podcasts, setPodcasts] = useState<MediaContent[]>([]);
     const [loading, setLoading] = useState(true);
-    
+
     // Convertir une Serie en MediaContent
     const convertSerieToMediaContent = (serie: Serie): MediaContent => ({
         id: serie.uid_serie,
@@ -47,7 +47,7 @@ const CategoryScreen: React.FC<CategoryScreenProps> = ({ mediaType, onBack, onSe
         languages: serie.lang ? [serie.lang] : [],
         progress: undefined
     });
-    
+
     // Convertir un Movie en MediaContent (pour les films)
     const convertMovieToMediaContent = (movie: Movie): MediaContent => ({
         id: movie.uid,
@@ -61,7 +61,7 @@ const CategoryScreen: React.FC<CategoryScreenProps> = ({ mediaType, onBack, onSe
         progress: undefined,
         video_path_hd: movie.video_path_hd
     });
-    
+
     // Convertir un Podcast (Serie avec serie_type: 'podcast') en MediaContent
     const convertPodcastToMediaContent = (podcast: Serie): MediaContent => ({
         id: podcast.uid_serie,
@@ -74,7 +74,7 @@ const CategoryScreen: React.FC<CategoryScreenProps> = ({ mediaType, onBack, onSe
         languages: podcast.lang ? [podcast.lang] : [],
         progress: undefined
     });
-    
+
     // Charger les données depuis Firestore
     useEffect(() => {
         const loadData = async () => {
@@ -99,16 +99,16 @@ const CategoryScreen: React.FC<CategoryScreenProps> = ({ mediaType, onBack, onSe
                 setLoading(false);
             }
         };
-        
+
         loadData();
     }, [mediaType]);
-    
+
     const screenTitleMap: Record<MediaType, string> = {
         [MediaType.Series]: t('seriesScreenTitle'),
         [MediaType.Movie]: t('moviesScreenTitle'),
         [MediaType.Podcast]: t('podcastsScreenTitle'),
     };
-    
+
     const sectionTitleMap = {
         all: {
             [MediaType.Series]: t('allSeries'),
@@ -126,12 +126,12 @@ const CategoryScreen: React.FC<CategoryScreenProps> = ({ mediaType, onBack, onSe
             [MediaType.Podcast]: t('mostLikedPodcasts'),
         }
     };
-    
+
     const continueWatchingForCategory = continueWatching.filter(item => item.type === mediaType);
-    const allForCategory = mediaType === MediaType.Series ? series : 
-                           mediaType === MediaType.Movie ? movies : 
-                           mediaType === MediaType.Podcast ? podcasts :
-                           allContent.filter(item => item.type === mediaType);
+    const allForCategory = mediaType === MediaType.Series ? series :
+        mediaType === MediaType.Movie ? movies :
+            mediaType === MediaType.Podcast ? podcasts :
+                allContent.filter(item => item.type === mediaType);
     const mostWatchedForCategory = mostWatched.filter(item => item.type === mediaType);
     const mostLikedForCategory = mostLiked.filter(item => item.type === mediaType);
 
@@ -145,12 +145,12 @@ const CategoryScreen: React.FC<CategoryScreenProps> = ({ mediaType, onBack, onSe
                     </div>
                 ) : (
                     allForCategory.map((item) => (
-                        <MediaCard 
-                            key={item.id} 
-                            item={item} 
-                            variant="list" 
-                            onSelect={onSelectMedia} 
-                            onPlay={onPlay} 
+                        <MediaCard
+                            key={item.id}
+                            item={item}
+                            variant="list"
+                            onSelect={onSelectMedia}
+                            onPlay={onPlay}
                         />
                     ))
                 )}

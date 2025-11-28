@@ -11,6 +11,7 @@ import {
 } from '../components/icons';
 import { useAppContext } from '../context/AppContext';
 import { toast } from 'react-toastify';
+import AuthPrompt from '../components/AuthPrompt';
 
 // --- Reusable formatter ---
 const formatNumber = (num: number) => {
@@ -48,12 +49,51 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
     const [isScrubbing, setIsScrubbing] = useState(false);
     const wasPlayingRef = useRef(false);
     const [unavailable, setUnavailable] = useState(false);
+    const [showControls, setShowControls] = useState(true);
+    const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    const togglePlay = () => videoRef.current?.paused ? videoRef.current?.play() : videoRef.current?.pause();
+    const togglePlay = () => {
+        resetControlsTimeout();
+        videoRef.current?.paused ? videoRef.current?.play() : videoRef.current?.pause();
+    };
+
+    // Gérer l'affichage automatique des contrôles
+    const resetControlsTimeout = () => {
+        setShowControls(true);
+        if (controlsTimeoutRef.current) {
+            clearTimeout(controlsTimeoutRef.current);
+        }
+        controlsTimeoutRef.current = setTimeout(() => {
+            setShowControls(false);
+        }, 3000); // Cache après 3 secondes d'inactivité
+    };
+
+    useEffect(() => {
+        resetControlsTimeout();
+        return () => {
+            if (controlsTimeoutRef.current) {
+                clearTimeout(controlsTimeoutRef.current);
+            }
+        };
+    }, [isPlaying, progress, currentTime]);
 
     useEffect(() => {
         const video = videoRef.current;
         if (!video) return;
+
+        // Fermer le PIP si une autre vidéo est en mode PIP
+        const handlePipChange = async () => {
+            if (document.pictureInPictureElement && document.pictureInPictureElement !== video) {
+                try {
+                    await document.exitPictureInPicture();
+                } catch (err) {
+                    console.error('Error exiting PiP:', err);
+                }
+            }
+        };
+        
+        document.addEventListener('enterpictureinpicture', handlePipChange);
+        document.addEventListener('leavepictureinpicture', handlePipChange);
 
         const handlePlay = () => setIsPlaying(true);
         const handlePause = () => setIsPlaying(false);
@@ -91,6 +131,8 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
         handleVolumeChange(); // Initialize state
 
         return () => {
+            document.removeEventListener('enterpictureinpicture', handlePipChange);
+            document.removeEventListener('leavepictureinpicture', handlePipChange);
             video.removeEventListener('play', handlePlay);
             video.removeEventListener('pause', handlePause);
             video.removeEventListener('timeupdate', handleTimeUpdate);
@@ -112,6 +154,20 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
     useEffect(() => {
         const video = videoRef.current;
         if (!video) return;
+        
+        // Fermer le PIP si la vidéo change
+        const closePip = async () => {
+            if (document.pictureInPictureElement === video) {
+                try {
+                    await document.exitPictureInPicture();
+                } catch (err) {
+                    console.error('Error exiting PiP:', err);
+                }
+            }
+        };
+        
+        closePip();
+        
         setIsPlaying(false);
         setProgress(0);
         setDuration(0);
@@ -126,9 +182,11 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
     }, [src]);
 
     const handleRewind = () => {
+        resetControlsTimeout();
         if (videoRef.current) videoRef.current.currentTime -= 10;
     };
     const handleFastForward = () => {
+        resetControlsTimeout();
         if (videoRef.current) videoRef.current.currentTime += 10;
     };
     const handlePlaybackRateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -140,6 +198,7 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
     };
 
     const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+        resetControlsTimeout();
         const video = videoRef.current;
         if (!video) return;
         const rect = e.currentTarget.getBoundingClientRect();
@@ -191,12 +250,14 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
     }, []);
 
     const toggleMute = () => {
+        resetControlsTimeout();
         if (videoRef.current) {
             videoRef.current.muted = !videoRef.current.muted;
         }
     }
 
     const togglePip = async () => {
+        resetControlsTimeout();
         if (!videoRef.current) return;
         if (document.pictureInPictureElement) {
             await document.exitPictureInPicture();
@@ -205,7 +266,32 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
         }
     };
 
+    // Fermer le PIP quand la source de la vidéo change
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video) return;
+        
+        const handleSrcChange = async () => {
+            if (document.pictureInPictureElement === video) {
+                try {
+                    await document.exitPictureInPicture();
+                } catch (err) {
+                    console.error('Error exiting PiP:', err);
+                }
+            }
+        };
+        
+        // Observer les changements de source
+        const observer = new MutationObserver(handleSrcChange);
+        observer.observe(video, { attributes: true, attributeFilter: ['src'] });
+        
+        return () => {
+            observer.disconnect();
+        };
+    }, [src]);
+
     const toggleFullscreen = () => {
+        resetControlsTimeout();
         const container = containerRef.current;
         if (!container) return;
         if (!document.fullscreenElement) {
@@ -242,10 +328,28 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
         );
     }
 
+    const handleMouseMove = () => {
+        resetControlsTimeout();
+    };
+
+    const handleMouseLeave = () => {
+        if (controlsTimeoutRef.current) {
+            clearTimeout(controlsTimeoutRef.current);
+        }
+        controlsTimeoutRef.current = setTimeout(() => {
+            setShowControls(false);
+        }, 3000);
+    };
+
     return (
-        <div ref={containerRef} className="relative w-full aspect-video bg-black group overflow-hidden">
+        <div 
+            ref={containerRef} 
+            className="relative w-full aspect-video bg-black group overflow-hidden"
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+        >
             <video ref={videoRef} src={src} poster={poster} className="w-full h-full" onClick={togglePlay} onError={() => setUnavailable(true)} />
-            <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between">
+            <div className={`absolute inset-0 bg-black/30 transition-opacity flex flex-col justify-between ${showControls ? 'opacity-100' : 'opacity-0'}`}>
                 <div className="flex justify-end p-2 sm:p-4">
                     <div className="flex items-center space-x-2 bg-black/60 p-2 rounded-lg backdrop-blur-sm">
                         <span className="text-white font-semibold text-sm w-12 text-center">{playbackRate.toFixed(2)}x</span>
@@ -340,7 +444,7 @@ const CommentItem: React.FC<{ comment: Comment }> = ({ comment }) => (
     </div>
 );
 
-const CommentSection: React.FC<{ itemUid: string }> = ({ itemUid }) => {
+const CommentSection: React.FC<{ itemUid: string, onAuthRequired: (action: string) => void }> = ({ itemUid, onAuthRequired }) => {
     const { t, userProfile } = useAppContext();
     const [comments, setComments] = useState<Comment[]>([]);
     const [newComment, setNewComment] = useState('');
@@ -361,10 +465,7 @@ const CommentSection: React.FC<{ itemUid: string }> = ({ itemUid }) => {
         if (!newComment.trim() || newComment.length > MAX_COMMENT_LENGTH) return;
 
         if (!userProfile) {
-            toast.error('Vous devez être connecté pour commenter', {
-                position: 'bottom-center',
-                autoClose: 2000,
-            });
+            onAuthRequired('commenter cette vidéo');
             return;
         }
 
@@ -456,6 +557,13 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
     const [episodesInSerie, setEpisodesInSerie] = useState<EpisodeSerie[]>([]);
     const [likeCount, setLikeCount] = useState(0);
     const [hasLiked, setHasLiked] = useState(false);
+    const [showAuthPrompt, setShowAuthPrompt] = useState(false);
+    const [authAction, setAuthAction] = useState('');
+
+    const handleAuthRequired = (action: string) => {
+        setAuthAction(action);
+        setShowAuthPrompt(true);
+    };
 
     useEffect(() => {
         const fetchEpisodes = async () => {
@@ -500,6 +608,11 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
     const displayEpisode = episode;
 
     const handleShare = async () => {
+        if (!userProfile) {
+            handleAuthRequired('partager cette vidéo');
+            return;
+        }
+
         const shareData = {
             title: displayEpisode.title,
             text: `Regardez "${displayEpisode.title}" sur CMFI Replay`,
@@ -536,10 +649,7 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
 
     const handleLike = async () => {
         if (!userProfile) {
-            toast.error('Vous devez être connecté pour liker', {
-                position: 'bottom-center',
-                autoClose: 2000,
-            });
+            handleAuthRequired('liker cette vidéo');
             return;
         }
 
@@ -559,6 +669,21 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
         }
     };
 
+    const handleBookmark = () => {
+        if (!userProfile) {
+            handleAuthRequired('ajouter cette vidéo à votre liste');
+            return;
+        }
+        toggleSeriesBookmark(
+            item.id,
+            episode.title,
+            episode.overview || episode.overviewFr || '',
+            episode.backdrop_path || episode.picture_path || '',
+            episode.video_path_hd || episode.video_path_sd || '',
+            episode.runtime_h_m || ''
+        );
+    };
+
     const isBookmarked = bookmarkedIds.includes(item.id);
 
     const currentIndex = useMemo(() => {
@@ -574,10 +699,98 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
     const hasNextEpisode = currentIndex !== -1 && currentIndex < episodesInSerie.length - 1;
 
     const handleVideoEnded = () => {
+        if (!userProfile) {
+            handleAuthRequired('continuer à regarder et découvrir plus de contenu');
+            return;
+        }
+
         if (autoplay && hasNextEpisode) {
             onNavigateEpisode('next');
         }
     };
+
+    const [likeAnimation, setLikeAnimation] = useState(false);
+    const [particles, setParticles] = useState<Array<{ id: number; x: number; y: number }>>([]);
+
+    const handleLikeWithAnimation = async () => {
+        setLikeAnimation(true);
+        // Créer des particules
+        const newParticles = Array.from({ length: 12 }, (_, i) => ({
+            id: Date.now() + i,
+            x: Math.random() * 100,
+            y: Math.random() * 100
+        }));
+        setParticles(newParticles);
+        
+        // Appeler la fonction like originale
+        await handleLike();
+        
+        // Nettoyer les particules après l'animation
+        setTimeout(() => {
+            setParticles([]);
+            setLikeAnimation(false);
+        }, 1000);
+    };
+
+    const LikeButton: React.FC<{ label: string, value?: string | number, onClick?: () => void, isActive?: boolean }> = ({ label, value, onClick, isActive }) => (
+        <button 
+            onClick={handleLikeWithAnimation} 
+            className={`relative flex flex-col items-center space-y-1 transition-all duration-300 ${
+                isActive 
+                    ? 'text-red-500 dark:text-red-400' 
+                    : 'text-gray-600 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400'
+            }`}
+        >
+            <div className="relative">
+                <div 
+                    className={`transition-all duration-300 ${
+                        likeAnimation ? 'scale-150' : 'scale-100'
+                    }`}
+                    style={{
+                        filter: likeAnimation ? 'drop-shadow(0 0 8px rgba(239, 68, 68, 0.8))' : 'none',
+                        transform: likeAnimation ? 'scale(1.5) rotate(15deg)' : 'scale(1) rotate(0deg)'
+                    }}
+                >
+                    <LikeIcon 
+                        className={`w-7 h-7 ${isActive ? 'fill-red-500 dark:fill-red-400' : ''}`}
+                    />
+                </div>
+                {/* Particules animées */}
+                {particles.map((particle, index) => {
+                    const angle = (index / particles.length) * Math.PI * 2;
+                    const distance = 40 + Math.random() * 30;
+                    return (
+                        <div
+                            key={particle.id}
+                            className="absolute pointer-events-none"
+                            style={{
+                                left: '50%',
+                                top: '50%',
+                                animation: `particleFloat 1s ease-out forwards`,
+                                animationDelay: `${index * 0.05}s`,
+                                '--random-x': Math.cos(angle),
+                                '--random-y': Math.sin(angle),
+                                '--distance': `${distance}px`
+                            } as React.CSSProperties}
+                        >
+                            <div className="w-2 h-2 bg-red-500 rounded-full opacity-90 shadow-lg shadow-red-500/50" />
+                        </div>
+                    );
+                })}
+                {/* Effet de pulse quand actif */}
+                {isActive && (
+                    <div className="absolute inset-0 animate-ping">
+                        <div className="w-7 h-7 bg-red-500 rounded-full opacity-20" />
+                    </div>
+                )}
+            </div>
+            <span className={`text-xs font-semibold transition-all duration-300 ${
+                likeAnimation ? 'scale-110' : 'scale-100'
+            }`}>
+                {value ? formatNumber(Number(value)) : label}
+            </span>
+        </button>
+    );
 
     const ActionButton: React.FC<{ Icon: React.FC<any>, label: string, value?: string | number, onClick?: () => void, isActive?: boolean }> = ({ Icon, label, value, onClick, isActive }) => (
         <button onClick={onClick} className={`flex flex-col items-center space-y-1 hover:text-amber-500 dark:hover:text-amber-400 ${isActive ? 'text-amber-500 dark:text-amber-400' : 'text-gray-600 dark:text-gray-400'}`}>
@@ -615,9 +828,8 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
                     <span>{formatNumber(0)} {t('views')}</span>
                 </div>
                 <div className="flex items-center justify-around py-2">
-                    <ActionButton
-                        Icon={LikeIcon}
-                        label={hasLiked ? t('liked') : t('like')}
+                    <LikeButton
+                        label={hasLiked ? (t('like') + ' ✓') : t('like')}
                         value={likeCount}
                         onClick={handleLike}
                         isActive={hasLiked}
@@ -625,14 +837,7 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
                     <ActionButton
                         Icon={isBookmarked ? CheckIcon : PlusIcon}
                         label={isBookmarked ? t('addedToList') : t('myList')}
-                        onClick={() => toggleSeriesBookmark(
-                            item.id,
-                            episode.title,
-                            episode.overview || episode.overviewFr || '',
-                            episode.backdrop_path || episode.picture_path || '',
-                            episode.video_path_hd || episode.video_path_sd || '',
-                            episode.runtime_h_m || ''
-                        )}
+                        onClick={handleBookmark}
                         isActive={isBookmarked}
                     />
                     <ActionButton
@@ -662,9 +867,20 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
                 </div>
 
                 <div className="border-t border-gray-200 dark:border-gray-800" />
-
-                <CommentSection itemUid={episode.uid_episode} />
             </div>
+
+            <div className="px-4 pb-4">
+                <div className="max-h-[calc(100vh-500px)] overflow-y-auto">
+                    <CommentSection itemUid={episode.uid_episode} onAuthRequired={handleAuthRequired} />
+                </div>
+            </div>
+
+            {showAuthPrompt && (
+                <AuthPrompt 
+                    action={authAction} 
+                    onClose={() => setShowAuthPrompt(false)} 
+                />
+            )}
         </div>
     );
 };

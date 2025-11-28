@@ -151,6 +151,17 @@ export interface BookSeries {
     refEpisode?: DocumentReference; // Référence Firestore à un document de la collection episodesSeries
 }
 
+// Interface pour la collection stats_vues
+export interface StatsVues {
+    id?: string;
+    dateDernierUpdate: string;
+    idEpisodeSerie?: DocumentReference; // Référence à un épisode de série (absent si c'est un film)
+    uid: string; // uid de l'épisode ou du film
+    nombreLectures: number;
+    tempsRegarde: number; // en secondes
+    user: DocumentReference; // Référence à l'utilisateur
+}
+
 // Constantes pour les collections
 const USERS_COLLECTION = 'users';
 const MOVIES_COLLECTION = 'movies';
@@ -162,6 +173,7 @@ const BOOK_DOC_COLLECTION = 'bookDoc';
 const BOOK_SERIES_COLLECTION = 'bookSeries';
 const LIKES_COLLECTION = 'like';
 const COMMENTS_COLLECTION = 'comment';
+const STATS_VUES_COLLECTION = 'stats_vues';
 
 // Fonction utilitaire pour générer un avatar par défaut
 export const generateDefaultAvatar = (name?: string): string => {
@@ -701,6 +713,24 @@ export const seasonSerieService = {
             return null;
         }
     },
+
+    async getSeasonByUid(uid_season: string): Promise<SeasonSerie | null> {
+        try {
+            const q = query(
+                collection(db, SEASONS_SERIES_COLLECTION),
+                where('uid_season', '==', uid_season),
+                limit(1)
+            );
+            const querySnapshot = await getDocs(q);
+            if (!querySnapshot.empty) {
+                return querySnapshot.docs[0].data() as SeasonSerie;
+            }
+            return null;
+        } catch (error) {
+            console.error('Error getting season by UID:', error);
+            return null;
+        }
+    },
 };
 
 // Services pour les épisodes de séries
@@ -1207,3 +1237,194 @@ export const bookSeriesService = {
         }
     }
 };
+
+// Interface pour les données enrichies de "Continuer la lecture"
+export interface ContinueWatchingItem {
+    id: string;
+    uid: string; // uid de l'épisode ou du film (peut être undefined pour les épisodes)
+    title: string;
+    imageUrl: string;
+    progress: number; // Pourcentage de progression (0-100)
+    tempsRegarde: number; // en secondes
+    runtime: number; // durée totale en secondes
+    type: 'movie' | 'episode';
+    // Pour les épisodes
+    episodeNumber?: number;
+    seasonNumber?: number;
+    serieTitle?: string;
+    episodeTitle?: string;
+    uid_episode?: string; // uid_episode pour récupérer l'épisode directement
+    episodeId?: string; // ID du document Firestore (fallback si uid_episode manquant)
+    dateDernierUpdate: string;
+}
+
+// Service pour stats_vues
+export const statsVuesService = {
+    async getContinueWatching(userUid: string, limitCount: number = 10): Promise<ContinueWatchingItem[]> {
+        try {
+            const userRef = doc(db, USERS_COLLECTION, userUid);
+            const q = query(
+                collection(db, STATS_VUES_COLLECTION),
+                where('user', '==', userRef),
+                orderBy('dateDernierUpdate', 'desc'),
+                limit(limitCount)
+            );
+
+            const querySnapshot = await getDocs(q);
+            const continueWatchingItems: ContinueWatchingItem[] = [];
+
+            for (const docSnapshot of querySnapshot.docs) {
+                const data = docSnapshot.data() as StatsVues;
+
+                // Vérifier si c'est un épisode ou un film
+                const isEpisode = !!data.idEpisodeSerie;
+
+                if (isEpisode && data.idEpisodeSerie) {
+                    // C'est un épisode de série
+                    const episodeDoc = await getDoc(data.idEpisodeSerie);
+                    if (episodeDoc.exists()) {
+                        const episode = episodeDoc.data() as EpisodeSerie;
+                        const runtime = episode.runtime || 0;
+                        const progress = runtime > 0 ? Math.min((data.tempsRegarde / runtime) * 100, 100) : 0;
+
+                        // Ne pas afficher si déjà terminé (>95%)
+                        if (progress < 95) {
+                            continueWatchingItems.push({
+                                id: docSnapshot.id,
+                                uid: data.uid || episode.uid_episode || episodeDoc.id, // Fallback sur l'ID du document
+                                title: episode.title_serie,
+                                imageUrl: episode.backdrop_path || episode.picture_path,
+                                progress,
+                                tempsRegarde: data.tempsRegarde,
+                                runtime,
+                                type: 'episode',
+                                episodeNumber: episode.episode_numero,
+                                episodeTitle: episode.title,
+                                serieTitle: episode.title_serie,
+                                uid_episode: episode.uid_episode || episodeDoc.id, // Fallback sur l'ID du document
+                                episodeId: episodeDoc.id, // Stocker l'ID du document
+                                dateDernierUpdate: data.dateDernierUpdate
+                            });
+                        }
+                    }
+                } else {
+                    // C'est un film
+                    const movie = await movieService.getMovieByUid(data.uid);
+                    if (movie) {
+                        // Convertir runtime_h_m (ex: "2h 30min") en secondes
+                        const runtimeMatch = movie.runtime?.match(/(\d+)h?\s*(\d+)?/);
+                        let runtime = 0;
+                        if (runtimeMatch) {
+                            const hours = parseInt(runtimeMatch[1] || '0');
+                            const minutes = parseInt(runtimeMatch[2] || '0');
+                            runtime = (hours * 3600) + (minutes * 60);
+                        }
+
+                        const progress = runtime > 0 ? Math.min((data.tempsRegarde / runtime) * 100, 100) : 0;
+
+                        // Ne pas afficher si déjà terminé (>95%)
+                        if (progress < 95) {
+                            continueWatchingItems.push({
+                                id: docSnapshot.id,
+                                uid: data.uid,
+                                title: movie.title,
+                                imageUrl: movie.backdrop_path || movie.poster_path,
+                                progress,
+                                tempsRegarde: data.tempsRegarde,
+                                runtime,
+                                type: 'movie',
+                                dateDernierUpdate: data.dateDernierUpdate
+                            });
+                        }
+                    }
+                }
+            }
+
+            return continueWatchingItems;
+        } catch (error) {
+            console.error('Error getting continue watching items:', error);
+            return [];
+        }
+    },
+
+    async getAllHistory(userUid: string): Promise<ContinueWatchingItem[]> {
+        try {
+            const userRef = doc(db, USERS_COLLECTION, userUid);
+            const q = query(
+                collection(db, STATS_VUES_COLLECTION),
+                where('user', '==', userRef),
+                orderBy('dateDernierUpdate', 'desc')
+            );
+
+            const querySnapshot = await getDocs(q);
+            const historyItems: ContinueWatchingItem[] = [];
+
+            for (const docSnapshot of querySnapshot.docs) {
+                const data = docSnapshot.data() as StatsVues;
+
+                // Vérifier si c'est un épisode ou un film
+                const isEpisode = !!data.idEpisodeSerie;
+
+                if (isEpisode && data.idEpisodeSerie) {
+                    // C'est un épisode de série
+                    const episodeDoc = await getDoc(data.idEpisodeSerie);
+                    if (episodeDoc.exists()) {
+                        const episode = episodeDoc.data() as EpisodeSerie;
+                        const runtime = episode.runtime || 0;
+                        const progress = runtime > 0 ? Math.min((data.tempsRegarde / runtime) * 100, 100) : 0;
+
+                        historyItems.push({
+                            id: docSnapshot.id,
+                            uid: data.uid || episode.uid_episode || episodeDoc.id,
+                            title: episode.title_serie,
+                            imageUrl: episode.backdrop_path || episode.picture_path,
+                            progress,
+                            tempsRegarde: data.tempsRegarde,
+                            runtime,
+                            type: 'episode',
+                            episodeNumber: episode.episode_numero,
+                            episodeTitle: episode.title,
+                            serieTitle: episode.title_serie,
+                            uid_episode: episode.uid_episode || episodeDoc.id,
+                            episodeId: episodeDoc.id,
+                            dateDernierUpdate: data.dateDernierUpdate
+                        });
+                    }
+                } else {
+                    // C'est un film
+                    const movie = await movieService.getMovieByUid(data.uid);
+                    if (movie) {
+                        // Convertir runtime_h_m (ex: "2h 30min") en secondes
+                        const runtimeMatch = movie.runtime?.match(/(\d+)h?\s*(\d+)?/);
+                        let runtime = 0;
+                        if (runtimeMatch) {
+                            const hours = parseInt(runtimeMatch[1] || '0');
+                            const minutes = parseInt(runtimeMatch[2] || '0');
+                            runtime = (hours * 3600) + (minutes * 60);
+                        }
+
+                        const progress = runtime > 0 ? Math.min((data.tempsRegarde / runtime) * 100, 100) : 0;
+
+                        historyItems.push({
+                            id: docSnapshot.id,
+                            uid: data.uid,
+                            title: movie.title,
+                            imageUrl: movie.backdrop_path || movie.poster_path,
+                            progress,
+                            tempsRegarde: data.tempsRegarde,
+                            runtime,
+                            type: 'movie',
+                            dateDernierUpdate: data.dateDernierUpdate
+                        });
+                    }
+                }
+            }
+
+            return historyItems;
+        } catch (error) {
+            console.error('Error getting all history items:', error);
+            return [];
+        }
+    }
+};
+

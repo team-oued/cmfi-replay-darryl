@@ -27,6 +27,14 @@ const analytics = getAnalytics(app);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
+
+// Configure Google Auth Provider
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({
+    prompt: 'select_account'
+});
+// Ajouter les scopes nécessaires si besoin
+googleProvider.addScope('profile');
+googleProvider.addScope('email');
 
 export default app;

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { ActiveTab } from '../types';
 import { useAppContext } from '../context/AppContext';
 
@@ -9,11 +10,14 @@ interface BottomNavProps {
 
 const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab }) => {
     const { t } = useAppContext();
+    const navigate = useNavigate();
+    const location = useLocation();
 
     const tabs = [
         {
             id: ActiveTab.Home,
             label: t('home'),
+            path: '/home',
             icon: (isActive: boolean) => (
                 <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -34,6 +38,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab }) => {
         {
             id: ActiveTab.Search,
             label: t('search'),
+            path: '/search',
             icon: (isActive: boolean) => (
                 <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -54,6 +59,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab }) => {
         {
             id: ActiveTab.Profile,
             label: t('profile'),
+            path: '/profile',
             icon: (isActive: boolean) => (
                 <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -77,11 +83,14 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab }) => {
         <nav className="bg-[#FBF9F3] dark:bg-black border-t border-gray-200 dark:border-gray-800 shadow-lg">
             <div className="flex justify-around items-center h-16">
                 {tabs.map((tab) => {
-                    const isActive = activeTab === tab.id;
+                    const isActive = location.pathname === tab.path;
                     return (
                         <button
                             key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
+                            onClick={() => {
+                                setActiveTab(tab.id);
+                                navigate(tab.path);
+                            }}
                             className={`flex flex-col items-center justify-center flex-1 h-full transition-colors duration-200 ${isActive ? 'bg-amber-50 dark:bg-gray-900' : 'hover:bg-gray-50 dark:hover:bg-gray-900'
                                 }`}
                             aria-label={tab.label}

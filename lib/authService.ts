@@ -39,7 +39,15 @@ export const authService = {
      */
     signInWithGooglePopup: async (): Promise<UserCredential> => {
         try {
+            console.log('🔄 Tentative de connexion Google via popup...');
+            
+            // Vérifier si les popups sont possibles
+            if (typeof window === 'undefined') {
+                throw new Error('Window object not available');
+            }
+
             const result = await signInWithPopup(auth, googleProvider);
+            console.log('✅ Popup Google réussie, utilisateur:', result.user.email);
 
             // Vérifier si le profil utilisateur existe, sinon le créer
             const user = result.user;
@@ -59,16 +67,27 @@ export const authService = {
                     language: 'en',
                     bookmarkedIds: []
                 });
-                console.log('Profil utilisateur Google créé:', {
+                console.log('✅ Profil utilisateur Google créé:', {
                     uid: user.uid,
                     email: user.email,
                     created_time: createdTime
                 });
+            } else {
+                console.log('✅ Profil utilisateur existant trouvé');
             }
 
             return result;
         } catch (error: any) {
-            console.error('Erreur lors de la connexion Google (popup):', error);
+            console.error('❌ Erreur lors de la connexion Google (popup):', error);
+            console.error('Code d\'erreur:', error.code);
+            console.error('Message d\'erreur:', error.message);
+            
+            // Si la popup est bloquée, signaler pour utiliser le fallback
+            if (error.code === 'auth/popup-blocked') {
+                console.log('⚠️ Popup bloquée, signalement pour fallback...');
+                throw new Error('POPUP_BLOCKED');
+            }
+            
             throw error;
         }
     },
@@ -79,9 +98,14 @@ export const authService = {
      */
     signInWithGoogleRedirect: async (): Promise<void> => {
         try {
+            console.log('Tentative de connexion Google via redirection...');
             await signInWithRedirect(auth, googleProvider);
+            // Note: La fonction ne retourne rien car l'utilisateur sera redirigé
+            // Le résultat sera récupéré via getGoogleRedirectResult() après le retour
         } catch (error: any) {
             console.error('Erreur lors de la connexion Google (redirect):', error);
+            console.error('Code d\'erreur:', error.code);
+            console.error('Message d\'erreur:', error.message);
             throw error;
         }
     },
@@ -95,6 +119,7 @@ export const authService = {
             const result = await getRedirectResult(auth);
 
             if (result) {
+                console.log('✅ Résultat de redirection Google trouvé:', result.user.email);
                 // Vérifier si le profil utilisateur existe, sinon le créer
                 const user = result.user;
                 const existingProfile = await userService.getUserProfile(user.uid);
@@ -113,18 +138,31 @@ export const authService = {
                         language: 'en',
                         bookmarkedIds: []
                     });
-                    console.log('Profil utilisateur Google créé (redirect):', {
+                    console.log('✅ Profil utilisateur Google créé (redirect):', {
                         uid: user.uid,
                         email: user.email,
                         created_time: createdTime
                     });
+                } else {
+                    console.log('✅ Profil utilisateur existant trouvé (redirect)');
                 }
             }
+            // Note: Si result est null, c'est normal - soit aucune redirection n'a eu lieu,
+            // soit l'utilisateur est déjà authentifié via onAuthStateChanged
 
             return result;
         } catch (error: any) {
-            console.error('Erreur lors de la récupération du résultat de redirection:', error);
-            throw error;
+            // Ne logger que les vraies erreurs de configuration
+            if (error.code === 'auth/operation-not-allowed' || error.code === 'auth/unauthorized-domain') {
+                console.error('❌ Erreur de configuration Firebase:', error.message);
+                throw error;
+            }
+            // Pour les autres erreurs, les logger mais ne pas les propager si c'est juste qu'il n'y a pas de résultat
+            if (error.message && !error.message.includes('no redirect result')) {
+                console.error('❌ Erreur lors de la récupération du résultat de redirection:', error);
+            }
+            // Ne pas throw pour éviter d'afficher des erreurs inutiles à l'utilisateur
+            return null;
         }
     },
 
@@ -132,6 +170,9 @@ export const authService = {
      * Détecte si l'appareil est mobile
      */
     isMobileDevice: (): boolean => {
+        if (typeof window === 'undefined' || !navigator) {
+            return false;
+        }
         return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
             navigator.userAgent
         );
@@ -139,14 +180,27 @@ export const authService = {
 
     /**
      * Connexion Google intelligente (choisit automatiquement popup ou redirect)
+     * Essaie d'abord la popup, puis fallback sur redirect si bloquée
      */
     signInWithGoogle: async (): Promise<UserCredential | void> => {
         if (authService.isMobileDevice()) {
             // Sur mobile, utiliser redirect pour éviter les problèmes de popup
+            console.log('📱 Appareil mobile détecté, utilisation de la redirection');
             return authService.signInWithGoogleRedirect();
         } else {
-            // Sur desktop, utiliser popup pour une meilleure UX
-            return authService.signInWithGooglePopup();
+            // Sur desktop, essayer popup d'abord
+            console.log('💻 Appareil desktop détecté, tentative avec popup');
+            try {
+                return await authService.signInWithGooglePopup();
+            } catch (error: any) {
+                // Si la popup est bloquée, utiliser la redirection comme fallback
+                if (error.message === 'POPUP_BLOCKED' || error.code === 'auth/popup-blocked') {
+                    console.log('⚠️ Popup bloquée, utilisation de la redirection comme fallback');
+                    return authService.signInWithGoogleRedirect();
+                }
+                // Sinon, propager l'erreur
+                throw error;
+            }
         }
     }
 };

@@ -79,12 +79,18 @@ const AuthScreen: React.FC = () => {
             try {
                 const result = await authService.getGoogleRedirectResult();
                 if (result) {
-                    console.log('Connexion Google réussie:', result.user);
+                    console.log('✅ Connexion Google réussie via redirection:', result.user.email);
+                    // onAuthStateChanged devrait déjà avoir mis à jour l'état
                     setIsAuthenticated(true);
                 }
+                // Si result est null, c'est normal - soit aucune redirection n'a eu lieu,
+                // soit l'utilisateur est déjà authentifié via onAuthStateChanged
             } catch (error: any) {
-                console.error('Erreur lors de la redirection Google:', error);
-                setError(error.message || 'Erreur lors de la connexion Google');
+                // Ne pas afficher d'erreur si c'est juste qu'il n'y a pas de résultat
+                if (error.code && error.code !== 'auth/operation-not-allowed' && error.code !== 'auth/unauthorized-domain') {
+                    console.error('❌ Erreur lors de la redirection Google:', error);
+                    setError(error.message || 'Erreur lors de la connexion Google');
+                }
             }
         };
 
@@ -96,16 +102,24 @@ const AuthScreen: React.FC = () => {
         setError('');
 
         try {
+            console.log('Début de la connexion Google...');
             const result = await authService.signInWithGoogle();
 
-            // Si c'est une redirection, result sera void
+            // Si c'est une redirection, result sera void et onAuthStateChanged gérera l'authentification
+            // Si c'est une popup, result contiendra le UserCredential
             if (result) {
-                console.log('Connexion Google réussie:', result.user);
+                console.log('Connexion Google réussie (popup):', result.user.email);
+                // onAuthStateChanged devrait déjà avoir mis à jour l'état
                 setIsAuthenticated(true);
+            } else {
+                console.log('Redirection Google en cours...');
+                // Pour la redirection, on ne fait rien ici
+                // getGoogleRedirectResult() dans useEffect gérera le résultat
             }
-            // Sinon, la redirection est en cours et l'utilisateur sera redirigé
         } catch (error: any) {
             console.error('Erreur lors de la connexion Google:', error);
+            console.error('Code d\'erreur:', error.code);
+            console.error('Message complet:', error.message);
 
             // Messages d'erreur personnalisés
             let errorMessage = 'Une erreur est survenue lors de la connexion Google';
@@ -116,12 +130,17 @@ const AuthScreen: React.FC = () => {
                 errorMessage = 'La fenêtre popup a été bloquée. Veuillez autoriser les popups pour ce site.';
             } else if (error.code === 'auth/cancelled-popup-request') {
                 errorMessage = 'Connexion annulée';
+            } else if (error.code === 'auth/account-exists-with-different-credential') {
+                errorMessage = 'Un compte existe déjà avec cet email mais avec une autre méthode de connexion.';
+            } else if (error.code === 'auth/operation-not-allowed') {
+                errorMessage = 'La connexion Google n\'est pas activée. Veuillez contacter le support.';
+            } else if (error.code === 'auth/unauthorized-domain') {
+                errorMessage = 'Ce domaine n\'est pas autorisé pour la connexion Google.';
             } else if (error.message) {
                 errorMessage = error.message;
             }
 
             setError(errorMessage);
-        } finally {
             setGoogleLoading(false);
         }
     };
