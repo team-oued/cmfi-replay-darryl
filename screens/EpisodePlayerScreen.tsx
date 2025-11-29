@@ -47,6 +47,7 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
     const [playbackRate, setPlaybackRate] = useState(1);
     const [buffered, setBuffered] = useState(0);
     const [isScrubbing, setIsScrubbing] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
     const wasPlayingRef = useRef(false);
     const [unavailable, setUnavailable] = useState(false);
     const [showControls, setShowControls] = useState(true);
@@ -95,6 +96,20 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
         document.addEventListener('enterpictureinpicture', handlePipChange);
         document.addEventListener('leavepictureinpicture', handlePipChange);
 
+        const handleCanPlay = () => {
+            setIsLoading(false);
+            setIsPlaying(true);
+            videoRef.current?.play().catch(() => setIsPlaying(false));
+        };
+        
+        const handleWaiting = () => {
+            setIsLoading(true);
+        };
+        
+        const handlePlaying = () => {
+            setIsLoading(false);
+        };
+
         const handlePlay = () => setIsPlaying(true);
         const handlePause = () => setIsPlaying(false);
         const handleTimeUpdate = () => {
@@ -127,6 +142,9 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
         video.addEventListener('loadedmetadata', handleLoadedMetadata);
         video.addEventListener('volumechange', handleVolumeChange);
         video.addEventListener('ended', handleEnded);
+        video.addEventListener('canplay', handleCanPlay);
+        video.addEventListener('waiting', handleWaiting);
+        video.addEventListener('playing', handlePlaying);
 
         handleVolumeChange(); // Initialize state
 
@@ -139,6 +157,9 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
             video.removeEventListener('loadedmetadata', handleLoadedMetadata);
             video.removeEventListener('volumechange', handleVolumeChange);
             video.removeEventListener('ended', handleEnded);
+            video.removeEventListener('canplay', handleCanPlay);
+            video.removeEventListener('waiting', handleWaiting);
+            video.removeEventListener('playing', handlePlaying);
         };
     }, [onEnded, isScrubbing]);
 
@@ -348,6 +369,18 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
         >
+            {/* Glide Loading Spinner */}
+            <div className={`absolute inset-0 flex flex-col items-center justify-center bg-black/90 z-10 transition-all duration-500 ${isLoading ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                <div className="glide-spinner">
+                    <div className="glide-spinner__track">
+                        <div className="glide-spinner__circle"></div>
+                        <div className="glide-spinner__circle"></div>
+                        <div className="glide-spinner__circle"></div>
+                        <div className="glide-spinner__circle"></div>
+                    </div>
+                    <div className="glide-spinner__label text-amber-400 text-sm font-medium mt-6">Chargement en cours</div>
+                </div>
+            </div>
             <video ref={videoRef} src={src} poster={poster} className="w-full h-full" onClick={togglePlay} onError={() => setUnavailable(true)} />
             <div className={`absolute inset-0 bg-black/30 transition-opacity flex flex-col justify-between ${showControls ? 'opacity-100' : 'opacity-0'}`}>
                 <div className="flex justify-end p-2 sm:p-4">

@@ -195,12 +195,16 @@ const AppContent: React.FC = () => {
             />
 
             {!isWatchRoute && (
-                <div className="fixed top-0 left-0 right-0 z-20 bg-[#FBF9F3] dark:bg-black p-4 flex justify-between items-center border-b border-gray-200 dark:border-gray-800 md:hidden">
-                    <h1 className="text-xl font-bold">CMFI Replay</h1>
-                    <HamburgerMenu
-                        isOpen={isSidebarOpen}
-                        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                    />
+                <div className="fixed top-0 left-0 right-0 z-20 bg-[#FBF9F3] dark:bg-black p-4 border-b border-gray-200 dark:border-gray-800 md:hidden">
+                    <div className="relative w-full flex items-center justify-center">
+                        <h1 className="text-xl font-bold text-center">CMFI Replay</h1>
+                        <div className="absolute right-0">
+                            <HamburgerMenu
+                                isOpen={isSidebarOpen}
+                                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                            />
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -225,8 +229,17 @@ const AppContent: React.FC = () => {
 
                             <Route path="/search" element={
                                 <SearchScreen
-                                    onSelectMedia={handleSelectMedia}
-                                    onPlay={handlePlay}
+                                    onNavigate={(screen: string, data?: any) => {
+                                        if (screen === 'movieDetail' && data?.uid) {
+                                            navigate(`/movie/${data.uid}`);
+                                        } else if (screen === 'serieDetail' && data?.uid_serie) {
+                                            navigate(`/serie/${data.uid_serie}`);
+                                        } else if (screen === 'seasonDetail' && data?.uid_serie) {
+                                            navigate(`/serie/${data.uid_serie}`);
+                                        } else if (screen === 'episodePlayer' && data?.uid_episode) {
+                                            navigate(`/watch/${data.uid_episode}`);
+                                        }
+                                    }}
                                 />
                             } />
 

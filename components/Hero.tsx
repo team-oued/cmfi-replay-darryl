@@ -51,7 +51,7 @@ const Hero: React.FC<HeroProps> = ({ items: propItems, onSelectMedia, onPlay }) 
 
     const timer = setTimeout(() => {
       setCurrentIndex((prevIndex) => (prevIndex + 1) % items.length);
-    }, 5000);
+    }, 3250);
 
     return () => clearTimeout(timer);
   }, [currentIndex, items, isPaused]);

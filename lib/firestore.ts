@@ -1428,3 +1428,248 @@ export const statsVuesService = {
     }
 };
 
+// Interface pour les résultats de recherche unifiés
+export interface SearchResult {
+    id: string;
+    uid: string;
+    title: string;
+    description: string;
+    imageUrl: string;
+    type: 'movie' | 'serie' | 'podcast' | 'season' | 'episode';
+    // Champs additionnels selon le type
+    serieTitle?: string; // Pour les saisons et épisodes
+    seasonNumber?: number; // Pour les saisons et épisodes
+    episodeNumber?: number; // Pour les épisodes
+    uid_serie?: string; // Pour les séries/saisons/épisodes
+    uid_season?: string; // Pour les saisons et épisodes
+    uid_episode?: string; // Pour les épisodes
+}
+
+// Service de recherche global
+export const searchService = {
+    /**
+     * Recherche dans toutes les collections
+     * @param searchTerm - Terme de recherche
+     * @returns Tableau de résultats de recherche unifiés
+     */
+    async searchAll(searchTerm: string): Promise<SearchResult[]> {
+        if (!searchTerm || searchTerm.trim().length === 0) {
+            return [];
+        }
+
+        const term = searchTerm.toLowerCase().trim();
+        const results: SearchResult[] = [];
+
+        try {
+            // Recherche parallèle dans toutes les collections
+            const [movies, series, seasons, episodes] = await Promise.all([
+                this.searchMovies(term),
+                this.searchSeries(term),
+                this.searchSeasons(term),
+                this.searchEpisodes(term)
+            ]);
+
+            results.push(...movies, ...series, ...seasons, ...episodes);
+
+            // Trier les résultats par pertinence (titre exact en premier)
+            return results.sort((a, b) => {
+                const aExactMatch = a.title.toLowerCase() === term;
+                const bExactMatch = b.title.toLowerCase() === term;
+
+                if (aExactMatch && !bExactMatch) return -1;
+                if (!aExactMatch && bExactMatch) return 1;
+
+                const aStartsWith = a.title.toLowerCase().startsWith(term);
+                const bStartsWith = b.title.toLowerCase().startsWith(term);
+
+                if (aStartsWith && !bStartsWith) return -1;
+                if (!aStartsWith && bStartsWith) return 1;
+
+                return a.title.localeCompare(b.title);
+            });
+        } catch (error) {
+            console.error('Error in global search:', error);
+            return [];
+        }
+    },
+
+    /**
+     * Recherche dans les films (title, description)
+     */
+    async searchMovies(searchTerm: string): Promise<SearchResult[]> {
+        try {
+            const moviesSnapshot = await getDocs(collection(db, MOVIES_COLLECTION));
+            const results: SearchResult[] = [];
+
+            moviesSnapshot.docs.forEach(doc => {
+                const movie = doc.data() as Movie;
+
+                // Ignorer les films cachés
+                if (movie.hidden) return;
+
+                const titleMatch = movie.title?.toLowerCase().includes(searchTerm);
+                const descriptionMatch = movie.overview?.toLowerCase().includes(searchTerm);
+
+                if (titleMatch || descriptionMatch) {
+                    results.push({
+                        id: doc.id,
+                        uid: movie.uid,
+                        title: movie.title,
+                        description: movie.overview || '',
+                        imageUrl: movie.backdrop_path || movie.poster_path || movie.picture_path,
+                        type: 'movie'
+                    });
+                }
+            });
+
+            return results;
+        } catch (error) {
+            console.error('Error searching movies:', error);
+            return [];
+        }
+    },
+
+    /**
+     * Recherche dans les séries/podcasts (title_serie, overview_serie)
+     */
+    async searchSeries(searchTerm: string): Promise<SearchResult[]> {
+        try {
+            const seriesSnapshot = await getDocs(collection(db, SERIES_COLLECTION));
+            const results: SearchResult[] = [];
+
+            seriesSnapshot.docs.forEach(doc => {
+                const serie = doc.data() as Serie;
+
+                // Ignorer les séries cachées
+                if (serie.is_hidden) return;
+
+                const titleMatch = serie.title_serie?.toLowerCase().includes(searchTerm);
+                const overviewMatch = serie.overview_serie?.toLowerCase().includes(searchTerm);
+
+                if (titleMatch || overviewMatch) {
+                    results.push({
+                        id: doc.id,
+                        uid: serie.uid_serie,
+                        uid_serie: serie.uid_serie,
+                        title: serie.title_serie,
+                        description: serie.overview_serie || '',
+                        imageUrl: serie.image_path || serie.back_path,
+                        type: serie.serie_type === 'podcast' ? 'podcast' : 'serie'
+                    });
+                }
+            });
+
+            return results;
+        } catch (error) {
+            console.error('Error searching series:', error);
+            return [];
+        }
+    },
+
+    /**
+     * Recherche dans les saisons (title_season, overview)
+     */
+    async searchSeasons(searchTerm: string): Promise<SearchResult[]> {
+        try {
+            const seasonsSnapshot = await getDocs(collection(db, SEASONS_SERIES_COLLECTION));
+            const results: SearchResult[] = [];
+
+            seasonsSnapshot.docs.forEach(doc => {
+                const season = doc.data() as SeasonSerie;
+
+                const titleMatch = season.title_season?.toLowerCase().includes(searchTerm);
+                const overviewMatch = season.overview?.toLowerCase().includes(searchTerm);
+
+                if (titleMatch || overviewMatch) {
+                    results.push({
+                        id: doc.id,
+                        uid: season.uid_season,
+                        uid_serie: season.uid_serie,
+                        uid_season: season.uid_season,
+                        title: season.title_season,
+                        description: season.overview || '',
+                        imageUrl: season.poster_path || season.backdrop_path,
+                        type: 'season',
+                        serieTitle: season.title_serie,
+                        seasonNumber: season.season_number
+                    });
+                }
+            });
+
+            return results;
+        } catch (error) {
+            console.error('Error searching seasons:', error);
+            return [];
+        }
+    },
+
+    /**
+     * Recherche dans les épisodes (title, overview, overviewFr, search_keywords)
+     */
+    async searchEpisodes(searchTerm: string): Promise<SearchResult[]> {
+        try {
+            const episodesSnapshot = await getDocs(collection(db, EPISODES_SERIES_COLLECTION));
+            const results: SearchResult[] = [];
+
+            episodesSnapshot.docs.forEach(doc => {
+                const episode = doc.data() as EpisodeSerie;
+
+                // Ignorer les épisodes cachés
+                if (episode.hidden) return;
+
+                const titleMatch = episode.title?.toLowerCase().includes(searchTerm);
+                const overviewMatch = episode.overview?.toLowerCase().includes(searchTerm);
+                const overviewFrMatch = episode.overviewFr?.toLowerCase().includes(searchTerm);
+                const keywordsMatch = episode.search_keywords?.some(
+                    keyword => keyword.toLowerCase().includes(searchTerm)
+                );
+
+                if (titleMatch || overviewMatch || overviewFrMatch || keywordsMatch) {
+                    results.push({
+                        id: doc.id,
+                        uid: episode.uid_episode,
+                        uid_episode: episode.uid_episode,
+                        uid_season: episode.uid_season,
+                        title: episode.title,
+                        description: episode.overviewFr || episode.overview || '',
+                        imageUrl: episode.backdrop_path || episode.picture_path,
+                        type: 'episode',
+                        serieTitle: episode.title_serie,
+                        episodeNumber: episode.episode_numero
+                    });
+                }
+            });
+
+            return results;
+        } catch (error) {
+            console.error('Error searching episodes:', error);
+            return [];
+        }
+    },
+
+    /**
+     * Recherche par type spécifique
+     */
+    async searchByType(searchTerm: string, type: 'movie' | 'serie' | 'podcast' | 'season' | 'episode'): Promise<SearchResult[]> {
+        const term = searchTerm.toLowerCase().trim();
+
+        switch (type) {
+            case 'movie':
+                return this.searchMovies(term);
+            case 'serie':
+                const series = await this.searchSeries(term);
+                return series.filter(s => s.type === 'serie');
+            case 'podcast':
+                const podcasts = await this.searchSeries(term);
+                return podcasts.filter(p => p.type === 'podcast');
+            case 'season':
+                return this.searchSeasons(term);
+            case 'episode':
+                return this.searchEpisodes(term);
+            default:
+                return [];
+        }
+    }
+};
+
+

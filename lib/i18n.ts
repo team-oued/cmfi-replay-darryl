@@ -131,6 +131,16 @@ const translations = {
         categorySeriesDescription: 'Discover our inspiring and edifying series',
         categoryMoviesDescription: 'Films that build and inspire your faith',
         categoryPodcastsDescription: 'Listen to our teachings wherever you are',
+        pleaseEnterCode: 'Please enter a voucher code',
+        errorRedeeming: 'Error redeeming voucher',
+        back: 'Back',
+        enterVoucherCode: 'Enter your voucher code below to activate your Premium subscription.',
+        voucherCode: 'Voucher code',
+        enterCodeWithoutSpaces: 'Enter the code without spaces or dashes',
+        processing: 'Processing...',
+        redeem: 'Redeem',
+        needHelp: 'Need help?',
+        contactSupport: 'Contact support',
     },
     fr: {
         home: 'Accueil',
@@ -262,6 +272,16 @@ const translations = {
         categorySeriesDescription: 'Découvrez nos séries inspirantes et édifiantes',
         categoryMoviesDescription: 'Des films qui édifient et inspirent votre foi',
         categoryPodcastsDescription: 'Écoutez nos enseignements où que vous soyez',
+        pleaseEnterCode: 'Veuillez entrer un code de réduction',
+        errorRedeeming: 'Erreur lors de l\'activation du code',
+        back: 'Retour',
+        enterVoucherCode: 'Entrez votre code promotionnel ci-dessous pour activer votre abonnement Premium.',
+        voucherCode: 'Code promotionnel',
+        enterCodeWithoutSpaces: 'Entrez le code sans espaces ni tirets',
+        processing: 'Traitement...',
+        redeem: 'Activer le code',
+        needHelp: 'Besoin d\'aide ?',
+        contactSupport: 'Contacter le support',
     }
 };
 

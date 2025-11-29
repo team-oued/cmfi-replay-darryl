@@ -116,33 +116,42 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, activeTab, setActive
 
   return (
     <>
-      {/* Overlay */}
-      <div
-        className={`fixed inset-0 bg-black bg-opacity-50 z-30 transition-opacity duration-300 ${
-          isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}
-        onClick={onClose}
-      />
+      {/* Overlay pour mobile */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-30 transition-opacity duration-300 lg:hidden"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
 
-      {/* Sidebar */}
+      {/* Barre latérale */}
       <div
-        className={`fixed top-0 left-0 h-full w-64 bg-[#FBF9F3] dark:bg-black shadow-xl transform transition-colors duration-300 z-40 ${
+        className={`fixed inset-y-0 left-0 z-40 w-64 bg-[#FBF9F3] dark:bg-black border-r border-gray-200 dark:border-gray-800 transform ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        } transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-auto flex flex-col h-full`}
+        role="navigation"
+        aria-label="Menu principal"
       >
-        <div className="flex flex-col h-full">
-          {/* Logo */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">CMFI Replay</h2>
-            <button
-              onClick={onClose}
-              className="p-1 rounded-md text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+        {/* En-tête */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">Menu</h2>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-full text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 lg:hidden"
+            aria-label="Fermer le menu"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-6 w-6"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
 
           {/* Navigation */}
           <nav className="flex-1 overflow-y-auto py-4">
@@ -254,7 +263,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, activeTab, setActive
               </svg>
               {t('profile')}
             </Link>
-          </div>
         </div>
       </div>
     </>
