@@ -34,14 +34,37 @@ import WatchScreen from './screens/WatchScreen';
 // Components
 import BottomNav from './components/BottomNav';
 import Sidebar from './components/Sidebar';
-import HamburgerMenu from './components/HamburgerMenu';
+import Header from './components/Header';
 import { ActiveTab, MediaContent, MediaType } from './types';
 import { serieService, seasonSerieService, episodeSerieService, EpisodeSerie } from './lib/firestore';
+import { usePageTitle } from './lib/pageTitle';
+import { initializeMovieViews } from './lib/firestore';
+
+const getTitleFromPath = (path: string, t: (key: string) => string): string => {
+    if (path === '/home') return t('home');
+    if (path === '/movies') return t('categoryMovies');
+    if (path === '/series') return t('categorySeries');
+    if (path === '/podcasts') return t('categoryPodcasts');
+    if (path.startsWith('/movie/')) return t('movie');
+    if (path.startsWith('/serie/')) return t('serie');
+    if (path.startsWith('/podcast/')) return t('podcast');
+    if (path === '/search') return t('search');
+    if (path === '/profile') return t('profile');
+    if (path === '/preferences') return t('preferences');
+    if (path === '/editprofile') return t('editProfile');
+    if (path === '/change-password') return t('changePassword');
+    if (path === '/history') return t('history');
+    if (path === '/bookmarks' || path === '/favorites') return t('favorites');
+    return '';
+};
 
 const AppContent: React.FC = () => {
-    const { isAuthenticated } = useAppContext();
+    const { isAuthenticated, t, loading } = useAppContext();
     const location = useLocation();
     const navigate = useNavigate();
+
+    // Mettre à jour le titre de la page en fonction de la route actuelle
+    usePageTitle();
 
     // Utiliser localStorage pour persister hasStarted
     const [hasStarted, setHasStarted] = useState(() => {
@@ -153,6 +176,15 @@ const AppContent: React.FC = () => {
     // Route publique pour /watch/:uid (accessible sans authentification)
     const isWatchRoute = location.pathname.startsWith('/watch/');
 
+    // Afficher un indicateur de chargement pendant la vérification de l'authentification
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-[#FBF9F3] dark:bg-black">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-amber-500"></div>
+            </div>
+        );
+    }
+
     if (!isAuthenticated && !isWatchRoute) {
         return (
             <Routes>
@@ -194,21 +226,16 @@ const AppContent: React.FC = () => {
                 setActiveTab={(tab) => setActiveTab(tab as ActiveTab)}
             />
 
-            {!isWatchRoute && (
-                <div className="fixed top-0 left-0 right-0 z-20 bg-[#FBF9F3] dark:bg-black p-4 border-b border-gray-200 dark:border-gray-800 md:hidden">
-                    <div className="relative w-full flex items-center justify-center">
-                        <h1 className="text-xl font-bold text-center">CMFI Replay</h1>
-                        <div className="absolute right-0">
-                            <HamburgerMenu
-                                isOpen={isSidebarOpen}
-                                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                            />
-                        </div>
-                    </div>
-                </div>
-            )}
+            <Header
+                title={location.pathname === '/home' ? t('home') : 
+                      location.pathname.startsWith('/watch/') ? t('watching') : 
+                      getTitleFromPath(location.pathname, t)}
+                isSidebarOpen={isSidebarOpen}
+                onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+                isWatchRoute={location.pathname.startsWith('/watch/')}
+            />
 
-            <div className={`page-transition fadeIn ${showBottomNav ? 'pb-20' : ''} ${!isWatchRoute ? 'pt-16' : ''} md:pt-0`}>
+            <div className={`page-transition fadeIn ${showBottomNav ? 'pb-20' : ''} ${!isWatchRoute ? 'pt-16 md:pt-16' : 'pt-0'} lg:pl-64`}>
                 <Routes>
                     {/* Watch Route - Accessible sans authentification */}
                     <Route path="/watch/:uid" element={
@@ -342,7 +369,7 @@ const AppContent: React.FC = () => {
             </div>
 
             {showBottomNav && (
-                <div className="fixed bottom-0 left-0 right-0 z-20">
+                <div className="fixed bottom-0 left-0 right-0 z-20 lg:hidden">
                     <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
                 </div>
             )}
@@ -361,5 +388,10 @@ const App: React.FC = () => {
         </BrowserRouter>
     );
 };
+
+// Dans App.tsx, ajoutez cette ligne temporairement
+if (typeof window !== 'undefined') {
+  (window as any).initializeMovieViews = initializeMovieViews;
+}
 
 export default App;

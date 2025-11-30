@@ -137,7 +137,7 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({ onBack }) => {
                     </div>
                 </PreferenceSection>
 
-                <PreferenceSection title={t('playback')}>
+                <PreferenceSection title={t('playbackSpeed')}>
                     <div className="px-4">
                         <PreferenceRow
                             Icon={ForwardIcon}

@@ -35,16 +35,16 @@ const Breadcrumbs: React.FC = () => {
                     label = t('profile') || 'Profil';
                     break;
                 case 'movies':
-                    label = 'Films';
+                    label = t('categoryMovies');
                     break;
                 case 'series':
-                    label = 'Séries';
+                    label = t('categorySeries');
                     break;
                 case 'podcasts':
-                    label = 'Podcasts';
+                    label = t('categoryPodcasts');
                     break;
                 case 'favorites':
-                    label = 'Favoris';
+                    label = t('favorites');
                     break;
                 case 'preferences':
                     label = t('preferences') || 'Préférences';
@@ -53,20 +53,18 @@ const Breadcrumbs: React.FC = () => {
                     label = 'Modifier le profil';
                     break;
                 case 'watch':
-                    label = 'Lecture';
+                    label = t('watch');
                     break;
                 case 'movie':
                 case 'serie':
                 case 'podcast':
                     // Pour les détails, on affiche le type
-                    label = value === 'movie' ? 'Film' :
-                        value === 'serie' ? 'Série' :
-                            'Podcast';
+                    label = t(value as 'movie' | 'serie' | 'podcast');
                     break;
                 default:
                     // Pour les UIDs, on affiche "Détails"
                     if (index > 0) {
-                        label = 'Détails';
+                        label = t('details') || 'Détails';
                     }
             }
 

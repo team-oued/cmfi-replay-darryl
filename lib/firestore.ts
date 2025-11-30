@@ -1,4 +1,4 @@
-import { db } from './firebase';
+import { db } from './firebase.ts';
 import {
     collection,
     doc,
@@ -14,6 +14,7 @@ import {
     arrayUnion,
     arrayRemove,
     Timestamp,
+    writeBatch,
     DocumentReference
 } from 'firebase/firestore';
 
@@ -731,6 +732,129 @@ export const seasonSerieService = {
             return null;
         }
     },
+};
+
+// Fonction utilitaire pour calculer et mettre à jour les vues des épisodes
+export const updateEpisodeViews = async (): Promise<void> => {
+    try {
+        console.log('Début du calcul des vues des épisodes...');
+        
+        // 1. Récupérer tous les documents de la collection statsVues
+        const statsVuesSnapshot = await getDocs(collection(db, 'statsVues'));
+        
+        // 2. Grouper les vues par idEpisodeSerie
+        const viewsByEpisode: { [key: string]: number } = {};
+        
+        statsVuesSnapshot.docs.forEach(doc => {
+            const data = doc.data();
+            if (data.idEpisodeSerie) {
+                const episodeRef = data.idEpisodeSerie;
+                const episodeId = typeof episodeRef === 'string' ? episodeRef : episodeRef.id;
+                const counter = data.counter || 0;
+                
+                if (!viewsByEpisode[episodeId]) {
+                    viewsByEpisode[episodeId] = 0;
+                }
+                viewsByEpisode[episodeId] += counter;
+            }
+        });
+        
+        console.log(`Nombre d'épisodes trouvés dans statsVues: ${Object.keys(viewsByEpisode).length}`);
+        
+        // 3. Mettre à jour chaque épisode avec le nombre total de vues
+        const BATCH_LIMIT = 500;
+        let batch = writeBatch(db);
+        let batchCount = 0;
+        let totalProcessed = 0;
+        
+        for (const [episodeId, totalViews] of Object.entries(viewsByEpisode)) {
+            try {
+                const episodeRef = doc(db, EPISODES_SERIES_COLLECTION, episodeId);
+                
+                // Vérifier si le document existe avant de l'ajouter au batch
+                const episodeDoc = await getDoc(episodeRef);
+                
+                if (episodeDoc.exists()) {
+                    batch.update(episodeRef, { views: totalViews });
+                    batchCount++;
+                    totalProcessed++;
+                    
+                    // Exécuter le batch par lots de BATCH_LIMIT (limite Firestore)
+                    if (batchCount >= BATCH_LIMIT) {
+                        await batch.commit();
+                        console.log(`Lot de ${batchCount} mises à jour effectué (${totalProcessed}/${Object.keys(viewsByEpisode).length} au total)`);
+                        batch = writeBatch(db); // Créer un nouveau batch
+                        batchCount = 0;
+                    }
+                } else {
+                    console.warn(`L'épisode ${episodeId} n'existe pas dans la collection ${EPISODES_SERIES_COLLECTION}`);
+                    totalProcessed++; // On l'inclut dans le total traité
+                }
+            } catch (error) {
+                console.error(`Erreur lors de la mise à jour de l'épisode ${episodeId}:`, error);
+                // Continuer avec les autres mises à jour même en cas d'erreur
+                totalProcessed++;
+            }
+        }
+        
+        // Exécuter le dernier lot s'il reste des opérations
+        if (batchCount > 0) {
+            await batch.commit();
+            console.log(`Dernier lot de ${batchCount} mises à jour effectué (${totalProcessed}/${Object.keys(viewsByEpisode).length} au total)`);
+        }
+        
+        console.log('Mise à jour des vues terminée avec succès !');
+        return Promise.resolve();
+    } catch (error) {
+        console.error('Erreur lors de la mise à jour des vues des épisodes:', error);
+        return Promise.reject(error);
+    }
+};
+
+// Initialise les vues des films (mise à jour par lots de 100)
+export const initializeMovieViews = async (): Promise<{success: boolean; updated: number}> => {
+  try {
+    console.log('Début de l\'initialisation des vues des films...');
+    
+    // Récupérer les films par lots de 100 pour limiter les lectures
+    const moviesQuery = query(
+      collection(db, 'movies'),
+      limit(100)  // Limite pour éviter de trop charger
+    );
+    
+    const snapshot = await getDocs(moviesQuery);
+    
+    if (snapshot.empty) {
+      console.log('Aucun film trouvé');
+      return { success: true, updated: 0 };
+    }
+    
+    // Filtrer les films qui n'ont pas de champ views
+    const moviesToUpdate = snapshot.docs.filter(doc => 
+      doc.data().views === undefined
+    );
+    
+    if (moviesToUpdate.length === 0) {
+      console.log('Tous les films ont déjà un champ views');
+      return { success: true, updated: 0 };
+    }
+    
+    console.log(`Mise à jour de ${moviesToUpdate.length} films...`);
+    
+    // Mettre à jour les films en un seul lot
+    const batch = writeBatch(db);
+    moviesToUpdate.forEach(doc => {
+      batch.update(doc.ref, { views: 0 });
+    });
+    
+    await batch.commit();
+    console.log(`${moviesToUpdate.length} films mis à jour avec succès`);
+    
+    return { success: true, updated: moviesToUpdate.length };
+  } catch (error) {
+    console.error('Erreur lors de l\'initialisation des vues des films:', error);
+    return { success: false, updated: 0 };
+  }
 };
 
 // Services pour les épisodes de séries

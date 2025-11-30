@@ -115,7 +115,7 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ onNavigate }) => {
 
       {/* Titre de la page */}
       <div className="px-6 py-4">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Rechercher</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('searchScreenTitle')}</h1>
       </div>
 
       {/* Barre de recherche */}
@@ -160,8 +160,8 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ onNavigate }) => {
         {searchTerm && (
           <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
             {results.length > 0
-              ? `${results.length} ${results.length === 1 ? 'résultat' : 'résultats'}`
-              : !isLoading && 'Aucun résultat'
+              ? `${t('resultsFor', { term: searchTerm })} (${results.length} ${results.length === 1 ? t('result') : t('results')})`
+              : !isLoading && t('noResultsFor', { term: searchTerm })
             }
           </h3>
         )}
@@ -228,8 +228,12 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ onNavigate }) => {
         {!searchTerm && !isLoading && (
           <div className="text-center py-12">
             <SearchIcon className="w-16 h-16 text-gray-300 dark:text-gray-700 mx-auto mb-4" />
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Résultats pour "{searchTerm}"</h2>
-            <p className="text-gray-600 dark:text-gray-300">Aucun résultat trouvé</p>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              {t('noSearchTerm')}
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400">
+              {t('searchPlaceholder')}
+            </p>
           </div>
         )}
       </div>

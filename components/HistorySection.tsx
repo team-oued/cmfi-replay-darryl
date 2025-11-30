@@ -15,7 +15,7 @@ export const HistoryCard: React.FC<HistoryCardProps> = ({ item, onClick }) => {
             onClick={onClick}
             className="h-full flex flex-col group"
         >
-            <div className="relative flex-1 flex flex-col rounded-xl overflow-hidden bg-gray-800/50 dark:bg-gray-900/70 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-200/10 hover:border-amber-500/30">
+            <div className="relative flex-1 flex flex-col rounded-xl overflow-hidden bg-[#f5f5f5] dark:bg-gray-900/70 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-200 dark:border-gray-700 hover:border-amber-500/30">
                 {/* Image container */}
                 <div className="relative w-full aspect-video overflow-hidden">
                     <img
@@ -48,7 +48,7 @@ export const HistoryCard: React.FC<HistoryCardProps> = ({ item, onClick }) => {
                     </h3>
                     {item.type === 'episode' && item.episodeTitle && (
                         <p className="text-xs text-gray-600 dark:text-gray-300 line-clamp-1">
-                            <span className="font-medium text-amber-500">Ép. {item.episodeNumber}</span> • {item.episodeTitle}
+                            <span className="font-medium text-amber-600 dark:text-amber-500">Ép. {item.episodeNumber}</span> • {item.episodeTitle}
                         </p>
                     )}
                     {item.lastWatched && (
