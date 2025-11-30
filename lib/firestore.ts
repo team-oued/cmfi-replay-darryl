@@ -88,6 +88,7 @@ export interface EpisodeSerie {
     uid_season: string;
     video_path_hd: string;
     video_path_sd: string;
+    views?: number;
 }
 
 export interface Movie {
@@ -110,6 +111,7 @@ export interface Movie {
     runtime_h_m: string;
     popular: boolean;
     trending: boolean;
+    views?: number;
 }
 
 export interface UserBookmark {
@@ -163,6 +165,14 @@ export interface StatsVues {
     user: DocumentReference; // Référence à l'utilisateur
 }
 
+// Interface pour la collection user_view
+export interface UserView {
+    view_date: string; // Format: "12 juin 2025 à 08:19:16 UTC+2"
+    uid: string; // uid du film (uid) ou de l'épisode (uid_episode)
+    video_type: 'movie' | 'episode';
+    user_uid: string; // uid de l'utilisateur
+}
+
 // Constantes pour les collections
 const USERS_COLLECTION = 'users';
 const MOVIES_COLLECTION = 'movies';
@@ -175,6 +185,7 @@ const BOOK_SERIES_COLLECTION = 'bookSeries';
 const LIKES_COLLECTION = 'like';
 const COMMENTS_COLLECTION = 'comment';
 const STATS_VUES_COLLECTION = 'stats_vues';
+const USER_VIEW_COLLECTION = 'user_view';
 
 // Fonction utilitaire pour générer un avatar par défaut
 export const generateDefaultAvatar = (name?: string): string => {
@@ -738,47 +749,47 @@ export const seasonSerieService = {
 export const updateEpisodeViews = async (): Promise<void> => {
     try {
         console.log('Début du calcul des vues des épisodes...');
-        
+
         // 1. Récupérer tous les documents de la collection statsVues
         const statsVuesSnapshot = await getDocs(collection(db, 'statsVues'));
-        
+
         // 2. Grouper les vues par idEpisodeSerie
         const viewsByEpisode: { [key: string]: number } = {};
-        
+
         statsVuesSnapshot.docs.forEach(doc => {
             const data = doc.data();
             if (data.idEpisodeSerie) {
                 const episodeRef = data.idEpisodeSerie;
                 const episodeId = typeof episodeRef === 'string' ? episodeRef : episodeRef.id;
                 const counter = data.counter || 0;
-                
+
                 if (!viewsByEpisode[episodeId]) {
                     viewsByEpisode[episodeId] = 0;
                 }
                 viewsByEpisode[episodeId] += counter;
             }
         });
-        
+
         console.log(`Nombre d'épisodes trouvés dans statsVues: ${Object.keys(viewsByEpisode).length}`);
-        
+
         // 3. Mettre à jour chaque épisode avec le nombre total de vues
         const BATCH_LIMIT = 500;
         let batch = writeBatch(db);
         let batchCount = 0;
         let totalProcessed = 0;
-        
+
         for (const [episodeId, totalViews] of Object.entries(viewsByEpisode)) {
             try {
                 const episodeRef = doc(db, EPISODES_SERIES_COLLECTION, episodeId);
-                
+
                 // Vérifier si le document existe avant de l'ajouter au batch
                 const episodeDoc = await getDoc(episodeRef);
-                
+
                 if (episodeDoc.exists()) {
                     batch.update(episodeRef, { views: totalViews });
                     batchCount++;
                     totalProcessed++;
-                    
+
                     // Exécuter le batch par lots de BATCH_LIMIT (limite Firestore)
                     if (batchCount >= BATCH_LIMIT) {
                         await batch.commit();
@@ -796,13 +807,13 @@ export const updateEpisodeViews = async (): Promise<void> => {
                 totalProcessed++;
             }
         }
-        
+
         // Exécuter le dernier lot s'il reste des opérations
         if (batchCount > 0) {
             await batch.commit();
             console.log(`Dernier lot de ${batchCount} mises à jour effectué (${totalProcessed}/${Object.keys(viewsByEpisode).length} au total)`);
         }
-        
+
         console.log('Mise à jour des vues terminée avec succès !');
         return Promise.resolve();
     } catch (error) {
@@ -812,49 +823,49 @@ export const updateEpisodeViews = async (): Promise<void> => {
 };
 
 // Initialise les vues des films (mise à jour par lots de 100)
-export const initializeMovieViews = async (): Promise<{success: boolean; updated: number}> => {
-  try {
-    console.log('Début de l\'initialisation des vues des films...');
-    
-    // Récupérer les films par lots de 100 pour limiter les lectures
-    const moviesQuery = query(
-      collection(db, 'movies'),
-      limit(100)  // Limite pour éviter de trop charger
-    );
-    
-    const snapshot = await getDocs(moviesQuery);
-    
-    if (snapshot.empty) {
-      console.log('Aucun film trouvé');
-      return { success: true, updated: 0 };
+export const initializeMovieViews = async (): Promise<{ success: boolean; updated: number }> => {
+    try {
+        console.log('Début de l\'initialisation des vues des films...');
+
+        // Récupérer les films par lots de 100 pour limiter les lectures
+        const moviesQuery = query(
+            collection(db, 'movies'),
+            limit(100)  // Limite pour éviter de trop charger
+        );
+
+        const snapshot = await getDocs(moviesQuery);
+
+        if (snapshot.empty) {
+            console.log('Aucun film trouvé');
+            return { success: true, updated: 0 };
+        }
+
+        // Filtrer les films qui n'ont pas de champ views
+        const moviesToUpdate = snapshot.docs.filter(doc =>
+            doc.data().views === undefined
+        );
+
+        if (moviesToUpdate.length === 0) {
+            console.log('Tous les films ont déjà un champ views');
+            return { success: true, updated: 0 };
+        }
+
+        console.log(`Mise à jour de ${moviesToUpdate.length} films...`);
+
+        // Mettre à jour les films en un seul lot
+        const batch = writeBatch(db);
+        moviesToUpdate.forEach(doc => {
+            batch.update(doc.ref, { views: 0 });
+        });
+
+        await batch.commit();
+        console.log(`${moviesToUpdate.length} films mis à jour avec succès`);
+
+        return { success: true, updated: moviesToUpdate.length };
+    } catch (error) {
+        console.error('Erreur lors de l\'initialisation des vues des films:', error);
+        return { success: false, updated: 0 };
     }
-    
-    // Filtrer les films qui n'ont pas de champ views
-    const moviesToUpdate = snapshot.docs.filter(doc => 
-      doc.data().views === undefined
-    );
-    
-    if (moviesToUpdate.length === 0) {
-      console.log('Tous les films ont déjà un champ views');
-      return { success: true, updated: 0 };
-    }
-    
-    console.log(`Mise à jour de ${moviesToUpdate.length} films...`);
-    
-    // Mettre à jour les films en un seul lot
-    const batch = writeBatch(db);
-    moviesToUpdate.forEach(doc => {
-      batch.update(doc.ref, { views: 0 });
-    });
-    
-    await batch.commit();
-    console.log(`${moviesToUpdate.length} films mis à jour avec succès`);
-    
-    return { success: true, updated: moviesToUpdate.length };
-  } catch (error) {
-    console.error('Erreur lors de l\'initialisation des vues des films:', error);
-    return { success: false, updated: 0 };
-  }
 };
 
 // Services pour les épisodes de séries
@@ -1797,3 +1808,197 @@ export const searchService = {
 };
 
 
+// Service pour gérer les vues des vidéos
+export const viewService = {
+    /**
+     * Enregistre une vue pour un film ou un épisode
+     * @param uid - uid du film ou uid_episode de l'épisode
+     * @param videoType - 'movie' ou 'episode'
+     * @param userUid - uid de l'utilisateur
+     */
+    async recordView(uid: string, videoType: 'movie' | 'episode', userUid: string): Promise<void> {
+        try {
+            // Créer le document de vue
+            const viewData: UserView = {
+                view_date: new Date().toLocaleString('fr-FR', {
+                    day: '2-digit',
+                    month: 'long',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    timeZoneName: 'short'
+                }),
+                uid: uid,
+                video_type: videoType,
+                user_uid: userUid
+            };
+
+            // Ajouter le document à la collection user_view
+            await setDoc(doc(collection(db, USER_VIEW_COLLECTION)), viewData);
+
+            // Incrémenter le compteur de vues dans la collection correspondante
+            if (videoType === 'movie') {
+                await this.incrementMovieViews(uid);
+            } else if (videoType === 'episode') {
+                await this.incrementEpisodeViews(uid);
+            }
+
+            console.log(`Vue enregistrée pour ${videoType} ${uid}`);
+        } catch (error) {
+            console.error('Error recording view:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Incrémente le compteur de vues d'un film
+     */
+    async incrementMovieViews(movieUid: string): Promise<void> {
+        try {
+            // Trouver le document du film par son uid
+            const q = query(
+                collection(db, MOVIES_COLLECTION),
+                where('uid', '==', movieUid),
+                limit(1)
+            );
+            const querySnapshot = await getDocs(q);
+
+            if (!querySnapshot.empty) {
+                const movieDoc = querySnapshot.docs[0];
+                const currentViews = movieDoc.data().views || 0;
+
+                await updateDoc(movieDoc.ref, {
+                    views: currentViews + 1
+                });
+            }
+        } catch (error) {
+            console.error('Error incrementing movie views:', error);
+        }
+    },
+
+    /**
+     * Incrémente le compteur de vues d'un épisode
+     */
+    async incrementEpisodeViews(episodeUid: string): Promise<void> {
+        try {
+            // Trouver le document de l'épisode par son uid_episode
+            const q = query(
+                collection(db, EPISODES_SERIES_COLLECTION),
+                where('uid_episode', '==', episodeUid),
+                limit(1)
+            );
+            const querySnapshot = await getDocs(q);
+
+            if (!querySnapshot.empty) {
+                const episodeDoc = querySnapshot.docs[0];
+                const currentViews = episodeDoc.data().views || 0;
+
+                await updateDoc(episodeDoc.ref, {
+                    views: currentViews + 1
+                });
+            }
+        } catch (error) {
+            console.error('Error incrementing episode views:', error);
+        }
+    },
+
+    /**
+     * Récupère le nombre de vues pour un film ou un épisode
+     */
+    async getViewCount(uid: string, videoType: 'movie' | 'episode'): Promise<number> {
+        try {
+            const q = query(
+                collection(db, USER_VIEW_COLLECTION),
+                where('uid', '==', uid),
+                where('video_type', '==', videoType)
+            );
+            const querySnapshot = await getDocs(q);
+            return querySnapshot.size;
+        } catch (error) {
+            console.error('Error getting view count:', error);
+            return 0;
+        }
+    },
+
+    /**
+     * Vérifie si un utilisateur a déjà vu une vidéo
+     */
+    async hasUserViewed(uid: string, videoType: 'movie' | 'episode', userUid: string): Promise<boolean> {
+        try {
+            const q = query(
+                collection(db, USER_VIEW_COLLECTION),
+                where('uid', '==', uid),
+                where('video_type', '==', videoType),
+                where('user_uid', '==', userUid),
+                limit(1)
+            );
+            const querySnapshot = await getDocs(q);
+            return !querySnapshot.empty;
+        } catch (error) {
+            console.error('Error checking if user viewed:', error);
+            return false;
+        }
+    },
+
+    /**
+     * Récupère les films et épisodes les plus vus
+     * @param limitCount Nombre maximum d'éléments à retourner
+     * @returns Un tableau d'objets contenant l'uid, le type (movie ou episode), le nombre de vues et le titre
+     */
+    async getMostWatchedItems(limitCount: number = 10): Promise<Array<{ uid: string; type: 'movie' | 'episode'; viewCount: number; title: string }>> {
+        try {
+            const watchedItems: Array<{ uid: string; type: 'movie' | 'episode'; viewCount: number; title: string }> = [];
+
+            // Récupérer tous les films avec leurs vues
+            const moviesQuery = query(
+                collection(db, MOVIES_COLLECTION),
+                where('hidden', '==', false),
+                where('views', '>', 0)
+            );
+            const moviesSnapshot = await getDocs(moviesQuery);
+
+            moviesSnapshot.docs.forEach(doc => {
+                const movie = doc.data() as Movie;
+                if (movie.views) {
+                    watchedItems.push({
+                        uid: movie.uid,
+                        type: 'movie',
+                        viewCount: movie.views,
+                        title: movie.title
+                    });
+                }
+            });
+
+            // Récupérer tous les épisodes avec leurs vues
+            const episodesQuery = query(
+                collection(db, EPISODES_SERIES_COLLECTION),
+                where('hidden', '==', false),
+                where('views', '>', 0)
+            );
+            const episodesSnapshot = await getDocs(episodesQuery);
+
+            episodesSnapshot.docs.forEach(doc => {
+                const episode = doc.data() as EpisodeSerie;
+                if (episode.views) {
+                    watchedItems.push({
+                        uid: episode.uid_episode,
+                        type: 'episode',
+                        viewCount: episode.views,
+                        title: episode.title
+                    });
+                }
+            });
+
+            // Trier par nombre de vues décroissant et limiter le résultat
+            const sortedItems = watchedItems
+                .sort((a, b) => b.viewCount - a.viewCount)
+                .slice(0, limitCount);
+
+            return sortedItems;
+        } catch (error) {
+            console.error('Error getting most watched items:', error);
+            return [];
+        }
+    }
+};

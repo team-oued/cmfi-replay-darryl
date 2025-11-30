@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { MediaType } from '../types';
-import { Movie, movieService, likeService, commentService, Comment, generateDefaultAvatar } from '../lib/firestore';
+import { Movie, movieService, likeService, commentService, Comment, generateDefaultAvatar, viewService } from '../lib/firestore';
 import {
     PlayIcon, PauseIcon, ArrowLeftIcon,
     LikeIcon, ShareIcon, PlusIcon,
@@ -33,7 +33,7 @@ const formatTime = (seconds: number) => {
 };
 
 // --- Video Player Component ---
-const VideoPlayer: React.FC<{ src: string, poster: string, onEnded?: () => void }> = ({ src, poster, onEnded }) => {
+const VideoPlayer: React.FC<{ src: string, poster: string, onEnded?: () => void, onPlayingStateChange?: (isPlaying: boolean) => void }> = ({ src, poster, onEnded, onPlayingStateChange }) => {
     const { t } = useAppContext();
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -109,8 +109,14 @@ const VideoPlayer: React.FC<{ src: string, poster: string, onEnded?: () => void 
             setIsLoading(false);
         };
 
-        const handlePlay = () => setIsPlaying(true);
-        const handlePause = () => setIsPlaying(false);
+        const handlePlay = () => {
+            setIsPlaying(true);
+            if (onPlayingStateChange) onPlayingStateChange(true);
+        };
+        const handlePause = () => {
+            setIsPlaying(false);
+            if (onPlayingStateChange) onPlayingStateChange(false);
+        };
         const handleTimeUpdate = () => {
             if (video.duration) {
                 setCurrentTime(video.currentTime);
@@ -557,7 +563,7 @@ interface PlayableItem {
     type: MediaType;
     title: string;
     imageUrl?: string;
-    comments?: CommentType[];
+    comments?: Comment[];
     video_path_hd?: string;
     original_language?: string;
 }
@@ -574,6 +580,7 @@ const MoviePlayerScreen: React.FC<MoviePlayerScreenProps> = ({ item, onBack }) =
     const [hasLiked, setHasLiked] = useState(false);
     const [showAuthPrompt, setShowAuthPrompt] = useState(false);
     const [authAction, setAuthAction] = useState('');
+    const [videoIsPlaying, setVideoIsPlaying] = useState(false);
 
     const handleAuthRequired = (action: string) => {
         setAuthAction(action);
@@ -589,7 +596,7 @@ const MoviePlayerScreen: React.FC<MoviePlayerScreenProps> = ({ item, onBack }) =
     useEffect(() => {
         const fetchMovieData = async () => {
             try {
-                const movie = await movieService.getMovieById(item.id);
+                const movie = await movieService.getMovieByUid(item.id);
                 setMovieData(movie);
             } catch (error) {
                 console.error('Error fetching movie data:', error);
@@ -621,6 +628,42 @@ const MoviePlayerScreen: React.FC<MoviePlayerScreenProps> = ({ item, onBack }) =
 
         fetchLikeData();
     }, [item.id, movieData, userProfile]);
+
+    // Track view after 30 seconds of watching (only when video is playing)
+    const watchTimeRef = useRef(0);
+    const hasRecordedViewRef = useRef(false);
+
+    useEffect(() => {
+        // Use movieData.uid if available, otherwise fallback to item.id
+        const movieUid = movieData?.uid || item.id;
+
+        if (!movieUid || !userProfile?.uid) return;
+
+        const viewTimer = setInterval(() => {
+            if (videoIsPlaying && !hasRecordedViewRef.current) {
+                watchTimeRef.current += 1;
+
+                if (watchTimeRef.current >= 30) {
+                    hasRecordedViewRef.current = true;
+                    viewService.recordView(movieUid, 'movie', userProfile.uid)
+                        .catch((error) => {
+                            console.error('Erreur lors de l\'enregistrement de la vue:', error);
+                        });
+                }
+            }
+        }, 1000);
+
+        return () => {
+            clearInterval(viewTimer);
+        };
+    }, [movieData, userProfile, videoIsPlaying, item.id]);
+
+    // Reset watch time when movie changes
+    useEffect(() => {
+        watchTimeRef.current = 0;
+        hasRecordedViewRef.current = false;
+    }, [movieData?.uid, item.id]);
+
 
     // Utiliser les données de la collection Movie si disponibles, sinon fallback sur MediaContent
     const displayItem = movieData || item;
@@ -755,8 +798,8 @@ const MoviePlayerScreen: React.FC<MoviePlayerScreenProps> = ({ item, onBack }) =
         <button
             onClick={handleLikeWithAnimation}
             className={`relative flex flex-col items-center space-y-1 transition-all duration-300 ${isActive
-                    ? 'text-red-500 dark:text-red-400'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400'
+                ? 'text-red-500 dark:text-red-400'
+                : 'text-gray-600 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400'
                 }`}
         >
             <div className="relative">
@@ -817,8 +860,8 @@ const MoviePlayerScreen: React.FC<MoviePlayerScreenProps> = ({ item, onBack }) =
 
     return (
         <div className="bg-[#FBF9F3] dark:bg-black min-h-screen animate-fadeIn">
-            <div className="relative">
-                <header className="absolute top-0 left-0 z-10 p-2 sm:p-4">
+            <div className="relative pt-16 md:pt-0">
+                <header className="absolute top-16 md:top-0 left-0 z-10 p-2 sm:p-4">
                     <button
                         onClick={onBack}
                         className="p-2 rounded-full text-white bg-black/40 hover:bg-black/60 backdrop-blur-sm transition-colors"
@@ -831,6 +874,7 @@ const MoviePlayerScreen: React.FC<MoviePlayerScreenProps> = ({ item, onBack }) =
                     src={movieData?.video_path_hd || item.video_path_hd}
                     poster={movieData?.picture_path || item.imageUrl}
                     onEnded={handleVideoEnded}
+                    onPlayingStateChange={setVideoIsPlaying}
                 />
             </div>
 
@@ -839,11 +883,11 @@ const MoviePlayerScreen: React.FC<MoviePlayerScreenProps> = ({ item, onBack }) =
                 <div className="flex items-center space-x-3 text-sm text-gray-500 dark:text-gray-400">
                     <span>{item.original_language || 'FR'}</span>
                     <span className="w-1.5 h-1.5 bg-gray-400 rounded-full" />
-                    <span>{formatNumber(0)} {t('views')}</span>
+                    <span>{formatNumber(movieData?.views || 0)} {t('views')}</span>
                 </div>
                 <div className="flex items-center justify-around py-2">
                     <LikeButton
-                        label={hasLiked ? t('liked') : t('like')}
+                        label={t('like')}
                         value={likeCount}
                         onClick={handleLike}
                         isActive={hasLiked}

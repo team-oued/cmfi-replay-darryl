@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { MediaContent } from '../types';
-import { EpisodeSerie, episodeSerieService, seasonSerieService, serieService, likeService, commentService, Comment, generateDefaultAvatar } from '../lib/firestore';
+import { EpisodeSerie, episodeSerieService, seasonSerieService, serieService, likeService, commentService, Comment, generateDefaultAvatar, viewService } from '../lib/firestore';
 import {
     PlayIcon, PauseIcon, ArrowLeftIcon, ChevronLeftIcon, ChevronRightIcon,
     LikeIcon, ShareIcon, PlusIcon,
@@ -33,7 +33,7 @@ const formatTime = (seconds: number) => {
 };
 
 // --- Video Player Component ---
-const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () => void, onEnded?: () => void }> = ({ src, poster, onUnavailable, onEnded }) => {
+const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () => void, onEnded?: () => void, onPlayingStateChange?: (isPlaying: boolean) => void }> = ({ src, poster, onUnavailable, onEnded, onPlayingStateChange }) => {
     const { t } = useAppContext();
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -92,7 +92,7 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
                 }
             }
         };
-        
+
         document.addEventListener('enterpictureinpicture', handlePipChange);
         document.addEventListener('leavepictureinpicture', handlePipChange);
 
@@ -101,17 +101,23 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
             setIsPlaying(true);
             videoRef.current?.play().catch(() => setIsPlaying(false));
         };
-        
+
         const handleWaiting = () => {
             setIsLoading(true);
         };
-        
+
         const handlePlaying = () => {
             setIsLoading(false);
         };
 
-        const handlePlay = () => setIsPlaying(true);
-        const handlePause = () => setIsPlaying(false);
+        const handlePlay = () => {
+            setIsPlaying(true);
+            if (onPlayingStateChange) onPlayingStateChange(true);
+        };
+        const handlePause = () => {
+            setIsPlaying(false);
+            if (onPlayingStateChange) onPlayingStateChange(false);
+        };
         const handleTimeUpdate = () => {
             if (video.duration) {
                 setCurrentTime(video.currentTime);
@@ -175,7 +181,7 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
     useEffect(() => {
         const video = videoRef.current;
         if (!video) return;
-        
+
         // Fermer le PIP si la vidéo change
         const closePip = async () => {
             if (document.pictureInPictureElement === video) {
@@ -186,9 +192,9 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
                 }
             }
         };
-        
+
         closePip();
-        
+
         setIsPlaying(false);
         setProgress(0);
         setDuration(0);
@@ -291,7 +297,7 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
     useEffect(() => {
         const video = videoRef.current;
         if (!video) return;
-        
+
         const handleSrcChange = async () => {
             if (document.pictureInPictureElement === video) {
                 try {
@@ -301,11 +307,11 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
                 }
             }
         };
-        
+
         // Observer les changements de source
         const observer = new MutationObserver(handleSrcChange);
         observer.observe(video, { attributes: true, attributeFilter: ['src'] });
-        
+
         return () => {
             observer.disconnect();
         };
@@ -363,8 +369,8 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
     };
 
     return (
-        <div 
-            ref={containerRef} 
+        <div
+            ref={containerRef}
             className="relative w-full aspect-video bg-black group overflow-hidden"
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
@@ -592,6 +598,7 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
     const [hasLiked, setHasLiked] = useState(false);
     const [showAuthPrompt, setShowAuthPrompt] = useState(false);
     const [authAction, setAuthAction] = useState('');
+    const [videoIsPlaying, setVideoIsPlaying] = useState(false);
 
     const handleAuthRequired = (action: string) => {
         setAuthAction(action);
@@ -636,6 +643,40 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
 
         fetchLikeData();
     }, [episode.uid_episode, userProfile]);
+
+    // Track view after 30 seconds of watching (only when video is playing)
+    const watchTimeRef = useRef(0);
+    const hasRecordedViewRef = useRef(false);
+
+    useEffect(() => {
+        if (!episode?.uid_episode || !userProfile?.uid) return;
+
+        const viewTimer = setInterval(() => {
+            if (videoIsPlaying && !hasRecordedViewRef.current) {
+                watchTimeRef.current += 1;
+
+                if (watchTimeRef.current >= 30) {
+                    hasRecordedViewRef.current = true;
+                    // Enregistrer la vue
+                    viewService.recordView(episode.uid_episode, 'episode', userProfile.uid)
+                        .catch((error) => {
+                            console.error('Erreur lors de l\'enregistrement de la vue:', error);
+                        });
+                }
+            }
+        }, 1000);
+
+        return () => {
+            clearInterval(viewTimer);
+        };
+    }, [episode, userProfile, videoIsPlaying]);
+
+    // Reset watch time when episode changes
+    useEffect(() => {
+        watchTimeRef.current = 0;
+        hasRecordedViewRef.current = false;
+    }, [episode?.uid_episode]);
+
 
     // Utiliser les données EpisodeSerie passées en prop
     const displayEpisode = episode;
@@ -754,10 +795,10 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
             y: Math.random() * 100
         }));
         setParticles(newParticles);
-        
+
         // Appeler la fonction like originale
         await handleLike();
-        
+
         // Nettoyer les particules après l'animation
         setTimeout(() => {
             setParticles([]);
@@ -766,25 +807,23 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
     };
 
     const LikeButton: React.FC<{ label: string, value?: string | number, onClick?: () => void, isActive?: boolean }> = ({ label, value, onClick, isActive }) => (
-        <button 
-            onClick={handleLikeWithAnimation} 
-            className={`relative flex flex-col items-center space-y-1 transition-all duration-300 ${
-                isActive 
-                    ? 'text-red-500 dark:text-red-400' 
-                    : 'text-gray-600 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400'
-            }`}
+        <button
+            onClick={handleLikeWithAnimation}
+            className={`relative flex flex-col items-center space-y-1 transition-all duration-300 ${isActive
+                ? 'text-red-500 dark:text-red-400'
+                : 'text-gray-600 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400'
+                }`}
         >
             <div className="relative">
-                <div 
-                    className={`transition-all duration-300 ${
-                        likeAnimation ? 'scale-150' : 'scale-100'
-                    }`}
+                <div
+                    className={`transition-all duration-300 ${likeAnimation ? 'scale-150' : 'scale-100'
+                        }`}
                     style={{
                         filter: likeAnimation ? 'drop-shadow(0 0 8px rgba(239, 68, 68, 0.8))' : 'none',
                         transform: likeAnimation ? 'scale(1.5) rotate(15deg)' : 'scale(1) rotate(0deg)'
                     }}
                 >
-                    <LikeIcon 
+                    <LikeIcon
                         className={`w-7 h-7 ${isActive ? 'fill-red-500 dark:fill-red-400' : ''}`}
                     />
                 </div>
@@ -817,9 +856,8 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
                     </div>
                 )}
             </div>
-            <span className={`text-xs font-semibold transition-all duration-300 ${
-                likeAnimation ? 'scale-110' : 'scale-100'
-            }`}>
+            <span className={`text-xs font-semibold transition-all duration-300 ${likeAnimation ? 'scale-110' : 'scale-100'
+                }`}>
                 {value ? formatNumber(Number(value)) : label}
             </span>
         </button>
@@ -834,8 +872,8 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
 
     return (
         <div className="bg-[#FBF9F3] dark:bg-black min-h-screen animate-fadeIn">
-            <div className="relative">
-                <header className="absolute top-0 left-0 z-10 p-2 sm:p-4">
+            <div className="relative pt-16 md:pt-0">
+                <header className="absolute top-16 md:top-0 left-0 z-10 p-2 sm:p-4">
                     <button
                         onClick={onBack}
                         className="p-2 rounded-full text-white bg-black/40 hover:bg-black/60 backdrop-blur-sm transition-colors"
@@ -850,6 +888,7 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
                     poster={episode.picture_path || item.imageUrl}
                     onUnavailable={onReturnHome}
                     onEnded={handleVideoEnded}
+                    onPlayingStateChange={setVideoIsPlaying}
                 />
             </div>
 
@@ -858,7 +897,7 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
                 <div className="flex items-center space-x-3 text-sm text-gray-500 dark:text-gray-400">
                     <span>{item.author || item.theme}</span>
                     <span className="w-1.5 h-1.5 bg-gray-400 rounded-full" />
-                    <span>{formatNumber(0)} {t('views')}</span>
+                    <span>{formatNumber(displayEpisode.views || 0)} {t('views')}</span>
                 </div>
                 <div className="flex items-center justify-around py-2">
                     <LikeButton
@@ -909,9 +948,9 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
             </div>
 
             {showAuthPrompt && (
-                <AuthPrompt 
-                    action={authAction} 
-                    onClose={() => setShowAuthPrompt(false)} 
+                <AuthPrompt
+                    action={authAction}
+                    onClose={() => setShowAuthPrompt(false)}
                 />
             )}
         </div>

@@ -9,7 +9,7 @@ import { featuredContent } from '../data/mockData';
 
 import { MediaContent, User, MediaType } from '../types';
 import { useAppContext } from '../context/AppContext';
-import { userService, generateDefaultAvatar, likeService, movieService, episodeSerieService, statsVuesService, ContinueWatchingItem } from '../lib/firestore';
+import { userService, generateDefaultAvatar, likeService, movieService, episodeSerieService, statsVuesService, ContinueWatchingItem, viewService } from '../lib/firestore';
 import ContinueWatchingSection from '../components/ContinueWatchingSection';
 
 const MediaRow: React.FC<{ title: string; items: MediaContent[]; onSelectMedia: (item: MediaContent) => void; onPlay: (item: MediaContent) => void; variant?: 'poster' | 'thumbnail' | 'list' }> = ({ title, items, onSelectMedia, onPlay, variant }) => (
@@ -143,6 +143,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
     const [loadingUsers, setLoadingUsers] = useState(true);
     const [mostLikedItems, setMostLikedItems] = useState<Array<{ content: MediaContent; likeCount: number }>>([]);
     const [loadingMostLiked, setLoadingMostLiked] = useState(true);
+    const [mostWatchedItems, setMostWatchedItems] = useState<Array<{ content: MediaContent; likeCount: number }>>([]);
+    const [loadingMostWatched, setLoadingMostWatched] = useState(true);
     const [continueWatchingItems, setContinueWatchingItems] = useState<ContinueWatchingItem[]>([]);
     const [loadingContinueWatching, setLoadingContinueWatching] = useState(true);
     const [loadingHero, setLoadingHero] = useState(true);
@@ -244,6 +246,69 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
         };
 
         fetchMostLikedItems();
+    }, []);
+
+    useEffect(() => {
+        const fetchMostWatchedItems = async () => {
+            try {
+                const watchedItems = await viewService.getMostWatchedItems(10);
+
+                // Récupérer les détails de chaque item (film ou épisode)
+                const itemsWithDetails = await Promise.all(
+                    watchedItems.map(async (item) => {
+                        if (item.type === 'movie') {
+                            // Récupérer le film
+                            let movie = await movieService.getMovieByUid(item.uid);
+                            if (movie && !movie.hidden) {
+                                const mediaContent: MediaContent = {
+                                    id: movie.uid,
+                                    type: MediaType.Movie,
+                                    title: movie.title,
+                                    author: movie.original_title,
+                                    theme: '',
+                                    imageUrl: movie.backdrop_path || movie.picture_path || movie.poster_path,
+                                    duration: movie.runtime_h_m,
+                                    description: movie.overview,
+                                    languages: [movie.original_language],
+                                    video_path_hd: movie.video_path_hd
+                                };
+                                return { content: mediaContent, likeCount: item.viewCount };
+                            }
+                        } else {
+                            // Récupérer l'épisode
+                            let episode = await episodeSerieService.getEpisodeByUid(item.uid);
+                            if (episode && !episode.hidden) {
+                                const mediaContent: MediaContent = {
+                                    id: episode.uid_episode,
+                                    type: MediaType.Series,
+                                    title: episode.title,
+                                    author: episode.title_serie,
+                                    theme: '',
+                                    imageUrl: episode.backdrop_path || episode.picture_path,
+                                    duration: episode.runtime_h_m,
+                                    description: episode.overviewFr || episode.overview,
+                                    languages: [],
+                                    video_path_hd: episode.video_path_hd
+                                };
+                                return { content: mediaContent, likeCount: item.viewCount };
+                            }
+                        }
+
+                        return null;
+                    })
+                );
+
+                // Filtrer les items null
+                const validItems = itemsWithDetails.filter(item => item !== null) as Array<{ content: MediaContent; likeCount: number }>;
+                setMostWatchedItems(validItems);
+            } catch (error) {
+                console.error('Error fetching most watched items:', error);
+            } finally {
+                setLoadingMostWatched(false);
+            }
+        };
+
+        fetchMostWatchedItems();
     }, []);
 
     // Récupérer les éléments "Continuer la lecture"
@@ -359,6 +424,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                 <RankedMediaRow
                     title={t('mostLiked') || 'Most Liked'}
                     items={mostLikedItems}
+                    onSelectMedia={onSelectMedia}
+                    onPlay={onPlay}
+                />
+            )}
+
+            {loadingMostWatched ? (
+                <MostLikedSkeleton />
+            ) : mostWatchedItems.length > 0 && (
+                <RankedMediaRow
+                    title={t('mostWatched') || 'Most Watched'}
+                    items={mostWatchedItems}
                     onSelectMedia={onSelectMedia}
                     onPlay={onPlay}
                 />
