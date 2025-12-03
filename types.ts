@@ -47,6 +47,8 @@ export interface MediaContent {
     likes?: number;
     comments?: Comment[];
     video_path_hd?: string;
+    is_premium?: boolean;
+    premium_text?: string;
 }
 
 export interface User {

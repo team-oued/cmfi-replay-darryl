@@ -53,6 +53,8 @@ const BookmarksScreen: React.FC<BookmarksScreenProps> = ({ onSelectMedia, onPlay
                                 languages: [movie.original_language],
                                 cast: [],
                                 director: '',
+                                is_premium: movie.is_premium,
+                                premium_text: movie.premium_text
                             };
                         }
 
@@ -173,7 +175,7 @@ const BookmarksScreen: React.FC<BookmarksScreenProps> = ({ onSelectMedia, onPlay
     };
 
     // Éviter les doublons dans les favoris
-    const uniqueEpisodes = useMemo(() => 
+    const uniqueEpisodes = useMemo(() =>
         bookmarkedEpisodes.reduce((acc: MediaContent[], current) => {
             const x = acc.find(item => item.id === current.id);
             return x ? acc : [...acc, current];

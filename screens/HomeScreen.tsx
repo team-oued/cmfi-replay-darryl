@@ -25,7 +25,7 @@ const MediaRow: React.FC<{ title: string; items: MediaContent[]; onSelectMedia: 
 
 const RankedMediaRow: React.FC<{
     title: string;
-    items: Array<{ content: MediaContent; likeCount: number }>;
+    items: Array<{ content: MediaContent; likeCount: number; viewCount?: number }>;
     onSelectMedia: (item: MediaContent) => void;
     onPlay: (item: MediaContent) => void;
 }> = ({ title, items, onSelectMedia, onPlay }) => {
@@ -111,6 +111,7 @@ const RankedMediaRow: React.FC<{
                         key={item.content.id}
                         item={item.content}
                         rank={index + 1}
+                        viewCount={item.viewCount}
                         onSelect={onSelectMedia}
                         onPlay={onPlay}
                     />
@@ -141,9 +142,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
     const { t, user } = useAppContext();
     const [activeUsers, setActiveUsers] = useState<User[]>([]);
     const [loadingUsers, setLoadingUsers] = useState(true);
-    const [mostLikedItems, setMostLikedItems] = useState<Array<{ content: MediaContent; likeCount: number }>>([]);
+    const [mostLikedItems, setMostLikedItems] = useState<Array<{ content: MediaContent; likeCount: number; viewCount?: number }>>([]);
     const [loadingMostLiked, setLoadingMostLiked] = useState(true);
-    const [mostWatchedItems, setMostWatchedItems] = useState<Array<{ content: MediaContent; likeCount: number }>>([]);
+    const [mostWatchedItems, setMostWatchedItems] = useState<Array<{ content: MediaContent; likeCount: number; viewCount: number }>>([]);
     const [loadingMostWatched, setLoadingMostWatched] = useState(true);
     const [continueWatchingItems, setContinueWatchingItems] = useState<ContinueWatchingItem[]>([]);
     const [loadingContinueWatching, setLoadingContinueWatching] = useState(true);
@@ -236,7 +237,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                 );
 
                 // Filtrer les items null
-                const validItems = itemsWithDetails.filter(item => item !== null) as Array<{ content: MediaContent; likeCount: number }>;
+                const validItems = itemsWithDetails.filter((item): item is { content: MediaContent; likeCount: number; viewCount?: number } => item !== null);
                 setMostLikedItems(validItems);
             } catch (error) {
                 console.error('Error fetching most liked items:', error);
@@ -272,7 +273,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                                     languages: [movie.original_language],
                                     video_path_hd: movie.video_path_hd
                                 };
-                                return { content: mediaContent, likeCount: item.viewCount };
+                                return { content: mediaContent, likeCount: item.viewCount, viewCount: item.viewCount };
                             }
                         } else {
                             // Récupérer l'épisode
@@ -290,7 +291,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                                     languages: [],
                                     video_path_hd: episode.video_path_hd
                                 };
-                                return { content: mediaContent, likeCount: item.viewCount };
+                                return { content: mediaContent, likeCount: item.viewCount, viewCount: item.viewCount };
                             }
                         }
 
@@ -299,7 +300,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                 );
 
                 // Filtrer les items null
-                const validItems = itemsWithDetails.filter(item => item !== null) as Array<{ content: MediaContent; likeCount: number }>;
+                const validItems = itemsWithDetails
+                    .filter((item): item is { content: MediaContent; likeCount: number; viewCount: number } => item !== null);
                 setMostWatchedItems(validItems);
             } catch (error) {
                 console.error('Error fetching most watched items:', error);

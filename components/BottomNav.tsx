@@ -3,12 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { ActiveTab } from '../types';
 import { useAppContext } from '../context/AppContext';
 
-interface BottomNavProps {
-    activeTab: ActiveTab;
-    setActiveTab: (tab: ActiveTab) => void;
-}
-
-const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab }) => {
+const BottomNav: React.FC = () => {
+    const { activeTab, setActiveTab } = useAppContext();
     const { t } = useAppContext();
     const navigate = useNavigate();
     const location = useLocation();
@@ -111,4 +107,4 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab }) => {
     );
 };
 
-export default BottomNav;
+export default React.memo(BottomNav);

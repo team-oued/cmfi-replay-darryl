@@ -1,10 +1,11 @@
 import React from 'react';
 import { MediaContent } from '../types';
-import { PlayIcon } from './icons';
+import { PlayIcon, EyeIcon } from './icons';
 
 interface RankedMediaCardProps {
     item: MediaContent;
     rank: number;
+    viewCount?: number;
     onSelect?: (item: MediaContent) => void;
     onPlay?: (item: MediaContent) => void;
 }
@@ -12,22 +13,53 @@ interface RankedMediaCardProps {
 const RankedMediaCard: React.FC<RankedMediaCardProps> = ({
     item,
     rank,
+    viewCount,
     onSelect,
     onPlay
 }) => {
     const { title, imageUrl, author } = item;
-    const handleSelect = () => onSelect && onSelect(item);
+    const handleSelect = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onSelect && onSelect(item);
+    };
+
     const handlePlay = (e: React.MouseEvent) => {
         e.stopPropagation();
         onPlay && onPlay(item);
     };
+    
+    const handleCardClick = (e: React.MouseEvent) => {
+        e.preventDefault();
+        // Si on a un gestionnaire onPlay, on l'appelle, sinon on utilise onSelect
+        if (onPlay) {
+            onPlay(item);
+        } else if (onSelect) {
+            onSelect(item);
+        }
+    };
 
     return (
         <div
-            onClick={handleSelect}
+            onClick={handleCardClick}
             className="flex-shrink-0 w-64 md:w-80 cursor-pointer group"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleCardClick(e as any);
+                }
+            }}
         >
             <div className="relative aspect-video bg-gray-300 dark:bg-gray-700 rounded-xl overflow-hidden shadow-lg">
+                {/* Badge de vues */}
+                {viewCount !== undefined && (
+                    <div className="absolute top-2 right-2 z-10 flex items-center bg-black/70 backdrop-blur-sm text-white text-xs font-medium px-2 py-1 rounded-full">
+                        <EyeIcon className="w-3 h-3 mr-1" />
+                        <span className="font-bold">{viewCount.toLocaleString()}</span>
+                    </div>
+                )}
+                
                 {/* Image */}
                 <img
                     src={imageUrl}

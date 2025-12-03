@@ -1,20 +1,32 @@
 import * as React from 'react';
-import type { JSX } from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
-import { TranslationKey } from '../lib/i18n';
 import { updateEpisodeViews } from '../lib/firestore';
 import { toast } from 'react-toastify';
+import { ActiveTab } from '../types';
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  activeTab: string;
-  setActiveTab: (tab: string) => void;
+  activeTab?: ActiveTab;
+  setActiveTab?: (tab: ActiveTab) => void;
+  isCollapsed?: boolean;
+  toggleCollapse?: () => void;
 }
 
-const Sidebar = ({ isOpen, onClose, activeTab, setActiveTab }: SidebarProps): JSX.Element => {
-  const { t } = useAppContext();
+const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
+  const { 
+    isSidebarCollapsed: isCollapsed, 
+    setIsSidebarCollapsed: setCollapsed,
+    t 
+  } = useAppContext();
+  
+  const toggleCollapse = () => {
+    // Ne pas permettre de réduire la sidebar sur mobile
+    if (window.innerWidth >= 1024) { // lg breakpoint
+      setCollapsed(!isCollapsed);
+    }
+  };
   const location = useLocation();
 
   interface MenuItem {
@@ -87,34 +99,10 @@ const Sidebar = ({ isOpen, onClose, activeTab, setActiveTab }: SidebarProps): JS
         </svg>
       ),
     },
-    {
-      id: 'admin-update-views',
-      label: 'Mettre à jour les vues',
-      path: '#',
-      icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-        </svg>
-      ),
-      isAdmin: true,
-      onClick: async (e: React.MouseEvent) => {
-        e.preventDefault();
-        const confirmed = window.confirm('Êtes-vous sûr de vouloir mettre à jour les vues ? Cette opération peut prendre quelques instants.');
-        if (confirmed) {
-          try {
-            await updateEpisodeViews();
-            toast.success('Mise à jour des vues terminée avec succès !');
-          } catch (error) {
-            console.error('Erreur lors de la mise à jour des vues :', error);
-            toast.error('Erreur lors de la mise à jour des vues. Voir la console pour plus de détails.');
-          }
-        }
-      }
-    }
   ];
 
   // Filtrer les éléments de menu pour n'afficher que ceux accessibles à tous les utilisateurs
-  const filteredMenuItems = menuItems.filter(item => !item.isAdmin);
+  const filteredMenuItems = menuItems;
 
   const isActive = (path: string) => {
     return location.pathname === path || location.pathname.startsWith(path + '/');
@@ -123,75 +111,126 @@ const Sidebar = ({ isOpen, onClose, activeTab, setActiveTab }: SidebarProps): JS
 
   return (
     <>
-      {/* Overlay pour mobile */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-30 transition-opacity duration-300 lg:opacity-0 lg:pointer-events-none"
-          onClick={onClose}
-          aria-hidden="true"
-        />
-      )}
-
-      {/* Barre latérale */}
+      {/* Overlay pour mobile avec animation */}
       <div
-        className={`fixed inset-y-0 left-0 z-40 w-64 bg-[#FBF9F3] dark:bg-black border-r border-gray-200 dark:border-gray-800 transform ${isOpen ? 'translate-x-0' : '-translate-x-full'
-          } transition-transform duration-300 ease-in-out lg:translate-x-0 lg:fixed lg:left-0 lg:top-0 lg:bottom-0 flex flex-col h-full`}
+        className={`fixed inset-0 z-30 transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'} lg:opacity-0 lg:pointer-events-none`}
+        onClick={onClose}
+        aria-hidden="true"
+      >
+        <div className="absolute inset-0 bg-black bg-opacity-50 transition-opacity duration-300" />
+      </div>
+
+      {/* Barre latérale avec animation fluide */}
+      <div
+        className={`fixed inset-y-0 left-0 z-40 ${
+          window.innerWidth >= 1024 ? (isCollapsed ? 'w-16' : 'w-64') : 'w-64'
+        } bg-[#FBF9F3] dark:bg-black border-r border-gray-200 dark:border-gray-800 flex flex-col h-full transition-all duration-300 ease-out ${
+          isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        }`}
+        style={{
+          transitionProperty: 'transform, width',
+          willChange: 'transform, width',
+          transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)'
+        }}
         role="navigation"
         aria-label="Menu principal"
       >
         {/* En-tête */}
-        <div className="flex items-center justify-between px-4 py-[17.8px] border-b border-gray-200 dark:border-gray-800">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">CMFI Replay</h2>
-          <button
-            onClick={onClose}
-            className="p-1 rounded-full text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 lg:hidden"
-            aria-label="Fermer le menu"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-6 w-6"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
+        <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} px-4 py-[17.8px] border-b border-gray-200 dark:border-gray-800`}>
+          {!isCollapsed && (
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">CMFI Replay</h2>
+          )}
+          <div className="flex items-center">
+            <button
+              onClick={onClose}
+              className="p-1 rounded-full text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 lg:hidden"
+              aria-label="Fermer le menu"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-6 w-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <button
+              onClick={toggleCollapse}
+              className="hidden lg:flex items-center justify-center p-1 rounded-full text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              aria-label={isCollapsed ? "Agrandir le menu" : "Réduire le menu"}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isCollapsed ? "M13 5l7 7-7 7M5 5l7 7-7 7" : "M11 19l-7-7 7-7m8 14l-7-7 7-7"} />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Champ de recherche */}
         <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800">
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <Link
-              to="/search"
-              onClick={onClose}
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent sm:text-sm"
-            >
-              <span className="text-gray-500 dark:text-gray-400">{t('search')}</span>
-            </Link>
+            {window.innerWidth >= 1024 && isCollapsed ? (
+              <Link
+                to="/search"
+                onClick={onClose}
+                className="flex items-center justify-center w-8 h-8 mx-auto rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                aria-label={t('search')}
+              >
+                <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                </svg>
+              </Link>
+            ) : (
+              <>
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <Link
+                  to="/search"
+                  onClick={onClose}
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent sm:text-sm"
+                >
+                  <span className="text-gray-500 dark:text-gray-400">{t('search')}</span>
+                </Link>
+              </>
+            )}
           </div>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto py-2 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent hover:scrollbar-thumb-gray-400 dark:hover:scrollbar-thumb-gray-600 transition-colors duration-200">
+        <nav className="flex-1 overflow-y-auto overflow-x-hidden py-2">
           <ul className="space-y-1 px-2">
             {filteredMenuItems.map((item) => (
               <li key={item.id}>
                 <Link
                   to={item.path}
-                  onClick={onClose}
-                  className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${isActive(item.path)
-                    ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-                    }`}
+                  onClick={(e) => {
+                    onClose();
+                    if (item.onClick) {
+                      item.onClick(e);
+                    }
+                  }}
+                  className={`flex items-center ${
+                    window.innerWidth >= 1024 && isCollapsed ? 'justify-center' : 'px-3'
+                  } py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                    isActive(item.path)
+                      ? 'bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-100'
+                      : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800/50'
+                  }`}
+                  aria-current={isActive(item.path) ? 'page' : undefined}
                 >
-                  <span className="mr-3">{item.icon}</span>
-                  {item.label}
+                  <span className="flex-shrink-0">{item.icon}</span>
+                  {(window.innerWidth < 1024 || !isCollapsed) && <span className="ml-3">{item.label}</span>}
                 </Link>
               </li>
             ))}
@@ -210,7 +249,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, setActiveTab }: SidebarProps): JS
                       onClick={item.onClick}
                       className="flex items-center px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg"
                     >
-                      <span className="mr-3">{item.icon}</span>
+                      <span className="w-5 mr-3 flex items-center justify-center">{item.icon}</span>
                       {item.label}
                     </a>
                   ))}
@@ -220,16 +259,10 @@ const Sidebar = ({ isOpen, onClose, activeTab, setActiveTab }: SidebarProps): JS
         </nav>
 
         {/* Espace vide en bas pour laisser de la marge */}
-        <div className="mt-auto py-4"></div>
-
-        <div className="px-4 py-2 border-t border-gray-200 dark:border-gray-800">
-          <p className="text-xs text-center text-gray-500 dark:text-gray-400">
-            {new Date().getFullYear()} CMFI Replay
-          </p>
-        </div>
+        <div className="mt-auto py-2"></div>
 
         {/* User section */}
-        <div className="p-4 border-t border-gray-200 dark:border-gray-800">
+        <div className="p-2 border-t border-gray-200 dark:border-gray-800">
           <Link
             to="/profile"
             onClick={onClose}
@@ -238,21 +271,23 @@ const Sidebar = ({ isOpen, onClose, activeTab, setActiveTab }: SidebarProps): JS
               : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
               }`}
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5 mr-3"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-              />
-            </svg>
-            {t('profile')}
+            <span className={`flex items-center justify-center ${isCollapsed ? 'w-full' : 'w-5 mr-3'}`}>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                />
+              </svg>
+            </span>
+            {!isCollapsed && <span>{t('profile')}</span>}
           </Link>
         </div>
       </div>

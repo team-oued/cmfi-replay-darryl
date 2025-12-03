@@ -17,6 +17,7 @@ import {
 } from '../components/icons';
 import { useAppContext } from '../context/AppContext';
 import { userService, UserProfile, generateDefaultAvatar } from '../lib/firestore';
+import PremiumBadge from '../components/PremiumBadge';
 
 const SettingsItem: React.FC<{
     Icon: React.FC<{ className?: string }>;
@@ -144,7 +145,11 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigate, onSelectMedia, 
         { icon: SettingsIcon, label: t('preferences'), action: () => navigate('Preferences') },
         { icon: KeyIcon, label: t('changePassword'), action: () => navigateRouter('/change-password') },
         { icon: CreditCardIcon, label: t('manageSubscription') },
-        { icon: TicketIcon, label: t('redeemVoucher') },
+        { 
+            icon: TicketIcon, 
+            label: t('redeemVoucher'), 
+            action: () => navigateRouter('/redeem-voucher') 
+        },
     ];
 
     return (
@@ -156,6 +161,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigate, onSelectMedia, 
                     className="w-24 h-24 rounded-full border-4 border-amber-500 object-cover"
                 />
                 <h2 className="text-2xl font-bold">{userProfile?.display_name || 'User'}</h2>
+                <PremiumBadge size="md" showDetails={true} />
                 <button
                     onClick={() => navigate('EditProfile')}
                     className="bg-transparent border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 font-semibold py-2 px-6 rounded-full transition-colors duration-200"
@@ -163,15 +169,6 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigate, onSelectMedia, 
                     {t('editProfile')}
                 </button>
             </div>
-
-            <section className="py-4">
-                <h3 className="text-xl font-bold px-4 mb-3">{t('activeNow')}</h3>
-                <div className="flex space-x-4 overflow-x-auto px-4 scrollbar-hide pb-2">
-                    {onlineUsers.map((user: User) => (
-                        <UserAvatar key={user.id} user={user} />
-                    ))}
-                </div>
-            </section>
 
             {loadingHistory ? (
                 <section className="py-4">

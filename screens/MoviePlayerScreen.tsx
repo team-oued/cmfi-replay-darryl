@@ -12,6 +12,7 @@ import {
 import { useAppContext } from '../context/AppContext';
 import { toast } from 'react-toastify';
 import AuthPrompt from '../components/AuthPrompt';
+import PremiumPaywall from '../components/PremiumPaywall';
 
 // --- Reusable formatter ---
 const formatNumber = (num: number) => {
@@ -49,12 +50,16 @@ const VideoPlayer: React.FC<{ src: string, poster: string, onEnded?: () => void,
     const [isScrubbing, setIsScrubbing] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const wasPlayingRef = useRef(false);
-    const [showControls, setShowControls] = useState(true);
+    const [showControls, setShowControls] = useState(false);
     const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     const togglePlay = () => {
-        resetControlsTimeout();
-        videoRef.current?.paused ? videoRef.current?.play() : videoRef.current?.pause();
+        const wasPlaying = !videoRef.current?.paused;
+        wasPlaying ? videoRef.current?.pause() : videoRef.current?.play();
+        setShowControls(wasPlaying); // Afficher les contrôles si on met en pause, sinon laisser le timeout gérer
+        if (!wasPlaying) {
+            resetControlsTimeout();
+        }
     };
 
     // Gérer l'affichage automatique des contrôles
@@ -69,7 +74,16 @@ const VideoPlayer: React.FC<{ src: string, poster: string, onEnded?: () => void,
     };
 
     useEffect(() => {
-        resetControlsTimeout();
+        // Ne pas afficher les contrôles automatiquement au chargement
+        if (isPlaying) {
+            const timer = setTimeout(() => {
+                setShowControls(false);
+            }, 2000); // Cacher les contrôles après 2 secondes de lecture
+            return () => clearTimeout(timer);
+        } else {
+            setShowControls(true); // Toujours montrer les contrôles en pause
+        }
+
         return () => {
             if (controlsTimeoutRef.current) {
                 clearTimeout(controlsTimeoutRef.current);
@@ -298,16 +312,22 @@ const VideoPlayer: React.FC<{ src: string, poster: string, onEnded?: () => void,
     const seekControlSize = "w-6 h-6 sm:w-8 sm:h-8";
 
     const handleMouseMove = () => {
-        resetControlsTimeout();
+        if (!isPlaying) {
+            setShowControls(true);
+        } else {
+            resetControlsTimeout();
+        }
     };
 
     const handleMouseLeave = () => {
-        if (controlsTimeoutRef.current) {
-            clearTimeout(controlsTimeoutRef.current);
+        if (isPlaying) {
+            if (controlsTimeoutRef.current) {
+                clearTimeout(controlsTimeoutRef.current);
+            }
+            controlsTimeoutRef.current = setTimeout(() => {
+                setShowControls(false);
+            }, 1000); // Réduit à 1 seconde pour un meilleur UX
         }
-        controlsTimeoutRef.current = setTimeout(() => {
-            setShowControls(false);
-        }, 3000);
     };
 
     return (
@@ -574,7 +594,7 @@ interface MoviePlayerScreenProps {
 }
 
 const MoviePlayerScreen: React.FC<MoviePlayerScreenProps> = ({ item, onBack }) => {
-    const { t, bookmarkedIds, toggleBookmark, userProfile } = useAppContext();
+    const { t, bookmarkedIds, toggleBookmark, userProfile, isPremium } = useAppContext();
     const [movieData, setMovieData] = useState<Movie | null>(null);
     const [likeCount, setLikeCount] = useState(0);
     const [hasLiked, setHasLiked] = useState(false);
@@ -858,68 +878,90 @@ const MoviePlayerScreen: React.FC<MoviePlayerScreenProps> = ({ item, onBack }) =
         </button>
     );
 
+    // Vérifier si le contenu est premium et si l'utilisateur n'est pas premium
+    if (movieData?.is_premium && !isPremium) {
+        return <PremiumPaywall contentTitle={movieData.title} contentType="movie" />;
+    }
+
     return (
         <div className="bg-[#FBF9F3] dark:bg-black min-h-screen animate-fadeIn">
-            <div className="relative pt-16 md:pt-0">
-                <header className="absolute top-16 md:top-0 left-0 z-10 p-2 sm:p-4">
-                    <button
-                        onClick={onBack}
-                        className="p-2 rounded-full text-white bg-black/40 hover:bg-black/60 backdrop-blur-sm transition-colors"
-                        aria-label="Go back"
-                    >
-                        <ArrowLeftIcon className="w-6 h-6" />
-                    </button>
-                </header>
-                <VideoPlayer
-                    src={movieData?.video_path_hd || item.video_path_hd}
-                    poster={movieData?.picture_path || item.imageUrl}
-                    onEnded={handleVideoEnded}
-                    onPlayingStateChange={setVideoIsPlaying}
-                />
-            </div>
+            {/* Bouton de retour en haut à gauche */}
+            <header className="absolute top-4 left-4 z-20">
+                <button
+                    onClick={onBack}
+                    className="p-2 rounded-full text-white bg-black/60 hover:bg-black/80 backdrop-blur-sm transition-all duration-200"
+                    aria-label="Go back"
+                >
+                    <ArrowLeftIcon className="w-6 h-6" />
+                </button>
+            </header>
 
-            <div className="p-4 space-y-6">
-                <h1 className="text-3xl font-bold">{movieData?.title || item.title}</h1>
-                <div className="flex items-center space-x-3 text-sm text-gray-500 dark:text-gray-400">
-                    <span>{item.original_language || 'FR'}</span>
-                    <span className="w-1.5 h-1.5 bg-gray-400 rounded-full" />
-                    <span>{formatNumber(movieData?.views || 0)} {t('views')}</span>
+            <div className="container mx-auto px-4 py-4 lg:py-6 pt-20">
+
+                {/* Conteneur principal avec grille pour la mise en page */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Colonne de gauche - Lecteur vidéo et métadonnées */}
+                    <div className="lg:col-span-2 space-y-6">
+                        <div className="relative w-full aspect-video bg-black rounded-xl overflow-hidden shadow-lg">
+                            <VideoPlayer
+                                src={movieData?.video_path_hd || item.video_path_hd}
+                                poster={movieData?.picture_path || item.imageUrl}
+                                onEnded={handleVideoEnded}
+                                onPlayingStateChange={setVideoIsPlaying}
+                            />
+                        </div>
+
+                        <div className="space-y-4">
+                            <h1 className="text-2xl font-bold">{movieData?.title || item.title}</h1>
+
+                            <div className="flex items-center space-x-3 text-sm text-gray-500 dark:text-gray-400">
+                                <span>{item.original_language || 'FR'}</span>
+                                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full" />
+                                <span>{formatNumber(movieData?.views || 0)} {t('views')}</span>
+                            </div>
+
+                            <div className="flex items-center justify-around py-2 border-t border-b border-gray-200 dark:border-gray-800">
+                                <LikeButton
+                                    label={t('like')}
+                                    value={likeCount}
+                                    onClick={handleLike}
+                                    isActive={hasLiked}
+                                />
+                                <ActionButton
+                                    Icon={isBookmarked ? CheckIcon : PlusIcon}
+                                    label={isBookmarked ? t('addedToList') : t('myList')}
+                                    onClick={handleBookmark}
+                                    isActive={isBookmarked}
+                                />
+                                <ActionButton
+                                    Icon={ShareIcon}
+                                    label={t('share')}
+                                    onClick={handleShare}
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Colonne de droite - Section des commentaires */}
+                    <div className="lg:col-span-1">
+                        <div className="sticky top-4 h-[calc(100vh-2rem)] overflow-hidden flex flex-col">
+                            <div className="flex-1 overflow-y-auto pb-4 pr-2 -mr-2">
+                                <CommentSection
+                                    itemUid={movieData?.uid || item.id}
+                                    onAuthRequired={handleAuthRequired}
+                                />
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div className="flex items-center justify-around py-2">
-                    <LikeButton
-                        label={t('like')}
-                        value={likeCount}
-                        onClick={handleLike}
-                        isActive={hasLiked}
-                    />
-                    <ActionButton
-                        Icon={isBookmarked ? CheckIcon : PlusIcon}
-                        label={isBookmarked ? t('addedToList') : t('myList')}
-                        onClick={handleBookmark}
-                        isActive={isBookmarked}
-                    />
-                    <ActionButton
-                        Icon={ShareIcon}
-                        label={t('share')}
-                        onClick={handleShare}
-                    />
-                </div>
 
-                <div className="border-t border-gray-200 dark:border-gray-800" />
+                {showAuthPrompt && (
+                    <AuthPrompt
+                        action={authAction}
+                        onClose={() => setShowAuthPrompt(false)}
+                    />
+                )}
             </div>
-
-            <div className="px-4 pb-4">
-                <div className="max-h-[calc(100vh-500px)] overflow-y-auto">
-                    <CommentSection itemUid={movieData?.uid || item.id} onAuthRequired={handleAuthRequired} />
-                </div>
-            </div>
-
-            {showAuthPrompt && (
-                <AuthPrompt
-                    action={authAction}
-                    onClose={() => setShowAuthPrompt(false)}
-                />
-            )}
         </div>
     );
 };

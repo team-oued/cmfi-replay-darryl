@@ -2002,3 +2002,6 @@ export const viewService = {
         }
     }
 };
+
+// Export du service d'abonnement
+export { subscriptionService } from './subscriptionService';

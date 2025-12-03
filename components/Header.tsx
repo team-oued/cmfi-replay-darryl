@@ -19,7 +19,7 @@ const Header: React.FC<HeaderProps> = ({
   onToggleSidebar,
   isWatchRoute = false 
 }) => {
-  const { theme, setTheme, t } = useAppContext();
+  const { theme, setTheme, t, isSidebarCollapsed } = useAppContext();
 
   const toggleTheme = () => {
     setTheme(theme === 'dark' ? 'light' : 'dark');
@@ -57,7 +57,10 @@ const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Header pour les écrans plus larges */}
-      <header className={`bg-[#FBF9F3] dark:bg-black hidden md:block fixed top-0 right-0 left-0 z-10 lg:left-64 transition-all duration-300 ${isWatchRoute ? 'lg:left-0' : ''}`}>
+      <header className={`bg-[#FBF9F3] dark:bg-black hidden md:block fixed top-0 right-0 left-0 z-10 transition-all duration-500 ease-in-out ${
+        isWatchRoute ? 'lg:left-0 bg-black/60 backdrop-blur-md' : 
+        isSidebarCollapsed ? 'lg:left-16' : 'lg:left-64'
+      } ${isWatchRoute ? 'bg-opacity-60' : ''}`}>
         <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200 dark:border-gray-800">
           {/* Bouton de retour et menu */}
           <div className="flex items-center space-x-4">

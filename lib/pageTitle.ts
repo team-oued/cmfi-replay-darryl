@@ -1,9 +1,11 @@
+import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 
-// Définition des clés de traduction valides pour les titres de page
-type PageTitleKey = 'watch' | 'categoryMovies' | 'categorySeries' | 'categoryPodcasts' | 
-                    'favorites' | 'profile' | 'preferences' | 'history' | 'movie' | 'serie' | 'podcast';
+import { TranslationKey } from './i18n';
+
+// Utilisation du type TranslationKey existant
+type PageTitleKey = TranslationKey;
 
 export const usePageTitle = () => {
   const location = useLocation();
@@ -38,6 +40,7 @@ export const usePageTitle = () => {
     if (pathname === '/profile') return `${safeT('profile')} - CMFI Replay`;
     if (pathname === '/preferences') return `${safeT('preferences')} - CMFI Replay`;
     if (pathname === '/history') return `${safeT('history')} - CMFI Replay`;
+    if (pathname === '/redeem-voucher') return `${safeT('redeemVoucher')} - CMFI Replay`;
     
     // Pages de détails
     if (pathname.startsWith('/movie/')) return `${safeT('movie')} - CMFI Replay`;
@@ -49,10 +52,17 @@ export const usePageTitle = () => {
   };
 
   // Mettre à jour le titre de la page
-  document.title = getPageTitle(location.pathname);
+  const updateTitle = () => {
+    document.title = getPageTitle(location.pathname);
+  };
 
-  // Retourner le titre pour une utilisation éventuelle dans les composants
-  return getPageTitle(location.pathname);
+  // Mettre à jour le titre au chargement
+  useEffect(() => {
+    updateTitle();
+  }, [location.pathname]);
+
+  // Retourner la fonction de mise à jour du titre
+  return { updateTitle };
 };
 
 export default usePageTitle;

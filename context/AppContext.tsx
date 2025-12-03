@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useState, useMemo, useEffect } from 'react';
 import { i18n, Language, TranslationKey } from '../lib/i18n';
 import { auth } from '../lib/firebase';
-import { userService, UserProfile, bookDocService, bookSeriesService } from '../lib/firestore';
+import { userService, UserProfile, bookDocService, bookSeriesService, subscriptionService } from '../lib/firestore';
 import { onAuthStateChanged, User } from 'firebase/auth';
+import { ActiveTab } from '../types';
 
 type Theme = 'light' | 'dark';
 
@@ -23,6 +24,18 @@ interface AppContextType {
     loading: boolean;
     autoplay: boolean;
     setAutoplay: (value: boolean) => void;
+    isSidebarCollapsed: boolean;
+    setIsSidebarCollapsed: (value: boolean) => void;
+    toggleSidebarCollapse: () => void;
+    activeTab: ActiveTab;
+    setActiveTab: (tab: ActiveTab) => void;
+    isPremium: boolean;
+    subscriptionDetails: {
+        planType: string;
+        endDate: Date | null;
+        daysRemaining: number | null;
+    } | null;
+    refreshSubscription: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -43,6 +56,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
     const [bookmarkedIds, setBookmarkedIds] = useState<string[]>([]);
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+        if (typeof window !== 'undefined') {
+            const savedState = window.localStorage.getItem('sidebarCollapsed');
+            return savedState === 'true';
+        }
+        return false;
+    });
+
+    const [activeTab, setActiveTab] = useState<ActiveTab>(ActiveTab.Home);
+
     const [autoplay, setAutoplayState] = useState<boolean>(() => {
         if (typeof window !== 'undefined') {
             const savedAutoplay = window.localStorage.getItem('autoplay');
@@ -51,12 +74,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return false;
     });
 
+    // États pour le statut premium
+    const [isPremium, setIsPremium] = useState(false);
+    const [subscriptionDetails, setSubscriptionDetails] = useState<{
+        planType: string;
+        endDate: Date | null;
+        daysRemaining: number | null;
+    } | null>(null);
+
     useEffect(() => {
         const root = window.document.documentElement;
         root.classList.remove('light', 'dark');
         root.classList.add(theme);
         localStorage.setItem('theme', theme);
     }, [theme]);
+
+    // Fonction pour rafraîchir le statut d'abonnement
+    const refreshSubscription = async () => {
+        if (!user) {
+            setIsPremium(false);
+            setSubscriptionDetails(null);
+            return;
+        }
+
+        try {
+            const details = await subscriptionService.getSubscriptionDetails(user.uid);
+            setIsPremium(details.isPremium);
+            setSubscriptionDetails({
+                planType: details.planType,
+                endDate: details.endDate,
+                daysRemaining: details.daysRemaining
+            });
+            console.log('✅ Subscription refreshed:', details);
+        } catch (error) {
+            console.error('Error refreshing subscription:', error);
+            setIsPremium(false);
+            setSubscriptionDetails(null);
+        }
+    };
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -80,6 +135,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                             ...bookSeries.map(series => series.uid)
                         ];
                         setBookmarkedIds(allBookmarkIds);
+
+                        // Charger le statut d'abonnement
+                        await refreshSubscription();
                     } else {
                         await userService.createUserProfile({
                             uid: user.uid,
@@ -92,6 +150,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                             language,
                             bookmarkedIds: []
                         });
+
+                        // Créer un abonnement gratuit pour le nouvel utilisateur
+                        await subscriptionService.createFreeSubscription(user.uid);
+                        await refreshSubscription();
                     }
                 } catch (error) {
                     console.error('Error loading user profile:', error);
@@ -99,6 +161,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             } else {
                 setUserProfile(null);
                 setBookmarkedIds([]);
+                setIsPremium(false);
+                setSubscriptionDetails(null);
             }
 
             setLoading(false);
@@ -189,6 +253,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const t = useMemo(() => i18n(language), [language]);
 
+    const toggleSidebarCollapse = () => {
+        setIsSidebarCollapsed(!isSidebarCollapsed);
+    };
+
     const value = {
         theme,
         setTheme,
@@ -206,6 +274,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         loading,
         autoplay,
         setAutoplay,
+        isSidebarCollapsed,
+        setIsSidebarCollapsed,
+        toggleSidebarCollapse,
+        activeTab,
+        setActiveTab,
+        isPremium,
+        subscriptionDetails,
+        refreshSubscription,
     };
 
     return (

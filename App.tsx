@@ -21,6 +21,7 @@ import PreferencesScreen from './screens/PreferencesScreen';
 import EditProfileScreen from './screens/EditProfileScreen';
 import ChangePasswordScreen from './screens/ChangePasswordScreen';
 import HistoryScreen from './screens/HistoryScreen';
+import RedeemVoucherScreen from './screens/RedeemVoucherScreen';
 
 // Category Screens
 import MoviesScreen from './screens/MoviesScreen';
@@ -38,7 +39,10 @@ import Header from './components/Header';
 import { ActiveTab, MediaContent, MediaType } from './types';
 import { serieService, seasonSerieService, episodeSerieService, EpisodeSerie } from './lib/firestore';
 import { usePageTitle } from './lib/pageTitle';
-import { initializeMovieViews } from './lib/firestore';
+import { initializeMovieViews, userService } from './lib/firestore';
+import { generateDefaultAvatar } from './lib/firestore';
+import UserAvatar from './components/UserAvatar';
+import { User } from './types';
 
 const getTitleFromPath = (path: string, t: (key: string) => string): string => {
     if (path === '/home') return t('home');
@@ -59,7 +63,16 @@ const getTitleFromPath = (path: string, t: (key: string) => string): string => {
 };
 
 const AppContent: React.FC = () => {
-    const { isAuthenticated, t, loading } = useAppContext();
+    const { 
+      isAuthenticated, 
+      t, 
+      loading, 
+      user, 
+      activeTab: contextActiveTab, 
+      setActiveTab: setContextActiveTab,
+      isSidebarCollapsed: contextIsSidebarCollapsed,
+      toggleSidebarCollapse: contextToggleSidebarCollapse
+    } = useAppContext();
     const location = useLocation();
     const navigate = useNavigate();
 
@@ -72,10 +85,36 @@ const AppContent: React.FC = () => {
         return stored === 'true';
     });
 
-    const [activeTab, setActiveTab] = useState<ActiveTab>(ActiveTab.Home);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [playingItem, setPlayingItem] = useState<{ media: MediaContent; episode?: EpisodeSerie } | null>(null);
     const [episodesCache, setEpisodesCache] = useState<{ serieId: string; episodes: EpisodeSerie[] } | null>(null);
+    const [onlineUsers, setOnlineUsers] = useState<User[]>([]);
+
+    // Fetch active users when component mounts
+    useEffect(() => {
+        const fetchActiveUsers = async () => {
+            try {
+                const activeUserProfiles = await userService.getActiveUsers(50);
+                const formattedUsers: User[] = activeUserProfiles.map(profile => ({
+                    id: profile.uid,
+                    name: profile.display_name || 'Unknown User',
+                    avatarUrl: profile.photo_url || generateDefaultAvatar(profile.display_name),
+                    isOnline: profile.presence === 'online' || profile.presence === 'idle'
+                }));
+                setOnlineUsers(formattedUsers);
+            } catch (error) {
+                console.error('Error fetching active users:', error);
+            }
+        };
+
+        if (isAuthenticated) {
+            fetchActiveUsers();
+        }
+    }, [isAuthenticated]);
+
+    const toggleSidebarCollapse = () => {
+        contextToggleSidebarCollapse();
+    };
 
     // Sauvegarder hasStarted dans localStorage
     useEffect(() => {
@@ -135,7 +174,7 @@ const AppContent: React.FC = () => {
     };
 
     const handleReturnHome = () => {
-        setActiveTab(ActiveTab.Home);
+        setContextActiveTab(ActiveTab.Home);
         setPlayingItem(null);
         navigate('/home');
     };
@@ -177,10 +216,34 @@ const AppContent: React.FC = () => {
     const isWatchRoute = location.pathname.startsWith('/watch/');
 
     // Afficher un indicateur de chargement pendant la vérification de l'authentification
+    // mais garder la sidebar fonctionnelle
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-[#FBF9F3] dark:bg-black">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-amber-500"></div>
+            <div className="min-h-screen bg-[#FBF9F3] dark:bg-black">
+                {/* Sidebar toujours accessible */}
+                <Sidebar
+                    isOpen={isSidebarOpen}
+                    onClose={() => setIsSidebarOpen(false)}
+                    activeTab={contextActiveTab}
+                    setActiveTab={setContextActiveTab}
+                    isCollapsed={contextIsSidebarCollapsed}
+                    toggleCollapse={contextToggleSidebarCollapse}
+                />
+                
+                {/* Header avec bouton de menu fonctionnel */}
+                <Header
+                    title=""
+                    isSidebarOpen={isSidebarOpen}
+                    onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+                    isWatchRoute={false}
+                />
+                
+                {/* Contenu de chargement */}
+                <div className={`${contextIsSidebarCollapsed ? 'lg:pl-16' : 'lg:pl-64'} pt-16`}>
+                    <div className="flex items-center justify-center h-screen">
+                        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-amber-500"></div>
+                    </div>
+                </div>
             </div>
         );
     }
@@ -198,6 +261,11 @@ const AppContent: React.FC = () => {
 
     // Déterminer si on doit afficher la bottom nav
     const showBottomNav = isAuthenticated && !location.pathname.startsWith('/watch/') && !['/login', '/register', '/forgot-password'].includes(location.pathname);
+
+    // Toujours permettre l'ouverture/fermeture de la sidebar, même pendant le chargement
+    const handleToggleSidebar = () => {
+        setIsSidebarOpen(!isSidebarOpen);
+    };
 
     return (
         <div className="min-h-screen bg-[#FBF9F3] dark:bg-black text-gray-900 dark:text-white">
@@ -222,20 +290,24 @@ const AppContent: React.FC = () => {
             <Sidebar
                 isOpen={isSidebarOpen}
                 onClose={() => setIsSidebarOpen(false)}
-                activeTab={activeTab}
-                setActiveTab={(tab) => setActiveTab(tab as ActiveTab)}
+                activeTab={contextActiveTab}
+                setActiveTab={setContextActiveTab}
+                isCollapsed={contextIsSidebarCollapsed}
+                toggleCollapse={contextToggleSidebarCollapse}
             />
 
-            <Header
-                title={location.pathname === '/home' ? t('home') : 
-                      location.pathname.startsWith('/watch/') ? t('watching') : 
-                      getTitleFromPath(location.pathname, t)}
-                isSidebarOpen={isSidebarOpen}
-                onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
-                isWatchRoute={location.pathname.startsWith('/watch/')}
-            />
+            {/* Ne pas afficher le header sur les pages de lecture vidéo */}
+            {!isWatchRoute && (
+                <Header
+                    title={location.pathname === '/home' ? t('home') :
+                        getTitleFromPath(location.pathname, t)}
+                    isSidebarOpen={isSidebarOpen}
+                    onToggleSidebar={handleToggleSidebar}
+                    isWatchRoute={location.pathname.startsWith('/watch/')}
+                />
+            )}
 
-            <div className={`page-transition fadeIn ${showBottomNav ? 'pb-20' : ''} ${!isWatchRoute ? 'pt-16 md:pt-16' : 'pt-0'} lg:pl-64`}>
+            <div className={`page-transition fadeIn min-h-screen ${showBottomNav ? 'pb-20' : ''} ${!isWatchRoute ? 'pt-16 md:pt-16' : 'pt-0'} transition-all duration-300 ease-in-out ${contextIsSidebarCollapsed ? 'lg:pl-16' : 'lg:pl-64'}`}>
                 <Routes>
                     {/* Watch Route - Accessible sans authentification */}
                     <Route path="/watch/:uid" element={
@@ -271,11 +343,23 @@ const AppContent: React.FC = () => {
                             } />
 
                             <Route path="/profile" element={
-                                <ProfileScreen
-                                    navigate={handleNavigateToScreen}
-                                    onSelectMedia={handleSelectMedia}
-                                    onPlay={handlePlay}
-                                />
+                                <div className="flex-1 flex flex-col">
+                                    <ProfileScreen
+                                        navigate={handleNavigateToScreen}
+                                        onSelectMedia={handleSelectMedia}
+                                        onPlay={handlePlay}
+                                    />
+                                    {user?.isAdmin && onlineUsers.length > 0 && (
+                                        <div className="mt-auto border-t border-gray-200 dark:border-gray-800 pt-4 px-4 pb-6">
+                                            <h3 className="text-lg font-semibold mb-3">Active Now</h3>
+                                            <div className="flex space-x-4 overflow-x-auto scrollbar-hide pb-2">
+                                                {onlineUsers.map((user) => (
+                                                    <UserAvatar key={user.id} user={user} />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             } />
 
                             <Route path="/bookmarks" element={
@@ -358,6 +442,10 @@ const AppContent: React.FC = () => {
                                     onBack={handleBack}
                                 />
                             } />
+
+                            <Route path="/redeem-voucher" element={
+                                <RedeemVoucherScreen />
+                            } />
                         </>
                     )}
 
@@ -370,7 +458,7 @@ const AppContent: React.FC = () => {
 
             {showBottomNav && (
                 <div className="fixed bottom-0 left-0 right-0 z-20 lg:hidden">
-                    <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
+                    <BottomNav />
                 </div>
             )}
         </div>
@@ -391,7 +479,7 @@ const App: React.FC = () => {
 
 // Dans App.tsx, ajoutez cette ligne temporairement
 if (typeof window !== 'undefined') {
-  (window as any).initializeMovieViews = initializeMovieViews;
+    (window as any).initializeMovieViews = initializeMovieViews;
 }
 
 export default App;
