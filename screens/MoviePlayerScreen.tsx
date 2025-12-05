@@ -48,6 +48,22 @@ const VideoPlayer: React.FC<{ src: string, poster: string, onEnded?: () => void,
     const [playbackRate, setPlaybackRate] = useState(1);
     const [buffered, setBuffered] = useState(0);
     const [isScrubbing, setIsScrubbing] = useState(false);
+
+    // Fermer automatiquement le PiP au chargement du composant
+    useEffect(() => {
+        const closePiP = async () => {
+            if (document.pictureInPictureElement) {
+                try {
+                    await document.exitPictureInPicture();
+                    console.log('PiP fermé au chargement du lecteur vidéo');
+                } catch (err) {
+                    console.error('Erreur lors de la fermeture du PiP :', err);
+                }
+            }
+        };
+
+        closePiP();
+    }, []);
     const [isLoading, setIsLoading] = useState(true);
     const wasPlayingRef = useRef(false);
     const [showControls, setShowControls] = useState(false);

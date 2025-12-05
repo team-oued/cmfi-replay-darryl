@@ -75,7 +75,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     // États pour le statut premium
-    const [isPremium, setIsPremium] = useState(false);
+    const [isPremium, setIsPremium] = useState<boolean | null>(null); // null signifie que le chargement est en cours
     const [subscriptionDetails, setSubscriptionDetails] = useState<{
         planType: string;
         endDate: Date | null;
@@ -90,31 +90,57 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, [theme]);
 
     // Fonction pour rafraîchir le statut d'abonnement
-    const refreshSubscription = async () => {
-        if (!user) {
+    const refreshSubscription = useMemo(() => async () => {
+        console.log(' [refreshSubscription] Début de la vérification du statut premium');
+        const currentUser = auth.currentUser; // Utiliser directement auth.currentUser
+        
+        if (!currentUser) {
+            console.log(' [refreshSubscription] Aucun utilisateur connecté, statut premium désactivé');
             setIsPremium(false);
             setSubscriptionDetails(null);
             return;
         }
 
         try {
-            const details = await subscriptionService.getSubscriptionDetails(user.uid);
+            console.log(' [refreshSubscription] Vérification du statut premium pour l\'utilisateur:', currentUser.uid);
+            const details = await subscriptionService.getSubscriptionDetails(currentUser.uid);
+            console.log(' [refreshSubscription] Détails de l\'abonnement:', details);
+
             setIsPremium(details.isPremium);
             setSubscriptionDetails({
                 planType: details.planType,
                 endDate: details.endDate,
                 daysRemaining: details.daysRemaining
             });
-            console.log('✅ Subscription refreshed:', details);
+
+            // Stocker en localStorage pour une récupération immédiate au chargement
+            if (typeof window !== 'undefined') {
+                localStorage.setItem('premiumStatus', JSON.stringify({
+                    isPremium: details.isPremium,
+                    planType: details.planType,
+                    endDate: details.endDate?.toISOString(),
+                    timestamp: new Date().toISOString()
+                }));
+            }
+
+            console.log(' [refreshSubscription] Statut premium mis à jour:', details.isPremium);
         } catch (error) {
             console.error('Error refreshing subscription:', error);
             setIsPremium(false);
             setSubscriptionDetails(null);
         }
-    };
+    }, []);
 
+    // Initialiser l'état avec l'utilisateur actuel s'il est déjà connecté
     useEffect(() => {
+        const currentUser = auth.currentUser;
+        if (currentUser) {
+            setUser(currentUser);
+            setIsAuthenticated(true);
+        }
+        
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            console.log(' État d\'authentification changé:', user ? `Utilisateur connecté: ${user.uid}` : 'Déconnecté');
             setUser(user);
             setIsAuthenticated(!!user);
             setLoading(true);

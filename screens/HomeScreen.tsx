@@ -442,20 +442,23 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                 />
             )}
 
-            <div className="space-y-4">
-                {loadingUsers ? (
-                    <section className="py-4">
-                        <h3 className="text-xl font-bold px-4 mb-3">{t('activeNow')}</h3>
-                        <div className="flex space-x-4 overflow-x-auto px-4 scrollbar-hide pb-2">
-                            {[...Array(8)].map((_, i) => (
-                                <UserAvatarSkeleton key={i} />
-                            ))}
-                        </div>
-                    </section>
-                ) : (
-                    <UserRow title={t('activeNow')} users={activeUsers} />
-                )}
-            </div>
+            {/* Section Active Now - Visible uniquement pour les administrateurs */}
+{/*             {user?.isAdmin && (
+                <div className="space-y-4">
+                    {loadingUsers ? (
+                        <section className="py-4">
+                            <h3 className="text-xl font-bold px-4 mb-3">{t('activeNow')}</h3>
+                            <div className="flex space-x-4 overflow-x-auto px-4 scrollbar-hide pb-2">
+                                {[...Array(8)].map((_, i) => (
+                                    <UserAvatarSkeleton key={i} />
+                                ))}
+                            </div>
+                        </section>
+                    ) : (
+                        <UserRow title={`${t('activeNow')} (Admin)`} users={activeUsers} />
+                    )}
+                </div>
+            )} */}
         </div>
     );
 };

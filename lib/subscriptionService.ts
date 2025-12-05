@@ -16,21 +16,35 @@ export const subscriptionService = {
      */
     async getUserSubscription(userUid: string): Promise<Subscription | null> {
         try {
+            console.log('🔍 [getUserSubscription] Fetching subscription for user:', userUid);
             const userRef = doc(db, 'users', userUid);
+            console.log('🔍 [getUserSubscription] User reference:', userRef.path);
+            
             const q = query(
                 collection(db, SUBSCRIPTIONS_COLLECTION),
                 where('user', '==', userRef)
             );
+            console.log('🔍 [getUserSubscription] Query:', q);
 
             const querySnapshot = await getDocs(q);
+            console.log('🔍 [getUserSubscription] Query result:', {
+                size: querySnapshot.size,
+                empty: querySnapshot.empty,
+                docs: querySnapshot.docs.map(d => d.data())
+            });
 
             if (querySnapshot.empty) {
-                console.log('No subscription found for user:', userUid);
+                console.log('🔍 [getUserSubscription] No subscription found for user:', userUid);
                 return null;
             }
 
             const subscriptionDoc = querySnapshot.docs[0];
-            return subscriptionDoc.data() as Subscription;
+            const subscriptionData = subscriptionDoc.data();
+            console.log('🔍 [getUserSubscription] Found subscription:', {
+                id: subscriptionDoc.id,
+                ...subscriptionData
+            });
+            return subscriptionData as Subscription;
         } catch (error) {
             console.error('Error getting user subscription:', error);
             return null;
@@ -200,10 +214,12 @@ export const subscriptionService = {
         endDate: Date | null;
         daysRemaining: number | null;
     }> {
+        console.log('🔍 [subscriptionService] getSubscriptionDetails called for user:', userUid);
         try {
             const subscription = await this.getUserSubscription(userUid);
 
             if (!subscription) {
+                console.log('🔍 [subscriptionService] No subscription found, returning free tier');
                 return {
                     isPremium: false,
                     planType: 'free',
@@ -214,16 +230,27 @@ export const subscriptionService = {
 
             const endDate = new Date(subscription.end_subscription);
             const now = new Date();
+            console.log('🔍 [subscriptionService] Current date:', now);
+            console.log('🔍 [subscriptionService] Subscription end date:', endDate);
+            
             const daysRemaining = subscription.type_plan === 'lifetime'
                 ? null
                 : Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                
+            console.log('🔍 [subscriptionService] Days remaining:', daysRemaining);
 
-            return {
-                isPremium: subscription.isPremium && (subscription.type_plan === 'lifetime' || endDate > now),
+            const isPremiumStatus = subscription.isPremium && (subscription.type_plan === 'lifetime' || endDate > now);
+            console.log('🔍 [subscriptionService] Calculated isPremium:', isPremiumStatus);
+            
+            const result = {
+                isPremium: isPremiumStatus,
                 planType: subscription.type_plan,
                 endDate: subscription.type_plan === 'lifetime' ? null : endDate,
                 daysRemaining
             };
+            
+            console.log('🔍 [subscriptionService] Final subscription details:', result);
+            return result;
         } catch (error) {
             console.error('Error getting subscription details:', error);
             return {

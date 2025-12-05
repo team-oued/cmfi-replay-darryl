@@ -48,6 +48,22 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
     const [playbackRate, setPlaybackRate] = useState(1);
     const [buffered, setBuffered] = useState(0);
     const [isScrubbing, setIsScrubbing] = useState(false);
+
+    // Fermer automatiquement le PiP au chargement du composant
+    useEffect(() => {
+        const closePiP = async () => {
+            if (document.pictureInPictureElement) {
+                try {
+                    await document.exitPictureInPicture();
+                    console.log('PiP fermé au chargement du lecteur vidéo');
+                } catch (err) {
+                    console.error('Erreur lors de la fermeture du PiP :', err);
+                }
+            }
+        };
+
+        closePiP();
+    }, []);
     const [isLoading, setIsLoading] = useState(true);
     const wasPlayingRef = useRef(false);
     const [unavailable, setUnavailable] = useState(false);
@@ -612,18 +628,63 @@ interface EpisodePlayerScreenProps {
 }
 
 const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode, onBack, onNavigateEpisode, onReturnHome }) => {
-    const { t, bookmarkedIds, toggleSeriesBookmark, userProfile, autoplay } = useAppContext();
+    const { t, bookmarkedIds, toggleSeriesBookmark, userProfile, autoplay, isPremium } = useAppContext();
     const [episodesInSerie, setEpisodesInSerie] = useState<EpisodeSerie[]>([]);
     const [likeCount, setLikeCount] = useState(0);
     const [hasLiked, setHasLiked] = useState(false);
     const [showAuthPrompt, setShowAuthPrompt] = useState(false);
     const [authAction, setAuthAction] = useState('');
     const [videoIsPlaying, setVideoIsPlaying] = useState(false);
+    const [isPremiumContent, setIsPremiumContent] = useState(false);
+    const [isCheckingPremium, setIsCheckingPremium] = useState(true);
 
     const handleAuthRequired = (action: string) => {
         setAuthAction(action);
         setShowAuthPrompt(true);
     };
+
+    // Vérifier si le contenu est premium
+    useEffect(() => {
+        const checkPremiumStatus = async () => {
+            try {
+                // Récupérer la saison de l'épisode
+                const season = await seasonSerieService.getSeasonByUid(episode.uid_season);
+                if (!season) {
+                    console.error('Saison non trouvée');
+                    setIsPremiumContent(false);
+                    return;
+                }
+
+                // Récupérer la série
+                const serie = await serieService.getSerieByUid(season.uid_serie);
+                if (!serie) {
+                    console.error('Série non trouvée');
+                    setIsPremiumContent(false);
+                    return;
+                }
+
+                // Vérifier si la série ou la saison est premium
+                const isContentPremium = Boolean(serie.premium_text?.trim() || season.premium_text?.trim());
+                console.log('Contenu premium:', isContentPremium);
+                console.log('Utilisateur premium:', isPremium);
+                setIsPremiumContent(isContentPremium);
+                
+                // Si c'est du contenu premium et que l'utilisateur n'est pas premium, afficher le paywall
+                if (isContentPremium && (!userProfile?.uid || !isPremium)) {
+                    if (!userProfile?.uid) {
+                        handleAuthRequired('accéder à ce contenu premium');
+                    }
+                }
+            } catch (error) {
+                console.error('Erreur lors de la vérification du statut premium:', error);
+                setIsPremiumContent(false);
+            } finally {
+                setIsCheckingPremium(false);
+            }
+        };
+
+        checkPremiumStatus();
+    }, [episode.uid_season, userProfile]);
 
     useEffect(() => {
         const fetchEpisodes = async () => {
@@ -889,6 +950,38 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
             <span className="text-xs font-semibold">{value ? formatNumber(Number(value)) : label}</span>
         </button>
     );
+
+    // Afficher un indicateur de chargement pendant la vérification du statut premium
+    if (isCheckingPremium) {
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-[#FBF9F3] dark:bg-black">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-amber-500"></div>
+            </div>
+        );
+    }
+
+    // Si le contenu est premium et que l'utilisateur n'est pas premium, afficher le paywall
+    if (isPremiumContent && (!userProfile?.uid || !isPremium)) {
+        return (
+            <div className="bg-[#FBF9F3] dark:bg-black min-h-screen">
+                <header className="absolute top-4 left-4 z-20">
+                    <button
+                        onClick={onBack}
+                        className="p-2 rounded-full text-white bg-black/60 hover:bg-black/80 backdrop-blur-sm transition-all duration-200"
+                        aria-label="Go back"
+                    >
+                        <ArrowLeftIcon className="w-6 h-6" />
+                    </button>
+                </header>
+                <div className="container mx-auto px-4 py-20">
+                    <PremiumPaywall 
+                        contentTitle={episode.title}
+                        contentType="episode"
+                    />
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="bg-[#FBF9F3] dark:bg-black min-h-screen animate-fadeIn">

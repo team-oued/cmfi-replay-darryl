@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { useAppContext } from '../context/AppContext';
 
 interface PremiumBadgeProps {
@@ -6,10 +6,27 @@ interface PremiumBadgeProps {
     showDetails?: boolean;
 }
 
-const PremiumBadge: React.FC<PremiumBadgeProps> = ({ size = 'md', showDetails = false }) => {
-    const { isPremium, subscriptionDetails, t } = useAppContext();
+const PremiumBadgeComponent: React.FC<PremiumBadgeProps> = ({ size = 'md', showDetails = false }) => {
+    const { isPremium, subscriptionDetails, t, loading } = useAppContext();
+
+    // Si le chargement est en cours, on affiche un indicateur de chargement
+    if (isPremium === null) {
+        return (
+            <div className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                <span>Chargement...</span>
+            </div>
+        );
+    }
+
+    console.log('🔍 [PremiumBadge] Rendu du composant avec:', {
+        isPremium,
+        subscriptionDetails,
+        showDetails,
+        loading
+    });
 
     if (!isPremium) {
+        console.log('🔍 [PremiumBadge] isPremium est false, pas de rendu');
         return null;
     }
 
@@ -26,6 +43,7 @@ const PremiumBadge: React.FC<PremiumBadgeProps> = ({ size = 'md', showDetails = 
     };
 
     const getPlanLabel = () => {
+        console.log('🔍 [PremiumBadge] getPlanLabel avec subscriptionDetails:', subscriptionDetails);
         if (!subscriptionDetails) return 'Premium';
 
         switch (subscriptionDetails.planType) {
@@ -41,6 +59,7 @@ const PremiumBadge: React.FC<PremiumBadgeProps> = ({ size = 'md', showDetails = 
     };
 
     const getDaysRemainingText = () => {
+        console.log('🔍 [PremiumBadge] getDaysRemainingText avec subscriptionDetails:', subscriptionDetails);
         if (!subscriptionDetails || !subscriptionDetails.daysRemaining) return null;
 
         const days = subscriptionDetails.daysRemaining;
@@ -77,5 +96,14 @@ const PremiumBadge: React.FC<PremiumBadgeProps> = ({ size = 'md', showDetails = 
         </div>
     );
 };
+
+// Utilisation de memo pour éviter les rendus inutiles
+const PremiumBadge = memo(PremiumBadgeComponent, (prevProps, nextProps) => {
+    // Ne se re-rend que si les props changent
+    return (
+        prevProps.size === nextProps.size &&
+        prevProps.showDetails === nextProps.showDetails
+    );
+});
 
 export default PremiumBadge;

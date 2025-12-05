@@ -15,7 +15,8 @@ import {
     arrayRemove,
     Timestamp,
     writeBatch,
-    DocumentReference
+    DocumentReference,
+    addDoc
 } from 'firebase/firestore';
 
 // Interfaces pour les collections
@@ -32,6 +33,7 @@ export interface UserProfile {
     bookmarkedIds: string[];
     createdAt?: Date | Timestamp;
     updatedAt?: Date | Timestamp;
+    isAdmin?: boolean;
 }
 
 // Interface pour la collection series
@@ -1479,6 +1481,53 @@ export const statsVuesService = {
         } catch (error) {
             console.error('Error getting continue watching items:', error);
             return [];
+        }
+    },
+
+    async updateViewingProgress(
+        userUid: string,
+        videoUid: string,
+        currentTime: number, // en secondes
+        isEpisode: boolean = false,
+        episodeRef?: DocumentReference // Optionnel, requis si c'est un épisode
+    ): Promise<void> {
+        try {
+            const userRef = doc(db, USERS_COLLECTION, userUid);
+            const now = new Date().toISOString();
+
+            // Vérifier s'il existe déjà une entrée pour cet utilisateur et cette vidéo
+            const q = query(
+                collection(db, STATS_VUES_COLLECTION),
+                where('user', '==', userRef),
+                where('uid', '==', videoUid)
+            );
+
+            const querySnapshot = await getDocs(q);
+            
+            if (!querySnapshot.empty) {
+                // Mise à jour de l'entrée existante
+                const docRef = querySnapshot.docs[0].ref;
+                await updateDoc(docRef, {
+                    tempsRegarde: currentTime,
+                    dateDernierUpdate: now,
+                    ...(isEpisode && { idEpisodeSerie: episodeRef })
+                });
+            } else {
+                // Création d'une nouvelle entrée
+                const newViewData: Omit<StatsVues, 'id'> = {
+                    uid: videoUid,
+                    user: userRef,
+                    tempsRegarde: currentTime,
+                    dateDernierUpdate: now,
+                    nombreLectures: 1, // Première lecture
+                    ...(isEpisode && { idEpisodeSerie: episodeRef })
+                };
+                
+                await addDoc(collection(db, STATS_VUES_COLLECTION), newViewData);
+            }
+        } catch (error) {
+            console.error('Error updating viewing progress:', error);
+            throw error;
         }
     },
 
