@@ -247,10 +247,12 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
     };
 
     return (
-        <div className="animate-fadeIn pb-8">
-            <div className="relative h-[60vh]">
+        <div className="animate-fadeIn pb-8 md:pb-12 bg-[#FBF9F3] dark:bg-black min-h-screen">
+            <div className="relative h-[50vh] md:h-[60vh] lg:h-[65vh]">
                 <img src={imageUrl} alt={title} className="absolute inset-0 w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#FBF9F3] via-[#FBF9F3]/70 to-transparent dark:from-black dark:via-black/70" />
+                {/* Gradient overlay amélioré pour meilleure lisibilité */}
+                <div className="absolute inset-0 bg-gradient-to-t from-[#FBF9F3] via-[#FBF9F3]/80 to-transparent dark:from-black dark:via-black/80" />
+                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#FBF9F3]/40 dark:to-black/40" />
                 <header className="absolute top-0 left-0 right-0 z-10">
                     <div className="flex items-center justify-between h-16 px-4">
                         <button
@@ -267,33 +269,52 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
                 </header>
             </div>
 
-            <div className="p-4 -mt-32 relative z-10 space-y-6">
-                <h1 className="text-4xl font-extrabold text-gray-900 dark:text-white drop-shadow-lg">{title}</h1>
+            <div className="p-4 md:p-6 lg:p-8 -mt-24 md:-mt-32 lg:-mt-40 relative z-10 space-y-4 md:space-y-6 max-w-7xl mx-auto">
+                {/* Titre avec meilleure gestion du texte */}
+                <div className="space-y-3 md:space-y-4">
+                    <h1 className="text-2xl md:text-3xl lg:text-4xl font-black text-gray-900 dark:text-white drop-shadow-lg leading-tight break-words">
+                        {title}
+                    </h1>
 
-                <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
-
-                    {item.duration && (
-                        <>
-                            <span>{item.duration}</span>
-                        </>
-                    )}
+                    {/* Métadonnées mieux organisées */}
+                    <div className="flex flex-wrap items-center gap-3 md:gap-4 text-sm md:text-base">
+                        {item.duration && (
+                            <span className="flex items-center gap-1.5 text-gray-700 dark:text-gray-300 font-medium">
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                {item.duration}
+                            </span>
+                        )}
+                        {languages && languages.length > 0 && (
+                            <span className="px-2.5 py-1 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium text-xs md:text-sm">
+                                {languages[0].toUpperCase()}
+                            </span>
+                        )}
+                        {type && (
+                            <span className="px-2.5 py-1 rounded-md bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold text-xs md:text-sm">
+                                {type === MediaType.Movie ? 'Film' : type === MediaType.Series ? 'Série' : 'Podcast'}
+                            </span>
+                        )}
+                    </div>
                 </div>
 
 
-                <div className="flex items-center space-x-6 mt-4 text-sm">
+                {/* Stats et actions - Mieux organisés */}
+                <div className="flex flex-wrap items-center gap-4 md:gap-6 text-sm md:text-base">
                     {isLoadingLikes ? (
-                        <span className="text-gray-500">Chargement...</span>
+                        <span className="text-gray-500 dark:text-gray-400">Chargement...</span>
                     ) : (
                         <>
-                            <span className="flex items-center space-x-1">
-                                <LikeIcon className={`w-5 h-5 ${hasLiked ? 'text-red-500/80' : 'text-gray-600 dark:text-gray-400'}`} />
-                                <span className={hasLiked ? 'text-red-500 font-medium' : 'text-gray-600 dark:text-gray-400'}>
+                            <span className="flex items-center gap-2">
+                                <LikeIcon className={`w-5 h-5 ${hasLiked ? 'text-red-500' : 'text-gray-600 dark:text-gray-400'}`} />
+                                <span className={hasLiked ? 'text-red-500 font-semibold' : 'text-gray-700 dark:text-gray-300'}>
                                     {likeCount} {t('likes')}
                                 </span>
                             </span>
-                            <span className="flex items-center space-x-1">
-                                <CommentIcon className="w-5 h-5 text-sky-500/80" />
-                                <span className="text-gray-600 dark:text-gray-400">
+                            <span className="flex items-center gap-2">
+                                <CommentIcon className="w-5 h-5 text-sky-500" />
+                                <span className="text-gray-700 dark:text-gray-300">
                                     {comments.length} {t(comments.length !== 1 ? 'comments' : 'comment')}
                                 </span>
                             </span>
@@ -301,47 +322,67 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
                     )}
                 </div>
 
-                <div className="flex items-center space-x-3 pt-2">
-                    <button onClick={handlePlay} className="flex items-center justify-center bg-amber-500 text-gray-900 font-bold py-3 px-8 rounded-lg hover:bg-amber-400 transition-colors duration-200 shadow-lg">
-                        <PlayIcon className="w-6 h-6 mr-2" />
-                        <span>{t('play')}</span>
+                {/* Boutons d'action améliorés */}
+                <div className="flex flex-wrap items-center gap-3 md:gap-4">
+                    <button 
+                        onClick={handlePlay} 
+                        className="flex items-center justify-center gap-2 bg-amber-500 text-gray-900 font-bold py-3 md:py-3.5 px-6 md:px-8 rounded-lg md:rounded-xl hover:bg-amber-400 transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl"
+                    >
+                        <PlayIcon className="w-5 h-5 md:w-6 md:h-6" />
+                        <span className="text-sm md:text-base">{t('play')}</span>
                     </button>
                     <button
                         onClick={() => toggleBookmark(item.id)}
-                        className={`flex items-center justify-center font-bold py-3 px-6 rounded-lg backdrop-blur-sm transition-colors duration-200 ${isBookmarked
-                            ? 'bg-amber-500 text-gray-900'
-                            : 'bg-gray-200/80 dark:bg-gray-800/80 text-gray-900 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-700'
-                            }`}
+                        className={`flex items-center justify-center gap-2 font-bold py-3 md:py-3.5 px-5 md:px-6 rounded-lg md:rounded-xl backdrop-blur-sm transition-all duration-300 hover:scale-105 ${
+                            isBookmarked
+                                ? 'bg-amber-500 text-gray-900 hover:bg-amber-400'
+                                : 'bg-gray-200/90 dark:bg-gray-800/90 text-gray-900 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-700'
+                        }`}
                     >
-                        {isBookmarked ? <CheckIcon className="w-6 h-6 mr-2" /> : <PlusIcon className="w-6 h-6 mr-2" />}
-                        <span>{isBookmarked ? t('addedToList') : t('myList')}</span>
+                        {isBookmarked ? (
+                            <CheckIcon className="w-5 h-5 md:w-6 md:h-6" />
+                        ) : (
+                            <PlusIcon className="w-5 h-5 md:w-6 md:h-6" />
+                        )}
+                        <span className="text-sm md:text-base">{isBookmarked ? t('addedToList') : t('myList')}</span>
                     </button>
                 </div>
 
-                <div>
-                    <h2 className="text-xl font-bold mb-2">{t('description')}</h2>
-                    <p className={`text-gray-600 dark:text-gray-300 leading-relaxed transition-all duration-300 ${isLongDescription && !isDescriptionExpanded ? 'line-clamp-3' : ''}`}>
-                        {description}
-                    </p>
-                    {isLongDescription && (
-                        <button
-                            onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
-                            className="text-amber-500 font-semibold mt-1 hover:text-amber-600 dark:hover:text-amber-400"
-                        >
-                            {isDescriptionExpanded ? t('showLess') : t('readMore')}
-                        </button>
+                {/* Description avec meilleure lisibilité */}
+                <div className="space-y-2 md:space-y-3">
+                    <h2 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white">{t('description')}</h2>
+                    {description ? (
+                        <>
+                            <p className={`text-gray-700 dark:text-gray-300 leading-relaxed text-sm md:text-base transition-all duration-300 ${
+                                isLongDescription && !isDescriptionExpanded ? 'line-clamp-4' : ''
+                            }`}>
+                                {description}
+                            </p>
+                            {isLongDescription && (
+                                <button
+                                    onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+                                    className="text-amber-600 dark:text-amber-400 font-semibold text-sm md:text-base hover:text-amber-700 dark:hover:text-amber-300 transition-colors duration-200"
+                                >
+                                    {isDescriptionExpanded ? t('showLess') : t('readMore')}
+                                </button>
+                            )}
+                        </>
+                    ) : (
+                        <p className="text-gray-500 dark:text-gray-400 text-sm md:text-base italic">
+                            {t('noDescription') || 'Aucune description disponible'}
+                        </p>
                     )}
                 </div>
 
                 {(type === MediaType.Series || type === MediaType.Podcast) && (
-                    <div>
-                        <h2 className="text-xl font-bold mb-3">{t('episodes')}</h2>
+                    <div className="space-y-4 md:space-y-6">
+                        <h2 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white">{t('episodes')}</h2>
                         {isLoading ? (
-                            <div className="text-center py-8">
-                                <div className="text-gray-500 dark:text-gray-400">{t('loading') || 'Chargement...'}</div>
+                            <div className="text-center py-8 md:py-12">
+                                <div className="text-gray-500 dark:text-gray-400 text-sm md:text-base">{t('loading') || 'Chargement...'}</div>
                             </div>
                         ) : (
-                            <div className="space-y-2">
+                            <div className="space-y-2 md:space-y-3">
                                 {/* Afficher les saisons depuis Firestore si disponibles, sinon fallback vers les données mockées */}
                                 {firestoreSeasons.length > 0 ? (
                                     firestoreSeasons.map(season => {

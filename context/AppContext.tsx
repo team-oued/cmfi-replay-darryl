@@ -115,10 +115,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
             // Stocker en localStorage pour une récupération immédiate au chargement
             if (typeof window !== 'undefined') {
+                // Vérifier que endDate est une Date valide avant d'appeler toISOString()
+                const endDateISO = details.endDate && details.endDate instanceof Date && !isNaN(details.endDate.getTime())
+                    ? details.endDate.toISOString()
+                    : null;
+                
                 localStorage.setItem('premiumStatus', JSON.stringify({
                     isPremium: details.isPremium,
                     planType: details.planType,
-                    endDate: details.endDate?.toISOString(),
+                    endDate: endDateISO,
                     timestamp: new Date().toISOString()
                 }));
             }

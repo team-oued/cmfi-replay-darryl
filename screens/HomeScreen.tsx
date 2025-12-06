@@ -11,17 +11,71 @@ import { MediaContent, User, MediaType } from '../types';
 import { useAppContext } from '../context/AppContext';
 import { userService, generateDefaultAvatar, likeService, movieService, episodeSerieService, statsVuesService, ContinueWatchingItem, viewService } from '../lib/firestore';
 import ContinueWatchingSection from '../components/ContinueWatchingSection';
+import InfoBar from '../components/InfoBar';
 
-const MediaRow: React.FC<{ title: string; items: MediaContent[]; onSelectMedia: (item: MediaContent) => void; onPlay: (item: MediaContent) => void; variant?: 'poster' | 'thumbnail' | 'list' }> = ({ title, items, onSelectMedia, onPlay, variant }) => (
-    <section className="py-4">
-        <h3 className="text-xl font-bold px-4 mb-3">{title}</h3>
-        <div className="flex space-x-4 overflow-x-auto px-4 scrollbar-hide pb-2">
-            {items.map((item) => (
-                <MediaCard key={item.id} item={item} variant={variant} onSelect={onSelectMedia} onPlay={onPlay} />
-            ))}
-        </div>
-    </section>
-);
+const MediaRow: React.FC<{ title: string; items: MediaContent[]; onSelectMedia: (item: MediaContent) => void; onPlay: (item: MediaContent) => void; variant?: 'poster' | 'thumbnail' | 'list' }> = ({ title, items, onSelectMedia, onPlay, variant }) => {
+    const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+    const [showLeftGradient, setShowLeftGradient] = React.useState(false);
+    const [showRightGradient, setShowRightGradient] = React.useState(true);
+
+    React.useEffect(() => {
+        const container = scrollContainerRef.current;
+        if (!container) return;
+
+        const checkScroll = () => {
+            const { scrollLeft, scrollWidth, clientWidth } = container;
+            setShowLeftGradient(scrollLeft > 10);
+            setShowRightGradient(scrollLeft < scrollWidth - clientWidth - 10);
+        };
+
+        checkScroll();
+        container.addEventListener('scroll', checkScroll);
+        window.addEventListener('resize', checkScroll);
+        return () => {
+            container.removeEventListener('scroll', checkScroll);
+            window.removeEventListener('resize', checkScroll);
+        };
+    }, [items]);
+
+    if (items.length === 0) return null;
+
+    return (
+        <section className="py-8 md:py-12 relative group">
+            {/* Titre avec meilleure hiérarchie */}
+            <div className="px-4 md:px-6 lg:px-8 mb-6">
+                <h3 className="text-2xl md:text-3xl lg:text-4xl font-black text-gray-900 dark:text-white tracking-tight">
+                    {title}
+                </h3>
+            </div>
+            
+            {/* Container avec gradients de fade dynamiques */}
+            <div className="relative">
+                {/* Gradient gauche */}
+                {showLeftGradient && (
+                    <div className="absolute left-0 top-0 bottom-0 w-20 md:w-32 lg:w-40 bg-gradient-to-r from-[#FBF9F3] dark:from-black via-[#FBF9F3]/80 dark:via-black/80 to-transparent z-20 pointer-events-none transition-opacity duration-500" />
+                )}
+                
+                {/* Gradient droite */}
+                {showRightGradient && (
+                    <div className="absolute right-0 top-0 bottom-0 w-20 md:w-32 lg:w-40 bg-gradient-to-l from-[#FBF9F3] dark:from-black via-[#FBF9F3]/80 dark:via-black/80 to-transparent z-20 pointer-events-none transition-opacity duration-500" />
+                )}
+                
+                {/* Carrousel avec scroll smooth et snap */}
+                <div 
+                    ref={scrollContainerRef}
+                    className="flex space-x-4 md:space-x-6 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-6 scroll-smooth snap-x snap-mandatory"
+                    style={{ scrollBehavior: 'smooth', WebkitOverflowScrolling: 'touch' }}
+                >
+                    {items.map((item, index) => (
+                        <div key={item.id} className="snap-start flex-shrink-0">
+                            <MediaCard item={item} variant={variant} onSelect={onSelectMedia} onPlay={onPlay} />
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </section>
+    );
+};
 
 const RankedMediaRow: React.FC<{
     title: string;
@@ -29,92 +83,29 @@ const RankedMediaRow: React.FC<{
     onSelectMedia: (item: MediaContent) => void;
     onPlay: (item: MediaContent) => void;
 }> = ({ title, items, onSelectMedia, onPlay }) => {
-    const scrollContainerRef = React.useRef<HTMLDivElement>(null);
-    const [canScrollLeft, setCanScrollLeft] = React.useState(false);
-    const [canScrollRight, setCanScrollRight] = React.useState(true);
-
-    // Vérifier si on peut scroller
-    const checkScrollability = () => {
-        if (scrollContainerRef.current) {
-            const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
-            setCanScrollLeft(scrollLeft > 0);
-            setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
-        }
-    };
-
-    React.useEffect(() => {
-        checkScrollability();
-        const container = scrollContainerRef.current;
-        if (container) {
-            container.addEventListener('scroll', checkScrollability);
-            window.addEventListener('resize', checkScrollability);
-            return () => {
-                container.removeEventListener('scroll', checkScrollability);
-                window.removeEventListener('resize', checkScrollability);
-            };
-        }
-    }, [items]);
-
-    const scroll = (direction: 'left' | 'right') => {
-        if (scrollContainerRef.current) {
-            const scrollAmount = 400; // Distance de défilement
-            const newScrollLeft = direction === 'left'
-                ? scrollContainerRef.current.scrollLeft - scrollAmount
-                : scrollContainerRef.current.scrollLeft + scrollAmount;
-
-            scrollContainerRef.current.scrollTo({
-                left: newScrollLeft,
-                behavior: 'smooth'
-            });
-        }
-    };
+    if (items.length === 0) return null;
 
     return (
-        <section className="py-4">
-            <div className="flex items-center justify-between px-4 mb-3">
-                <h3 className="text-xl font-bold">{title}</h3>
-                <div className="flex space-x-2">
-                    <button
-                        onClick={() => scroll('left')}
-                        disabled={!canScrollLeft}
-                        className={`p-2 rounded-full transition-all duration-300 ${canScrollLeft
-                            ? 'bg-gray-800/50 hover:bg-gray-700/70 text-white'
-                            : 'bg-gray-800/20 text-gray-500 cursor-not-allowed'
-                            }`}
-                        aria-label="Défiler vers la gauche"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                        </svg>
-                    </button>
-                    <button
-                        onClick={() => scroll('right')}
-                        disabled={!canScrollRight}
-                        className={`p-2 rounded-full transition-all duration-300 ${canScrollRight
-                            ? 'bg-gray-800/50 hover:bg-gray-700/70 text-white'
-                            : 'bg-gray-800/20 text-gray-500 cursor-not-allowed'
-                            }`}
-                        aria-label="Défiler vers la droite"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                    </button>
-                </div>
+        <section className="py-8 md:py-12">
+            {/* Titre */}
+            <div className="px-4 md:px-6 lg:px-8 mb-6">
+                <h3 className="text-2xl md:text-3xl lg:text-4xl font-black text-gray-900 dark:text-white tracking-tight">
+                    {title}
+                </h3>
             </div>
-            <div
-                ref={scrollContainerRef}
-                className="flex space-x-4 overflow-x-auto px-4 scrollbar-hide pb-2"
-            >
+            
+            {/* Container simple sans effets de défilement */}
+            <div className="flex space-x-4 md:space-x-6 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-6">
                 {items.map((item, index) => (
-                    <RankedMediaCard
-                        key={item.content.id}
-                        item={item.content}
-                        rank={index + 1}
-                        viewCount={item.viewCount}
-                        onSelect={onSelectMedia}
-                        onPlay={onPlay}
-                    />
+                    <div key={item.content.id} className="flex-shrink-0">
+                        <RankedMediaCard
+                            item={item.content}
+                            rank={index + 1}
+                            viewCount={item.viewCount}
+                            onSelect={onSelectMedia}
+                            onPlay={onPlay}
+                        />
+                    </div>
                 ))}
             </div>
         </section>
@@ -395,52 +386,67 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
 
     return (
         <div className="min-h-screen bg-[#FBF9F3] dark:bg-black">
-            {/* Hero Section avec Skeleton */}
-            {loadingHero ? (
-                <HeroSkeleton />
-            ) : (
-                <Hero items={featuredContent} onSelectMedia={onSelectMedia} onPlay={onPlay} />
-            )}
+            {/* Hero Section avec Skeleton - Animation d'entrée */}
+            <div className="animate-fadeIn">
+                {loadingHero ? (
+                    <HeroSkeleton />
+                ) : (
+                    <Hero items={featuredContent} onSelectMedia={onSelectMedia} onPlay={onPlay} />
+                )}
+            </div>
 
-            {/* Catégories avec Skeleton */}
-            {loadingCategories ? (
-                <CategoryTilesSkeleton />
-            ) : (
-                <CategoryTiles navigateToCategory={navigateToCategory} />
-            )}
+            {/* Barre d'information déroulante */}
+            <InfoBar />
 
-            {/* Section Continuer la lecture avec Skeleton */}
-            {loadingContinueWatching ? (
-                <ContinueWatchingSkeleton />
-            ) : continueWatchingItems.length > 0 ? (
-                <ContinueWatchingSection
-                    items={continueWatchingItems}
-                    onItemClick={handleContinueWatchingClick}
-                    title={t('continueWatching') || 'Continuer la lecture'}
-                />
-            ) : null}
+            {/* Catégories avec Skeleton - Animation d'entrée décalée */}
+            <div className="animate-fadeIn" style={{ animationDelay: '150ms' }}>
+                {loadingCategories ? (
+                    <CategoryTilesSkeleton />
+                ) : (
+                    <CategoryTiles navigateToCategory={navigateToCategory} />
+                )}
+            </div>
 
-            {loadingMostLiked ? (
-                <MostLikedSkeleton />
-            ) : mostLikedItems.length > 0 && (
-                <RankedMediaRow
-                    title={t('mostLiked') || 'Most Liked'}
-                    items={mostLikedItems}
-                    onSelectMedia={onSelectMedia}
-                    onPlay={onPlay}
-                />
-            )}
+            {/* Section Continuer la lecture avec Skeleton - Animation d'entrée décalée */}
+            <div className="animate-fadeIn" style={{ animationDelay: '300ms' }}>
+                {loadingContinueWatching ? (
+                    <ContinueWatchingSkeleton />
+                ) : continueWatchingItems.length > 0 ? (
+                    <ContinueWatchingSection
+                        items={continueWatchingItems}
+                        onItemClick={handleContinueWatchingClick}
+                        title={t('continueWatching') || 'Continuer la lecture'}
+                    />
+                ) : null}
+            </div>
 
-            {loadingMostWatched ? (
-                <MostLikedSkeleton />
-            ) : mostWatchedItems.length > 0 && (
-                <RankedMediaRow
-                    title={t('mostWatched') || 'Most Watched'}
-                    items={mostWatchedItems}
-                    onSelectMedia={onSelectMedia}
-                    onPlay={onPlay}
-                />
-            )}
+            {/* Section Most Liked - Animation d'entrée décalée */}
+            <div className="animate-fadeIn" style={{ animationDelay: '450ms' }}>
+                {loadingMostLiked ? (
+                    <MostLikedSkeleton />
+                ) : mostLikedItems.length > 0 && (
+                    <RankedMediaRow
+                        title={t('mostLiked') || 'Most Liked'}
+                        items={mostLikedItems}
+                        onSelectMedia={onSelectMedia}
+                        onPlay={onPlay}
+                    />
+                )}
+            </div>
+
+            {/* Section Most Watched - Animation d'entrée décalée */}
+            <div className="animate-fadeIn" style={{ animationDelay: '600ms' }}>
+                {loadingMostWatched ? (
+                    <MostLikedSkeleton />
+                ) : mostWatchedItems.length > 0 && (
+                    <RankedMediaRow
+                        title={t('mostWatched') || 'Most Watched'}
+                        items={mostWatchedItems}
+                        onSelectMedia={onSelectMedia}
+                        onPlay={onPlay}
+                    />
+                )}
+            </div>
 
             {/* Section Active Now - Visible uniquement pour les administrateurs */}
 {/*             {user?.isAdmin && (

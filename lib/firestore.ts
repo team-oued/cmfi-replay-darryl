@@ -294,6 +294,19 @@ export const userService = {
         }
     },
 
+    /**
+     * Définit le statut admin d'un utilisateur
+     */
+    async setAdminStatus(uid: string, isAdmin: boolean): Promise<void> {
+        try {
+            await this.updateUserProfile(uid, { isAdmin });
+            console.log(`Admin status ${isAdmin ? 'granted' : 'revoked'} for user: ${uid}`);
+        } catch (error) {
+            console.error('Error setting admin status:', error);
+            throw error;
+        }
+    },
+
     async getActiveUsers(limitCount: number = 50): Promise<UserProfile[]> {
         try {
             const q = query(
@@ -2054,3 +2067,193 @@ export const viewService = {
 
 // Export du service d'abonnement
 export { subscriptionService } from './subscriptionService';
+
+// Interface pour les messages d'information
+export interface InfoBarMessage {
+    id: string;
+    message: string;
+    isActive: boolean;
+    createdAt: Date | Timestamp;
+    updatedAt: Date | Timestamp;
+    createdBy?: string;
+}
+
+// Collection pour les messages d'information
+const INFO_BAR_COLLECTION = 'infoBarMessages';
+
+// Service pour gérer les messages d'information
+export const infoBarService = {
+    /**
+     * Récupère le message actif
+     */
+    async getActiveMessage(): Promise<InfoBarMessage | null> {
+        try {
+            // Récupérer tous les messages actifs et trier côté client pour éviter l'index composite
+            const q = query(
+                collection(db, INFO_BAR_COLLECTION),
+                where('isActive', '==', true)
+            );
+            const querySnapshot = await getDocs(q);
+            
+            if (querySnapshot.empty) {
+                return null;
+            }
+            
+            // Trier par updatedAt côté client et prendre le plus récent
+            const messages = querySnapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    message: data.message || '',
+                    isActive: data.isActive || false,
+                    createdAt: data.createdAt?.toDate() || new Date(),
+                    updatedAt: data.updatedAt?.toDate() || new Date(),
+                    createdBy: data.createdBy
+                };
+            });
+            
+            // Trier par updatedAt décroissant et prendre le premier
+            messages.sort((a, b) => {
+                const dateA = a.updatedAt instanceof Date ? a.updatedAt.getTime() : 0;
+                const dateB = b.updatedAt instanceof Date ? b.updatedAt.getTime() : 0;
+                return dateB - dateA;
+            });
+            
+            return messages[0] || null;
+        } catch (error) {
+            console.error('Error getting active info bar message:', error);
+            return null;
+        }
+    },
+
+    /**
+     * Crée un nouveau message d'information
+     */
+    async createMessage(message: string, userId: string): Promise<string> {
+        try {
+            // Désactiver tous les autres messages
+            const allMessagesQuery = query(
+                collection(db, INFO_BAR_COLLECTION),
+                where('isActive', '==', true)
+            );
+            const allMessagesSnapshot = await getDocs(allMessagesQuery);
+            
+            const batch = writeBatch(db);
+            allMessagesSnapshot.docs.forEach(doc => {
+                batch.update(doc.ref, { isActive: false });
+            });
+            
+            // Créer le nouveau message
+            const newMessageRef = doc(collection(db, INFO_BAR_COLLECTION));
+            batch.set(newMessageRef, {
+                message,
+                isActive: true,
+                createdAt: Timestamp.now(),
+                updatedAt: Timestamp.now(),
+                createdBy: userId
+            });
+            
+            await batch.commit();
+            return newMessageRef.id;
+        } catch (error) {
+            console.error('Error creating info bar message:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Met à jour un message existant
+     */
+    async updateMessage(messageId: string, message: string, userId: string): Promise<void> {
+        try {
+            const messageRef = doc(db, INFO_BAR_COLLECTION, messageId);
+            await updateDoc(messageRef, {
+                message,
+                updatedAt: Timestamp.now(),
+                createdBy: userId
+            });
+        } catch (error) {
+            console.error('Error updating info bar message:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Active ou désactive un message
+     */
+    async setMessageActive(messageId: string, isActive: boolean): Promise<void> {
+        try {
+            const messageRef = doc(db, INFO_BAR_COLLECTION, messageId);
+            
+            if (isActive) {
+                // Désactiver tous les autres messages actifs
+                const activeMessagesQuery = query(
+                    collection(db, INFO_BAR_COLLECTION),
+                    where('isActive', '==', true)
+                );
+                const activeMessagesSnapshot = await getDocs(activeMessagesQuery);
+                
+                const batch = writeBatch(db);
+                activeMessagesSnapshot.docs.forEach(doc => {
+                    if (doc.id !== messageId) {
+                        batch.update(doc.ref, { isActive: false });
+                    }
+                });
+                batch.update(messageRef, { 
+                    isActive: true,
+                    updatedAt: Timestamp.now()
+                });
+                await batch.commit();
+            } else {
+                await updateDoc(messageRef, { 
+                    isActive: false,
+                    updatedAt: Timestamp.now()
+                });
+            }
+        } catch (error) {
+            console.error('Error setting message active:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Récupère tous les messages (pour l'admin)
+     */
+    async getAllMessages(): Promise<InfoBarMessage[]> {
+        try {
+            const q = query(
+                collection(db, INFO_BAR_COLLECTION),
+                orderBy('updatedAt', 'desc')
+            );
+            const querySnapshot = await getDocs(q);
+            
+            return querySnapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    message: data.message || '',
+                    isActive: data.isActive || false,
+                    createdAt: data.createdAt?.toDate() || new Date(),
+                    updatedAt: data.updatedAt?.toDate() || new Date(),
+                    createdBy: data.createdBy
+                };
+            });
+        } catch (error) {
+            console.error('Error getting all info bar messages:', error);
+            return [];
+        }
+    },
+
+    /**
+     * Supprime un message
+     */
+    async deleteMessage(messageId: string): Promise<void> {
+        try {
+            const messageRef = doc(db, INFO_BAR_COLLECTION, messageId);
+            await deleteDoc(messageRef);
+        } catch (error) {
+            console.error('Error deleting info bar message:', error);
+            throw error;
+        }
+    }
+};

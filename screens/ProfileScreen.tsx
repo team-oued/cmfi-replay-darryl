@@ -152,6 +152,15 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigate, onSelectMedia, 
         },
     ];
 
+    // Items admin
+    const adminItems = userProfile?.isAdmin ? [
+        {
+            icon: SettingsIcon,
+            label: 'Gérer les messages d\'information',
+            action: () => navigateRouter('/manage-info-bar')
+        },
+    ] : [];
+
     return (
         <div className="pt-4">
             <div className="flex flex-col items-center p-6 space-y-3 border-b border-gray-200 dark:border-gray-800">
@@ -213,6 +222,16 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigate, onSelectMedia, 
                         <SettingsItem key={item.label} Icon={item.icon} label={item.label} onClick={item.action} />
                     ))}
                 </div>
+                {adminItems.length > 0 && (
+                    <div className="mt-4">
+                        <h3 className="text-lg font-bold mb-3 text-amber-600 dark:text-amber-400">Administration</h3>
+                        <div className="border border-amber-200 dark:border-amber-800 rounded-lg overflow-hidden divide-y divide-amber-200 dark:divide-amber-800">
+                            {adminItems.map((item) => (
+                                <SettingsItem key={item.label} Icon={item.icon} label={item.label} onClick={item.action} />
+                            ))}
+                        </div>
+                    </div>
+                )}
                 <div className="mt-4 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden divide-y divide-gray-200 dark:divide-gray-800">
                     <SettingsItem Icon={LogoutIcon} label={t('logout')} isDestructive onClick={() => setIsAuthenticated(false)} />
                 </div>

@@ -23,6 +23,7 @@ import ChangePasswordScreen from './screens/ChangePasswordScreen';
 import HistoryScreen from './screens/HistoryScreen';
 import RedeemVoucherScreen from './screens/RedeemVoucherScreen';
 import ManageSubscriptionScreen from './screens/ManageSubscriptionScreen';
+import ManageInfoBarScreen from './screens/ManageInfoBarScreen';
 import PaymentSuccessScreen from './screens/PaymentSuccessScreen';
 
 // Category Screens
@@ -451,6 +452,10 @@ const AppContent: React.FC = () => {
 
                             <Route path="/manage-subscription" element={
                                 <ManageSubscriptionScreen />
+                            } />
+
+                            <Route path="/manage-info-bar" element={
+                                <ManageInfoBarScreen />
                             } />
 
                             <Route path="/payment-success" element={

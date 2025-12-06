@@ -169,20 +169,135 @@ const Hero: React.FC<HeroProps> = ({ items: propItems, onSelectMedia, onPlay }) 
   };
 
   return (
-    <div className={`relative w-full h-[60vh] md:h-[70vh] ${bgClass} ${textClass} overflow-hidden`}>
-      {/* Background blur du slide actuel */}
+    <div className={`relative w-full h-[65vh] md:h-[75vh] lg:h-[80vh] ${bgClass} ${textClass} overflow-hidden`}>
+      {/* Background multi-couches premium avec effets visuels */}
       <div className="absolute inset-0 w-full h-full">
-        <img
-          src={currentItem.imageUrl}
-          alt=""
-          className="w-full h-full object-cover blur-2xl opacity-30 scale-110"
+        {/* Image principale floutée avec parallax et transition fluide */}
+        <div className="absolute inset-0 transition-opacity duration-1000 ease-out">
+          <img
+            key={currentItem.id}
+            src={currentItem.imageUrl}
+            alt=""
+            className="w-full h-full object-cover blur-3xl opacity-40 dark:opacity-30 scale-125"
+            style={{ transform: `scale(1.25) translateY(${currentIndex * 5}px)` }}
+          />
+        </div>
+        
+        {/* Vignettes des autres films en arrière-plan (effet de profondeur) */}
+        <div className="absolute inset-0 overflow-hidden">
+          {items.slice(0, 5).map((item, idx) => {
+            if (idx === currentIndex) return null;
+            const offset = idx - currentIndex;
+            const absOffset = Math.abs(offset);
+            if (absOffset > 2) return null;
+            
+            return (
+              <div
+                key={item.id}
+                className="absolute inset-0 transition-all duration-1000 ease-out"
+                style={{
+                  opacity: 0.05 - absOffset * 0.02,
+                  transform: `translateX(${offset * 20}%) scale(${1.1 - absOffset * 0.05})`,
+                  filter: 'blur(40px)',
+                }}
+              >
+                <img
+                  src={item.imageUrl}
+                  alt=""
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Pattern de grille subtil animé */}
+        <div 
+          className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]"
+          style={{
+            backgroundImage: `
+              linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)
+            `,
+            backgroundSize: '50px 50px',
+            animation: 'gridMove 20s linear infinite',
+          }}
         />
+
+        {/* Effet de bruit cinématographique subtil */}
+        <div 
+          className="absolute inset-0 opacity-[0.02] dark:opacity-[0.03] mix-blend-overlay"
+          style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
+            backgroundSize: '200px 200px',
+            animation: 'noiseMove 8s steps(8) infinite',
+          }}
+        />
+
+        {/* Effets de lumière animés (spotlights) */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div 
+            className="absolute w-[800px] h-[800px] rounded-full blur-3xl opacity-20 dark:opacity-10"
+            style={{
+              background: 'radial-gradient(circle, rgba(245,158,11,0.4) 0%, transparent 70%)',
+              top: '20%',
+              left: '10%',
+              animation: 'lightMove1 15s ease-in-out infinite',
+            }}
+          />
+          <div 
+            className="absolute w-[600px] h-[600px] rounded-full blur-3xl opacity-15 dark:opacity-8"
+            style={{
+              background: 'radial-gradient(circle, rgba(59,130,246,0.3) 0%, transparent 70%)',
+              bottom: '30%',
+              right: '15%',
+              animation: 'lightMove2 20s ease-in-out infinite',
+            }}
+          />
+        </div>
+
+        {/* Gradient overlay multi-couches premium */}
         <div className={`absolute inset-0 ${gradientClass}`} />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-transparent to-black/50 dark:from-black/80 dark:via-transparent dark:to-black/60" />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/40 dark:to-black/50" />
+        <div className="absolute bottom-0 left-0 right-0 h-2/5 bg-gradient-to-t from-[#FBF9F3] via-[#FBF9F3]/90 to-transparent dark:from-black dark:via-black/90" />
+        
+        {/* Bordure lumineuse animée en bas */}
+        <div 
+          className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-amber-500/50 to-transparent"
+          style={{
+            animation: 'borderGlow 3s ease-in-out infinite',
+          }}
+        />
       </div>
 
-      {/* Coverflow Container */}
-      <div className="relative h-full flex items-center justify-center" style={{ perspective: window.innerWidth < 768 ? '1200px' : '2000px' }}>
-        <div className="relative w-full h-[55%] md:h-[60%] flex items-center justify-center">
+      {/* Styles CSS pour les animations */}
+      <style>{`
+        @keyframes gridMove {
+          0% { transform: translate(0, 0); }
+          100% { transform: translate(50px, 50px); }
+        }
+        @keyframes lightMove1 {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          50% { transform: translate(100px, -50px) scale(1.2); }
+        }
+        @keyframes lightMove2 {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          50% { transform: translate(-80px, 60px) scale(1.15); }
+        }
+        @keyframes borderGlow {
+          0%, 100% { opacity: 0.3; }
+          50% { opacity: 0.8; }
+        }
+        @keyframes noiseMove {
+          0% { transform: translate(0, 0); }
+          100% { transform: translate(-200px, -200px); }
+        }
+      `}</style>
+
+      {/* Coverflow Container avec perspective améliorée */}
+      <div className="relative h-full flex items-center justify-center" style={{ perspective: window.innerWidth < 768 ? '1500px' : '2500px' }}>
+        <div className="relative w-full h-[60%] md:h-[65%] lg:h-[70%] flex items-center justify-center">
           {getVisibleSlides().map(({ item, displayIndex, actualIndex }) => {
             const style = getSlideStyle(displayIndex);
             const isCurrent = displayIndex === currentIndex;
@@ -200,7 +315,11 @@ const Hero: React.FC<HeroProps> = ({ items: propItems, onSelectMedia, onPlay }) 
                 }}
                 onClick={(e) => handleSlideClick(actualIndex, e)}
               >
-                <div className={`relative rounded-xl md:rounded-2xl overflow-hidden shadow-2xl ${isCurrent ? 'ring-2 md:ring-4 ring-white/30' : ''} ${item.is_premium ? 'border-2 border-yellow-400' : ''}`}>
+                <div className={`relative rounded-xl md:rounded-2xl lg:rounded-3xl overflow-hidden shadow-2xl transition-all duration-1000 ${
+                  isCurrent 
+                    ? 'ring-2 md:ring-4 lg:ring-4 ring-white/50 shadow-[0_0_60px_rgba(255,255,255,0.4)]' 
+                    : 'ring-0 opacity-70 hover:opacity-85'
+                } ${item.is_premium ? 'border-2 border-amber-400 shadow-amber-400/30' : ''}`}>
                   {item.is_premium && !isPremium && (
                     <div className="absolute top-2 right-2 z-10 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-1 rounded-md flex items-center gap-1">
                       <StarIcon className="w-3 h-3" />
@@ -210,7 +329,11 @@ const Hero: React.FC<HeroProps> = ({ items: propItems, onSelectMedia, onPlay }) 
                   <img
                     src={item.imageUrl}
                     alt={item.title}
-                    className={`w-full h-full object-cover aspect-video ${item.is_premium ? 'brightness-90' : ''}`}
+                    className={`w-full h-full object-cover aspect-video transition-all duration-1000 ${
+                      isCurrent 
+                        ? 'brightness-100 scale-100' 
+                        : 'brightness-80 scale-105'
+                    } ${item.is_premium ? 'brightness-90' : ''}`}
                   />
                   {item.is_premium && !isPremium && (
                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
@@ -218,16 +341,50 @@ const Hero: React.FC<HeroProps> = ({ items: propItems, onSelectMedia, onPlay }) 
                     </div>
                   )}
 
-                  {/* Overlay gradient - Plus fort pour assurer la lisibilité */}
-                  <div className={`absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent transition-opacity duration-700 ${isCurrent ? 'opacity-100' : 'opacity-0'}`} />
+                  {/* Overlay gradient premium - Multi-couches */}
+                  <div className={`absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent transition-opacity duration-700 ${
+                    isCurrent ? 'opacity-100' : 'opacity-70'
+                  }`} />
+                  
+                  {/* Overlay supplémentaire pour les cartes latérales */}
+                  {!isCurrent && (
+                    <div className="absolute inset-0 bg-black/20 transition-opacity duration-700" />
+                  )}
 
-                  {/* Info du slide actuel - Toujours en blanc pour la lisibilité */}
+                  {/* Info du slide actuel - Design premium avec meilleure lisibilité */}
                   {isCurrent && (
-                    <div className="absolute bottom-0 left-0 right-0 p-3 md:p-6 space-y-2 md:space-y-3 animate-fadeIn">
-                      <h2 className="text-lg md:text-2xl lg:text-3xl font-bold drop-shadow-lg line-clamp-2 text-white">{item.title}</h2>
+                    <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 lg:p-8 space-y-3 md:space-y-4 animate-fadeIn">
+                      {/* Titre avec gestion du texte améliorée */}
+                      <div className="space-y-2 md:space-y-3">
+                        <h2 className="text-xl md:text-3xl lg:text-4xl font-black drop-shadow-2xl text-white leading-tight tracking-tight break-words">
+                          {item.title}
+                        </h2>
+                        
+                        {/* Métadonnées enrichies */}
+                        <div className="flex flex-wrap items-center gap-2 md:gap-3 text-xs md:text-sm">
+                          {item.duration && (
+                            <span className="text-white/95 font-semibold drop-shadow-lg flex items-center gap-1.5">
+                              <svg className="w-3.5 h-3.5 md:w-4 md:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              {item.duration}
+                            </span>
+                          )}
+                          {item.languages && item.languages.length > 0 && (
+                            <span className="text-white/90 drop-shadow-md px-2 py-1 rounded-md bg-white/15 backdrop-blur-sm border border-white/25 text-xs md:text-sm font-medium">
+                              {item.languages[0].toUpperCase()}
+                            </span>
+                          )}
+                          {item.type && (
+                            <span className="px-2.5 py-1 rounded-md bg-white/20 backdrop-blur-md border border-white/30 text-white/95 text-xs md:text-sm font-bold">
+                              {item.type === MediaType.Movie ? 'Film' : item.type === MediaType.Series ? 'Série' : 'Podcast'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
 
-                      {/* Action buttons */}
-                      <div className="flex items-center gap-2 md:gap-3 pt-1 md:pt-2" onClick={(e) => e.stopPropagation()}>
+                      {/* Action buttons améliorés */}
+                      <div className="flex items-center gap-3 md:gap-4 pt-2" onClick={(e) => e.stopPropagation()}>
                         {item.is_premium && !isPremium ? (
                           // Bouton Unlock Premium pour les utilisateurs non premium sur du contenu premium
                           <button
@@ -242,15 +399,17 @@ const Hero: React.FC<HeroProps> = ({ items: propItems, onSelectMedia, onPlay }) 
                             <span>{unlockText}</span>
                           </button>
                         ) : (
-                          // Bouton Play pour le contenu non premium OU pour les utilisateurs premium
+                          // Bouton Play premium style Netflix
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               onPlay(item);
                             }}
-                            className="flex items-center gap-1.5 md:gap-2 bg-white text-black px-4 md:px-6 py-2 md:py-2.5 rounded-full text-sm md:text-base font-semibold hover:bg-white/90 transition-all duration-300 hover:scale-105 shadow-lg"
+                            className="group flex items-center gap-2 md:gap-3 bg-white text-black px-5 md:px-7 py-2.5 md:py-3 rounded-lg md:rounded-xl text-sm md:text-base font-bold hover:bg-gray-100 transition-all duration-300 hover:scale-105 shadow-xl hover:shadow-white/50"
                           >
-                            <PlayIcon className="w-4 h-4 md:w-5 md:h-5" />
+                            <div className="w-7 h-7 md:w-9 md:h-9 rounded-full bg-black/10 flex items-center justify-center group-hover:bg-black/20 transition-colors">
+                              <PlayIcon className="w-4 h-4 md:w-5 md:h-5 ml-0.5" />
+                            </div>
                             <span>{playText}</span>
                           </button>
                         )}
@@ -260,13 +419,28 @@ const Hero: React.FC<HeroProps> = ({ items: propItems, onSelectMedia, onPlay }) 
                             e.stopPropagation();
                             toggleBookmark(item.id, item.title, item.imageUrl, item.type, item.description || '');
                           }}
-                          className="flex items-center justify-center w-9 h-9 md:w-11 md:h-11 bg-white/20 backdrop-blur-md rounded-full hover:bg-white/30 transition-all duration-300 hover:scale-110 shadow-lg border border-white/30"
+                          className="group flex items-center justify-center w-10 h-10 md:w-12 md:h-12 bg-white/10 backdrop-blur-md rounded-full hover:bg-white/20 transition-all duration-300 hover:scale-110 shadow-lg border border-white/30 hover:border-white/50"
+                          title={isBookmarked ? 'Retirer des favoris' : 'Ajouter aux favoris'}
                         >
                           {isBookmarked ? (
-                            <CheckIcon className="w-4 h-4 md:w-5 md:h-5 text-white" />
+                            <CheckIcon className="w-5 h-5 md:w-6 md:h-6 text-white group-hover:scale-110 transition-transform" />
                           ) : (
-                            <PlusIcon className="w-4 h-4 md:w-5 md:h-5 text-white" />
+                            <PlusIcon className="w-5 h-5 md:w-6 md:h-6 text-white group-hover:rotate-90 transition-transform duration-300" />
                           )}
+                        </button>
+                        
+                        {/* Bouton Info premium */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSelectMedia(item);
+                          }}
+                          className="group flex items-center justify-center w-10 h-10 md:w-12 md:h-12 bg-white/10 backdrop-blur-md rounded-full hover:bg-white/20 transition-all duration-300 hover:scale-110 shadow-lg border border-white/30 hover:border-white/50"
+                          title="Plus d'infos"
+                        >
+                          <svg className="w-5 h-5 md:w-6 md:h-6 text-white group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
                         </button>
                       </div>
                     </div>
