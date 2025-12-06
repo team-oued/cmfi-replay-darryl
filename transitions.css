@@ -17,6 +17,7 @@
         opacity: 0;
         transform: translateY(10px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -27,6 +28,7 @@
     from {
         opacity: 1;
     }
+
     to {
         opacity: 0;
         transform: translateY(-10px);
@@ -35,39 +37,48 @@
 
 /* Animations pour l'indicateur de chargement */
 @keyframes wave {
-    0%, 60%, 100% { 
-        height: 20%; 
-        opacity: 0.3; 
+
+    0%,
+    60%,
+    100% {
+        height: 20%;
+        opacity: 0.3;
     }
-    30% { 
-        height: 80%; 
-        opacity: 1; 
+
+    30% {
+        height: 80%;
+        opacity: 1;
     }
 }
 
 @keyframes pulse {
-    0%, 100% { 
-        opacity: 0; 
-        transform: translateY(0); 
+
+    0%,
+    100% {
+        opacity: 0;
+        transform: translateY(0);
     }
-    50% { 
-        opacity: 1; 
-        transform: translateY(-2px); 
+
+    50% {
+        opacity: 1;
+        transform: translateY(-2px);
     }
 }
 
 @keyframes progress {
-    0% { 
-        width: 0; 
-        opacity: 0.5; 
+    0% {
+        width: 0;
+        opacity: 0.5;
     }
-    50% { 
-        width: 100%; 
-        opacity: 1; 
+
+    50% {
+        width: 100%;
+        opacity: 1;
     }
-    100% { 
-        width: 0; 
-        opacity: 0.5; 
+
+    100% {
+        width: 0;
+        opacity: 0.5;
     }
 }
 
@@ -78,9 +89,17 @@
     display: inline-block;
 }
 
-.loading-dots span:nth-child(1) { animation-delay: 0s; }
-.loading-dots span:nth-child(2) { animation-delay: 0.2s; }
-.loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+.loading-dots span:nth-child(1) {
+    animation-delay: 0s;
+}
+
+.loading-dots span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.loading-dots span:nth-child(3) {
+    animation-delay: 0.4s;
+}
 
 .animate-progress {
     animation: progress 2s ease-in-out infinite;
@@ -136,6 +155,7 @@
         opacity: 0;
         transform: translateX(20px);
     }
+
     to {
         opacity: 1;
         transform: translateX(0);
@@ -147,6 +167,7 @@
         opacity: 1;
         transform: translateX(0);
     }
+
     to {
         opacity: 0;
         transform: translateX(-20px);
@@ -163,6 +184,7 @@
         opacity: 0;
         transform: scale(0.95);
     }
+
     to {
         opacity: 1;
         transform: scale(1);
@@ -199,6 +221,7 @@
     0% {
         transform: translateX(-100%);
     }
+
     100% {
         transform: translateX(100%);
     }
@@ -277,14 +300,22 @@
     0% {
         transform: rotate(0deg);
     }
+
     100% {
         transform: rotate(360deg);
     }
 }
 
 @keyframes text-pulse {
-    0%, 100% { opacity: 0.6; }
-    50% { opacity: 1; }
+
+    0%,
+    100% {
+        opacity: 0.6;
+    }
+
+    50% {
+        opacity: 1;
+    }
 }
 
 /* Like Button Animations */
@@ -293,37 +324,60 @@
         opacity: 1;
         transform: translate(-50%, -50%) scale(1) rotate(0deg);
     }
+
     100% {
         opacity: 0;
-        transform: translate(
-            calc(-50% + var(--random-x, 0) * var(--distance, 50px)),
-            calc(-50% + var(--random-y, -1) * var(--distance, 50px))
-        ) scale(0) rotate(360deg);
+        transform: translate(calc(-50% + var(--random-x, 0) * var(--distance, 50px)),
+                calc(-50% + var(--random-y, -1) * var(--distance, 50px))) scale(0) rotate(360deg);
     }
 }
 
 @keyframes likeBounce {
-    0%, 100% {
+
+    0%,
+    100% {
         transform: scale(1);
     }
+
     25% {
         transform: scale(1.3) rotate(-5deg);
     }
+
     50% {
         transform: scale(1.5) rotate(5deg);
     }
+
     75% {
         transform: scale(1.2) rotate(-3deg);
     }
 }
 
 @keyframes heartPulse {
-    0%, 100% {
+
+    0%,
+    100% {
         transform: scale(1);
         filter: drop-shadow(0 0 0 rgba(239, 68, 68, 0));
     }
+
     50% {
         transform: scale(1.2);
         filter: drop-shadow(0 0 12px rgba(239, 68, 68, 0.8));
     }
+}
+
+/* Shimmer Animation for Skeleton Loaders */
+@keyframes shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+.animate-shimmer {
+    animation: shimmer 2s ease-in-out infinite;
+    background-size: 200% 100%;
 }

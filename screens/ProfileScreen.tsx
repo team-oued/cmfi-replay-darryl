@@ -144,11 +144,11 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigate, onSelectMedia, 
         { icon: BookmarkIcon, label: t('myFavorites'), action: () => navigate('Bookmarks') },
         { icon: SettingsIcon, label: t('preferences'), action: () => navigate('Preferences') },
         { icon: KeyIcon, label: t('changePassword'), action: () => navigateRouter('/change-password') },
-        { icon: CreditCardIcon, label: t('manageSubscription') },
-        { 
-            icon: TicketIcon, 
-            label: t('redeemVoucher'), 
-            action: () => navigateRouter('/redeem-voucher') 
+        { icon: CreditCardIcon, label: t('manageSubscription'), action: () => navigateRouter('/manage-subscription') },
+        {
+            icon: TicketIcon,
+            label: t('redeemVoucher'),
+            action: () => navigateRouter('/redeem-voucher')
         },
     ];
 
@@ -175,7 +175,24 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigate, onSelectMedia, 
                     <h3 className="text-xl font-bold px-4 mb-3">{t('history')}</h3>
                     <div className="flex space-x-4 overflow-x-auto px-4 scrollbar-hide pb-2">
                         {[...Array(5)].map((_, i) => (
-                            <div key={i} className="flex-none w-48 bg-gray-200 dark:bg-black/80 rounded-lg aspect-video animate-pulse" />
+                            <div key={i} className="flex-none w-48 group">
+                                {/* Image skeleton */}
+                                <div className="relative aspect-video bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-800 dark:via-gray-700 dark:to-gray-800 rounded-lg overflow-hidden animate-shimmer bg-[length:200%_100%]">
+                                    {/* Play button skeleton */}
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <div className="w-12 h-12 rounded-full bg-white/20 dark:bg-black/20 animate-pulse" />
+                                    </div>
+                                    {/* Progress bar skeleton */}
+                                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-300 dark:bg-gray-600">
+                                        <div className="h-full bg-gray-400 dark:bg-gray-500 animate-pulse" style={{ width: '60%' }} />
+                                    </div>
+                                </div>
+                                {/* Title skeleton */}
+                                <div className="mt-2 space-y-2">
+                                    <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-800 dark:via-gray-700 dark:to-gray-800 rounded animate-shimmer bg-[length:200%_100%]" />
+                                    <div className="h-3 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-800 dark:via-gray-700 dark:to-gray-800 rounded w-3/4 animate-shimmer bg-[length:200%_100%]" />
+                                </div>
+                            </div>
                         ))}
                     </div>
                 </section>

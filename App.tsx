@@ -22,6 +22,8 @@ import EditProfileScreen from './screens/EditProfileScreen';
 import ChangePasswordScreen from './screens/ChangePasswordScreen';
 import HistoryScreen from './screens/HistoryScreen';
 import RedeemVoucherScreen from './screens/RedeemVoucherScreen';
+import ManageSubscriptionScreen from './screens/ManageSubscriptionScreen';
+import PaymentSuccessScreen from './screens/PaymentSuccessScreen';
 
 // Category Screens
 import MoviesScreen from './screens/MoviesScreen';
@@ -63,15 +65,15 @@ const getTitleFromPath = (path: string, t: (key: string) => string): string => {
 };
 
 const AppContent: React.FC = () => {
-    const { 
-      isAuthenticated, 
-      t, 
-      loading, 
-      user, 
-      activeTab: contextActiveTab, 
-      setActiveTab: setContextActiveTab,
-      isSidebarCollapsed: contextIsSidebarCollapsed,
-      toggleSidebarCollapse: contextToggleSidebarCollapse
+    const {
+        isAuthenticated,
+        t,
+        loading,
+        user,
+        activeTab: contextActiveTab,
+        setActiveTab: setContextActiveTab,
+        isSidebarCollapsed: contextIsSidebarCollapsed,
+        toggleSidebarCollapse: contextToggleSidebarCollapse
     } = useAppContext();
     const location = useLocation();
     const navigate = useNavigate();
@@ -229,7 +231,7 @@ const AppContent: React.FC = () => {
                     isCollapsed={contextIsSidebarCollapsed}
                     toggleCollapse={contextToggleSidebarCollapse}
                 />
-                
+
                 {/* Header avec bouton de menu fonctionnel */}
                 <Header
                     title=""
@@ -237,7 +239,7 @@ const AppContent: React.FC = () => {
                     onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
                     isWatchRoute={false}
                 />
-                
+
                 {/* Contenu de chargement */}
                 <div className={`${contextIsSidebarCollapsed ? 'lg:pl-16' : 'lg:pl-64'} pt-16`}>
                     <div className="flex items-center justify-center h-screen">
@@ -445,6 +447,14 @@ const AppContent: React.FC = () => {
 
                             <Route path="/redeem-voucher" element={
                                 <RedeemVoucherScreen />
+                            } />
+
+                            <Route path="/manage-subscription" element={
+                                <ManageSubscriptionScreen />
+                            } />
+
+                            <Route path="/payment-success" element={
+                                <PaymentSuccessScreen />
                             } />
                         </>
                     )}
