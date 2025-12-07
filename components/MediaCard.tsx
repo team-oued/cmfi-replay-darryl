@@ -70,31 +70,77 @@ const MediaCard: React.FC<MediaCardProps> = ({ item, variant = 'thumbnail', onSe
 
   if (variant === 'list') {
     return (
-      <div onClick={handleSelect} className={`flex items-center space-x-4 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-200 cursor-pointer ${is_premium ? 'ring-2 ring-amber-400/40 bg-gradient-to-r from-amber-950/20 to-transparent' : ''
+      <div 
+        onClick={handleSelect} 
+        className={`group relative flex items-center gap-5 p-4 md:p-5 rounded-2xl bg-white dark:bg-gray-900/50 border border-gray-200/80 dark:border-gray-800/80 hover:border-amber-500/60 dark:hover:border-amber-500/60 hover:shadow-xl hover:shadow-amber-500/10 transition-all duration-300 cursor-pointer overflow-hidden ${
+          is_premium ? 'ring-1 ring-amber-400/30' : ''
+        }`}
+      >
+        {/* Ligne de gradient au hover */}
+        <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-amber-500 to-orange-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+        
+        {/* Image avec aspect ratio cinématique */}
+        <div className={`relative w-28 h-20 md:w-36 md:h-24 lg:w-40 lg:h-28 bg-gray-200 dark:bg-gray-800 rounded-xl overflow-hidden flex-shrink-0 transition-all duration-300 group-hover:scale-105 ${
+          is_premium ? 'ring-1 ring-amber-400/50' : ''
         }`}>
-        <div className={`w-16 h-16 bg-gray-300 dark:bg-gray-700 rounded-lg overflow-hidden flex-shrink-0 relative ${is_premium ? 'ring-2 ring-amber-400/60' : ''
-          }`}>
           {is_premium && (
-            <div className="absolute top-0 right-0 z-10 p-1 bg-black/80 rounded-bl-lg border-l border-b border-amber-400/50">
+            <div className="absolute top-1.5 right-1.5 z-10 p-1 bg-black/85 backdrop-blur-sm rounded-md">
               <CrownIcon />
             </div>
           )}
-          <img src={imageUrl} alt={title} className="w-full h-full object-cover" />
+          <img 
+            src={imageUrl} 
+            alt={title} 
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+          />
+          {/* Overlay au hover */}
+          <div
+            onClick={handlePlay}
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300"
+          >
+            <div className="w-12 h-12 rounded-full bg-white/95 flex items-center justify-center shadow-2xl transform group-hover:scale-110 transition-transform duration-300">
+              <PlayIcon className="w-6 h-6 text-gray-900 ml-0.5" />
+            </div>
+          </div>
         </div>
+        
+        {/* Informations */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <h3 className="text-gray-900 dark:text-white font-semibold">{title}</h3>
+          <div className="flex items-center gap-2 mb-1.5">
+            <h3 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white truncate group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors duration-300">
+              {title}
+            </h3>
             {is_premium && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gradient-to-r from-amber-400 to-yellow-500 text-black">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-gradient-to-r from-amber-400 to-orange-500 text-black flex-shrink-0">
                 <CrownIcon />
-                Premium
+                <span>PREMIUM</span>
               </span>
             )}
           </div>
-          <p className="text-gray-500 dark:text-gray-400 text-sm truncate">{author || item.theme}</p>
+          {(author || item.theme) && (
+            <p className="text-sm text-gray-600 dark:text-gray-400 truncate mb-1">
+              {author || item.theme}
+            </p>
+          )}
+          {item.duration && (
+            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-500">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>{item.duration}</span>
+            </div>
+          )}
         </div>
-        <button className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 z-10" onClick={handlePlay}>
-          <PlayIcon className="w-7 h-7 text-gray-800 dark:text-white" />
+        
+        {/* Bouton d'action */}
+        <button 
+          className="p-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300 flex-shrink-0" 
+          onClick={(e) => {
+            e.stopPropagation();
+            handlePlay(e);
+          }}
+        >
+          <PlayIcon className="w-5 h-5" />
         </button>
       </div>
     );

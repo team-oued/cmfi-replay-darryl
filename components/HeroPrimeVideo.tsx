@@ -1,0 +1,242 @@
+import React, { useState, useEffect } from 'react';
+import { MediaContent, MediaType } from '../types';
+import { PlayIcon, PlusIcon, CheckIcon, InfoIcon } from './icons';
+import { useAppContext } from '../context/AppContext';
+import { movieService, Movie } from '../lib/firestore';
+
+interface HeroPrimeVideoProps {
+  items?: MediaContent[];
+  onSelectMedia: (item: MediaContent) => void;
+  onPlay: (item: MediaContent) => void;
+}
+
+const HeroPrimeVideo: React.FC<HeroPrimeVideoProps> = ({ items: propItems, onSelectMedia, onPlay }) => {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const [movies, setMovies] = useState<Movie[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { t, bookmarkedIds, toggleBookmark, isPremium } = useAppContext();
+
+  // Récupérer les films populaires
+  useEffect(() => {
+    const fetchPopularMovies = async () => {
+      try {
+        const popularMovies = await movieService.getPopularMovies(10);
+        setMovies(popularMovies);
+      } catch (error) {
+        console.error('Error fetching popular movies:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPopularMovies();
+  }, []);
+
+  const items = movies.length > 0 ? movies.map(movie => ({
+    id: movie.uid,
+    title: movie.title,
+    theme: movie.original_language,
+    imageUrl: movie.backdrop_path || movie.picture_path,
+    type: MediaType.Movie,
+    duration: movie.runtime_h_m,
+    description: movie.overview,
+    video_path_hd: movie.video_path_hd,
+    languages: [movie.original_language],
+    is_premium: movie.is_premium || false,
+    premium_text: movie.premium_text || ''
+  })) : propItems || [];
+
+  useEffect(() => {
+    if (!items || items.length <= 1 || isPaused) return;
+
+    const timer = setTimeout(() => {
+      setCurrentIndex((prevIndex) => (prevIndex + 1) % items.length);
+    }, 5000);
+
+    return () => clearTimeout(timer);
+  }, [currentIndex, items, isPaused]);
+
+  if (loading || !items || items.length === 0) {
+    return (
+      <div className="relative w-full h-[70vh] md:h-[80vh] bg-black flex items-center justify-center">
+        <div className="text-white text-lg">{t('loading') || 'Chargement...'}</div>
+      </div>
+    );
+  }
+
+  const currentItem = items[currentIndex];
+  const isBookmarked = bookmarkedIds.includes(currentItem.id);
+
+  const handlePrev = () => {
+    setCurrentIndex((prevIndex) => (prevIndex - 1 + items.length) % items.length);
+  };
+
+  const handleNext = () => {
+    setCurrentIndex((prevIndex) => (prevIndex + 1) % items.length);
+  };
+
+  const handlePlay = () => {
+    onPlay(currentItem);
+  };
+
+  const handleBookmark = () => {
+    toggleBookmark(
+      currentItem.id,
+      currentItem.title,
+      currentItem.description || '',
+      currentItem.imageUrl || '',
+      false
+    );
+  };
+
+  return (
+    <div className="relative w-full h-[70vh] md:h-[80vh] bg-black overflow-hidden">
+      {/* Image de fond avec parallax */}
+      <div className="absolute inset-0">
+        <img
+          key={currentItem.id}
+          src={currentItem.imageUrl}
+          alt={currentItem.title}
+          className="w-full h-full object-cover transition-opacity duration-1000"
+        />
+        {/* Gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/60" />
+      </div>
+
+      {/* Contenu principal - Layout Prime Video */}
+      <div className="relative z-10 h-full flex items-center">
+        <div className="container mx-auto px-4 md:px-8 lg:px-12">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+            {/* Colonne gauche - Contenu textuel */}
+            <div className="space-y-6 md:space-y-8">
+              {/* Logo/Badge si premium */}
+              {currentItem.is_premium && (
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500/20 backdrop-blur-sm rounded-lg border border-amber-500/30">
+                  <svg className="w-5 h-5 text-amber-400" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
+                  </svg>
+                  <span className="text-amber-400 font-bold text-sm">PREMIUM</span>
+                </div>
+              )}
+
+              {/* Titre principal */}
+              <h1 className="text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-black text-white leading-tight">
+                {currentItem.title.toUpperCase()}
+              </h1>
+
+              {/* Métadonnées */}
+              <div className="flex items-center gap-4 text-white/80 text-sm md:text-base">
+                {currentItem.duration && (
+                  <span className="px-3 py-1 bg-white/10 backdrop-blur-sm rounded-full">
+                    {currentItem.duration}
+                  </span>
+                )}
+                {currentItem.languages && currentItem.languages.length > 0 && (
+                  <span>{currentItem.languages[0].toUpperCase()}</span>
+                )}
+              </div>
+
+              {/* Description */}
+              {currentItem.description && (
+                <p className="text-white/90 text-base md:text-lg leading-relaxed max-w-2xl line-clamp-3">
+                  {currentItem.description}
+                </p>
+              )}
+
+              {/* Boutons d'action */}
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={handlePlay}
+                  className="group flex items-center gap-3 px-6 md:px-8 py-3 md:py-4 bg-white hover:bg-white/90 text-black font-bold rounded-lg md:rounded-xl transition-all duration-300 hover:scale-105 shadow-xl"
+                >
+                  <PlayIcon className="w-6 h-6 md:w-7 md:h-7" />
+                  <span className="text-base md:text-lg">{t('play') || 'Regarder'}</span>
+                </button>
+
+                <button
+                  onClick={handleBookmark}
+                  className="p-3 md:p-4 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full border border-white/20 transition-all duration-300 hover:scale-110"
+                  aria-label={isBookmarked ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+                >
+                  {isBookmarked ? (
+                    <CheckIcon className="w-6 h-6 md:w-7 md:h-7 text-white" />
+                  ) : (
+                    <PlusIcon className="w-6 h-6 md:w-7 md:h-7 text-white" />
+                  )}
+                </button>
+
+                <button
+                  onClick={() => onSelectMedia(currentItem)}
+                  className="p-3 md:p-4 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full border border-white/20 transition-all duration-300 hover:scale-110"
+                  aria-label="Plus d'infos"
+                >
+                  <InfoIcon className="w-6 h-6 md:w-7 md:h-7 text-white" />
+                </button>
+              </div>
+            </div>
+
+            {/* Colonne droite - Image principale (visible sur desktop) */}
+            <div className="hidden lg:block relative">
+              <div className="relative aspect-[16/9] rounded-2xl overflow-hidden shadow-2xl ring-4 ring-white/10">
+                <img
+                  src={currentItem.imageUrl}
+                  alt={currentItem.title}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Contrôles de navigation */}
+      {items.length > 1 && (
+        <>
+          <button
+            onClick={handlePrev}
+            className="absolute left-4 top-1/2 -translate-y-1/2 z-20 p-3 bg-black/60 hover:bg-black/80 backdrop-blur-sm rounded-full border border-white/20 transition-all duration-300 hover:scale-110"
+            aria-label="Précédent"
+          >
+            <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+
+          <button
+            onClick={handleNext}
+            className="absolute right-4 top-1/2 -translate-y-1/2 z-20 p-3 bg-black/60 hover:bg-black/80 backdrop-blur-sm rounded-full border border-white/20 transition-all duration-300 hover:scale-110"
+            aria-label="Suivant"
+          >
+            <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </>
+      )}
+
+      {/* Indicateurs de carrousel */}
+      {items.length > 1 && (
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
+          {items.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => setCurrentIndex(index)}
+              className={`h-2 rounded-full transition-all duration-300 ${
+                index === currentIndex
+                  ? 'w-8 bg-white'
+                  : 'w-2 bg-white/40 hover:bg-white/60'
+              }`}
+              aria-label={`Aller à la slide ${index + 1}`}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default HeroPrimeVideo;
+

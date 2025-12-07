@@ -512,14 +512,22 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
 
 // --- Comments Section ---
 const CommentItem: React.FC<{ comment: Comment }> = ({ comment }) => (
-    <div className="flex items-start space-x-3">
-        <img src={comment.user_photo_url || generateDefaultAvatar(comment.created_by)} alt={comment.created_by} className="w-10 h-10 rounded-full flex-shrink-0 mt-1" />
-        <div className="flex-1">
-            <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg">
-                <p className="font-semibold text-sm">{comment.created_by}</p>
-                <p className="text-gray-700 dark:text-gray-300">{comment.comment}</p>
+    <div className="flex items-start space-x-3 group">
+        <div className="relative flex-shrink-0">
+            <img 
+                src={comment.user_photo_url || generateDefaultAvatar(comment.created_by)} 
+                alt={comment.created_by} 
+                className="w-12 h-12 rounded-full ring-2 ring-amber-500/20 group-hover:ring-amber-500/40 transition-all duration-300" 
+            />
+        </div>
+        <div className="flex-1 min-w-0">
+            <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 p-4 rounded-xl rounded-tl-none shadow-sm group-hover:shadow-md transition-all duration-300 border border-gray-200/50 dark:border-gray-700/50">
+                <p className="font-bold text-sm text-gray-900 dark:text-white mb-1.5">{comment.created_by}</p>
+                <p className="text-gray-700 dark:text-gray-300 leading-relaxed break-words">{comment.comment}</p>
             </div>
-            <p className="text-xs text-gray-500 mt-1">{comment.created_at}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 ml-1">
+                {comment.created_at}
+            </p>
         </div>
     </div>
 );
@@ -577,47 +585,60 @@ const CommentSection: React.FC<{ itemUid: string, onAuthRequired: (action: strin
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold">{t('comments')} ({comments.length})</h3>
-                <div className="flex items-center space-x-2 bg-gray-200 dark:bg-gray-800 p-1 rounded-full">
+            <div className="flex items-center justify-between pb-2 border-b border-gray-200 dark:border-gray-800">
+                <h3 className="text-2xl font-black text-gray-900 dark:text-white">
+                    {t('comments')} <span className="text-amber-500">({comments.length})</span>
+                </h3>
+                <div className="flex items-center space-x-2 bg-gray-100 dark:bg-gray-800 p-1 rounded-full">
                     <button
                         onClick={() => setSortBy('recent')}
-                        className={`text-sm font-semibold px-3 py-1 rounded-full transition-colors ${sortBy === 'recent' ? 'bg-white dark:bg-gray-700 shadow' : 'text-gray-600 dark:text-gray-300'}`}
+                        className={`text-sm font-bold px-4 py-1.5 rounded-full transition-all duration-300 ${sortBy === 'recent' ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/30' : 'text-gray-600 dark:text-gray-300 hover:text-amber-500'}`}
                     >
                         {t('mostRecent')}
                     </button>
                     <button
                         onClick={() => setSortBy('top')}
-                        className={`text-sm font-semibold px-3 py-1 rounded-full transition-colors ${sortBy === 'top' ? 'bg-white dark:bg-gray-700 shadow' : 'text-gray-600 dark:text-gray-300'}`}
+                        className={`text-sm font-bold px-4 py-1.5 rounded-full transition-all duration-300 ${sortBy === 'top' ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/30' : 'text-gray-600 dark:text-gray-300 hover:text-amber-500'}`}
                     >
                         {t('topComments')}
                     </button>
                 </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="flex items-start space-x-3">
-                <img src={userProfile?.photo_url || generateDefaultAvatar(userProfile?.display_name)} alt="you" className="w-10 h-10 rounded-full flex-shrink-0 mt-1" />
+            <form onSubmit={handleSubmit} className="flex items-start space-x-3 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 p-4 rounded-2xl border border-gray-200/50 dark:border-gray-700/50 shadow-sm">
+                <img src={userProfile?.photo_url || generateDefaultAvatar(userProfile?.display_name)} alt="you" className="w-12 h-12 rounded-full flex-shrink-0 ring-2 ring-amber-500/20" />
                 <div className="flex-1">
                     <div className="relative">
                         <textarea
                             value={newComment}
                             onChange={(e) => setNewComment(e.target.value)}
                             placeholder={t('addAComment')}
-                            className="w-full bg-gray-100 dark:bg-gray-800 border-transparent rounded-xl p-3 pr-12 focus:ring-amber-500 focus:border-amber-500 resize-none transition-shadow"
-                            rows={2}
-                            maxLength={MAX_COMMENT_LENGTH + 1} // Allow one extra char to show red color
+                            className="w-full bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-xl p-4 pr-14 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 resize-none transition-all duration-300 shadow-sm"
+                            rows={3}
+                            maxLength={MAX_COMMENT_LENGTH + 1}
                         />
-                        <button type="submit" className="absolute right-2 top-2 p-2 bg-amber-500 text-white rounded-full hover:bg-amber-600 disabled:bg-gray-400 disabled:cursor-not-allowed" disabled={!newComment.trim() || newComment.length > MAX_COMMENT_LENGTH}>
+                        <button 
+                            type="submit" 
+                            className="absolute right-3 bottom-3 p-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full hover:from-amber-600 hover:to-orange-600 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-110 disabled:hover:scale-100" 
+                            disabled={!newComment.trim() || newComment.length > MAX_COMMENT_LENGTH}
+                        >
                             <PaperAirplaneIcon className="w-5 h-5" />
                         </button>
                     </div>
-                    <p className={`text-xs text-right mt-1 pr-2 font-medium ${charCountColor}`}>
+                    <p className={`text-xs text-right mt-2 pr-2 font-semibold ${charCountColor}`}>
                         {newComment.length}/{MAX_COMMENT_LENGTH}
                     </p>
                 </div>
             </form>
             <div className="space-y-4">
-                {sortedComments.map((c, idx) => <CommentItem key={`${c.uid}-${idx}-${c.created_at}`} comment={c} />)}
+                {sortedComments.length > 0 ? (
+                    sortedComments.map((c, idx) => <CommentItem key={`${c.uid}-${idx}-${c.created_at}`} comment={c} />)
+                ) : (
+                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                        <p className="text-lg font-semibold">Aucun commentaire pour le moment</p>
+                        <p className="text-sm mt-2">Soyez le premier à commenter !</p>
+                    </div>
+                )}
             </div>
         </div>
     )
@@ -990,24 +1011,24 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
 
     return (
         <div className="bg-[#FBF9F3] dark:bg-black min-h-screen animate-fadeIn">
-            {/* Bouton de retour en haut à gauche */}
-            <header className="absolute top-4 left-4 z-20">
+            {/* Bouton de retour amélioré avec gradient */}
+            <header className="absolute top-4 left-4 z-30">
                 <button
                     onClick={onBack}
-                    className="p-2 rounded-full text-white bg-black/60 hover:bg-black/80 backdrop-blur-sm transition-all duration-200"
+                    className="group p-3 rounded-full text-white bg-black/70 hover:bg-black/90 backdrop-blur-md transition-all duration-300 hover:scale-110 shadow-xl border border-white/10"
                     aria-label="Go back"
                 >
-                    <ArrowLeftIcon className="w-6 h-6" />
+                    <ArrowLeftIcon className="w-6 h-6 transition-transform group-hover:-translate-x-1" />
                 </button>
             </header>
 
-            <div className="container mx-auto px-4 py-4 lg:py-6 pt-20">
+            <div className="container mx-auto px-4 md:px-6 lg:px-8 py-4 lg:py-8 pt-20">
 
                 {/* Conteneur principal avec grille pour la mise en page */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Colonne de gauche - Lecteur vidéo et métadonnées */}
                     <div className="lg:col-span-2 space-y-6">
-                        <div className="relative w-full aspect-video bg-black rounded-xl overflow-hidden shadow-lg">
+                        <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl ring-2 ring-black/20 dark:ring-white/5">
                             <VideoPlayer
                                 key={episode.uid_episode || episode.title}
                                 src={episode.video_path_hd?.trim() ? episode.video_path_hd : episode.video_path_sd}
@@ -1018,16 +1039,23 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
                             />
                         </div>
 
-                        <div className="space-y-4">
-                            <h1 className="text-2xl font-bold">{displayEpisode.title}</h1>
-
-                            <div className="flex items-center space-x-3 text-sm text-gray-500 dark:text-gray-400">
-                                <span>{item.author || item.theme}</span>
-                                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full" />
-                                <span>{formatNumber(displayEpisode.views || 0)} {t('views')}</span>
+                        <div className="space-y-6">
+                            <div>
+                                <h1 className="text-3xl md:text-4xl font-black text-gray-900 dark:text-white mb-3 leading-tight">
+                                    {displayEpisode.title}
+                                </h1>
+                                <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
+                                    <span className="px-3 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 rounded-full font-semibold">
+                                        {item.author || item.theme}
+                                    </span>
+                                    <span className="w-1.5 h-1.5 bg-gray-400 rounded-full" />
+                                    <span className="font-medium">
+                                        {formatNumber(displayEpisode.views || 0)} {t('views')}
+                                    </span>
+                                </div>
                             </div>
 
-                            <div className="flex items-center justify-around py-2 border-t border-b border-gray-200 dark:border-gray-800">
+                            <div className="flex items-center justify-around py-4 px-2 bg-white/50 dark:bg-gray-900/50 rounded-2xl backdrop-blur-sm border border-gray-200/50 dark:border-gray-800/50 shadow-lg">
                                 <LikeButton
                                     label={hasLiked ? (t('like') + ' ✓') : t('like')}
                                     value={likeCount}
@@ -1047,35 +1075,37 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
                                 />
                             </div>
 
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between gap-4">
                                 <button
                                     onClick={() => onNavigateEpisode('prev')}
                                     disabled={!hasPrevEpisode}
-                                    className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="group flex items-center space-x-2 px-6 py-3 rounded-xl bg-gradient-to-r from-gray-200 to-gray-300 dark:from-gray-800 dark:to-gray-700 hover:from-amber-500 hover:to-orange-500 text-gray-900 dark:text-white hover:text-white disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-gray-200 disabled:hover:to-gray-300 transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 disabled:hover:scale-100 font-semibold"
                                 >
-                                    <ChevronLeftIcon className="w-5 h-5" />
+                                    <ChevronLeftIcon className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
                                     <span>{t('prevEpisode')}</span>
                                 </button>
                                 <button
                                     onClick={() => onNavigateEpisode('next')}
                                     disabled={!hasNextEpisode}
-                                    className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="group flex items-center space-x-2 px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-amber-500 disabled:hover:to-orange-500 transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 disabled:hover:scale-100 font-semibold"
                                 >
                                     <span>{t('nextEpisode')}</span>
-                                    <ChevronRightIcon className="w-5 h-5" />
+                                    <ChevronRightIcon className="w-5 h-5 transition-transform group-hover:translate-x-1" />
                                 </button>
                             </div>
                         </div>
                     </div>
 
-                    {/* Colonne de droite - Section des commentaires */}
+                    {/* Colonne de droite - Section des commentaires améliorée */}
                     <div className="lg:col-span-1">
                         <div className="sticky top-4 h-[calc(100vh-2rem)] overflow-hidden flex flex-col">
-                            <div className="flex-1 overflow-y-auto pb-4 pr-2 -mr-2">
-                                <CommentSection
-                                    itemUid={episode.uid_episode}
-                                    onAuthRequired={handleAuthRequired}
-                                />
+                            <div className="flex-1 overflow-y-auto pb-4 pr-2 -mr-2 scrollbar-thin scrollbar-thumb-amber-500 scrollbar-track-gray-200 dark:scrollbar-track-gray-800">
+                                <div className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-md rounded-2xl p-6 border border-gray-200/50 dark:border-gray-800/50 shadow-xl">
+                                    <CommentSection
+                                        itemUid={episode.uid_episode}
+                                        onAuthRequired={handleAuthRequired}
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>
