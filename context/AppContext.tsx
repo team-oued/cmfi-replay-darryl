@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useState, useMemo, useEffect } from 'react';
 import { i18n, Language, TranslationKey } from '../lib/i18n';
-import { auth } from '../lib/firebase';
+import { auth, db } from '../lib/firebase';
 import { userService, UserProfile, bookDocService, bookSeriesService, subscriptionService } from '../lib/firestore';
 import { onAuthStateChanged, User } from 'firebase/auth';
+import { onSnapshot, doc } from 'firebase/firestore';
 import { ActiveTab } from '../types';
 
 type Theme = 'light' | 'dark';
@@ -80,23 +81,74 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     // État pour le mode d'affichage de la page d'accueil
-    const [homeViewMode, setHomeViewModeState] = useState<HomeViewMode>(() => {
-        if (typeof window !== 'undefined') {
-            const saved = window.localStorage.getItem('homeViewMode') as HomeViewMode;
-            return saved || 'default';
-        }
-        return 'default';
-    });
+    const [homeViewMode, setHomeViewModeState] = useState<HomeViewMode>('default');
+    const [loadingViewMode, setLoadingViewMode] = useState(true);
 
-    // Sauvegarder le mode d'affichage
+    // Charger le mode d'affichage depuis Firestore (paramètres globaux)
     useEffect(() => {
-        if (typeof window !== 'undefined') {
-            window.localStorage.setItem('homeViewMode', homeViewMode);
-        }
-    }, [homeViewMode]);
+        const loadViewMode = async () => {
+            try {
+                const { appSettingsService } = await import('../lib/firestore');
+                const settings = await appSettingsService.getAppSettings();
+                if (settings) {
+                    setHomeViewModeState(settings.homeViewMode);
+                }
+            } catch (error) {
+                console.error('Error loading view mode:', error);
+                // Fallback sur localStorage si erreur
+                if (typeof window !== 'undefined') {
+                    const saved = window.localStorage.getItem('homeViewMode') as HomeViewMode;
+                    if (saved) {
+                        setHomeViewModeState(saved);
+                    }
+                }
+            } finally {
+                setLoadingViewMode(false);
+            }
+        };
 
-    const setHomeViewMode = (mode: HomeViewMode) => {
+        loadViewMode();
+    }, []);
+
+    // Écouter les changements de mode d'affichage en temps réel
+    useEffect(() => {
+        const settingsRef = doc(db, 'appSettings', 'global');
+        const unsubscribe = onSnapshot(settingsRef, (snapshot) => {
+            if (snapshot.exists()) {
+                const data = snapshot.data();
+                if (data.homeViewMode) {
+                    setHomeViewModeState(data.homeViewMode);
+                }
+            }
+        }, (error) => {
+            console.error('Error listening to view mode changes:', error);
+        });
+
+        return () => unsubscribe();
+    }, []);
+
+    const setHomeViewMode = async (mode: HomeViewMode) => {
+        // Mise à jour optimiste
         setHomeViewModeState(mode);
+        
+        // Sauvegarder dans Firestore si l'utilisateur est admin
+        if (userProfile?.isAdmin && user) {
+            try {
+                const { appSettingsService } = await import('../lib/firestore');
+                await appSettingsService.setHomeViewMode(mode, user.uid);
+            } catch (error) {
+                console.error('Error saving view mode to Firestore:', error);
+                // En cas d'erreur, sauvegarder dans localStorage comme fallback
+                if (typeof window !== 'undefined') {
+                    window.localStorage.setItem('homeViewMode', mode);
+                }
+            }
+        } else {
+            // Si l'utilisateur n'est pas admin, sauvegarder uniquement dans localStorage
+            if (typeof window !== 'undefined') {
+                window.localStorage.setItem('homeViewMode', mode);
+            }
+        }
     };
 
     // États pour le statut premium

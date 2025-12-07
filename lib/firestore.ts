@@ -188,6 +188,7 @@ const LIKES_COLLECTION = 'like';
 const COMMENTS_COLLECTION = 'comment';
 const STATS_VUES_COLLECTION = 'stats_vues';
 const USER_VIEW_COLLECTION = 'user_view';
+const APP_SETTINGS_COLLECTION = 'appSettings';
 
 // Fonction utilitaire pour générer un avatar par défaut
 export const generateDefaultAvatar = (name?: string): string => {
@@ -2233,6 +2234,66 @@ export const infoBarService = {
             await deleteDoc(messageRef);
         } catch (error) {
             console.error('Error deleting info bar message:', error);
+            throw error;
+        }
+    }
+};
+
+// Interface pour les paramètres globaux de l'application
+export interface AppSettings {
+    homeViewMode: 'default' | 'prime' | 'netflix';
+    updatedAt: Date | Timestamp;
+    updatedBy?: string;
+}
+
+// Service pour gérer les paramètres globaux de l'application
+export const appSettingsService = {
+    /**
+     * Récupère les paramètres globaux de l'application
+     */
+    async getAppSettings(): Promise<AppSettings | null> {
+        try {
+            const settingsRef = doc(db, APP_SETTINGS_COLLECTION, 'global');
+            const settingsDoc = await getDoc(settingsRef);
+            
+            if (settingsDoc.exists()) {
+                const data = settingsDoc.data();
+                return {
+                    homeViewMode: data.homeViewMode || 'default',
+                    updatedAt: data.updatedAt?.toDate() || new Date(),
+                    updatedBy: data.updatedBy
+                };
+            }
+            
+            // Si aucun paramètre n'existe, créer les paramètres par défaut
+            const defaultSettings: AppSettings = {
+                homeViewMode: 'default',
+                updatedAt: new Date()
+            };
+            await setDoc(settingsRef, {
+                ...defaultSettings,
+                updatedAt: Timestamp.now()
+            });
+            return defaultSettings;
+        } catch (error) {
+            console.error('Error getting app settings:', error);
+            return null;
+        }
+    },
+
+    /**
+     * Met à jour le mode d'affichage global (admin uniquement)
+     */
+    async setHomeViewMode(mode: 'default' | 'prime' | 'netflix', userId: string): Promise<void> {
+        try {
+            const settingsRef = doc(db, APP_SETTINGS_COLLECTION, 'global');
+            await setDoc(settingsRef, {
+                homeViewMode: mode,
+                updatedAt: Timestamp.now(),
+                updatedBy: userId
+            }, { merge: true });
+        } catch (error) {
+            console.error('Error setting home view mode:', error);
             throw error;
         }
     }
