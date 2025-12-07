@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import Hero from '../components/Hero';
 import HeroPrimeVideo from '../components/HeroPrimeVideo';
+import HeroNetflix from '../components/HeroNetflix';
 import MediaCard from '../components/MediaCard';
 import RankedMediaCard from '../components/RankedMediaCard';
+import PrimeMediaCard from '../components/PrimeMediaCard';
 import UserAvatar from '../components/UserAvatar';
 import CategoryTiles from '../components/CategoryTiles';
 import { MediaCardSkeleton, UserAvatarSkeleton, HeroSkeleton, ContinueWatchingSkeleton, CategoryTilesSkeleton, MostLikedSkeleton } from '../components/Skeleton';
@@ -10,12 +12,10 @@ import { featuredContent } from '../data/mockData';
 import { PlayIcon } from '../components/icons';
 
 import { MediaContent, User, MediaType } from '../types';
-import { useAppContext } from '../context/AppContext';
+import { useAppContext, HomeViewMode } from '../context/AppContext';
 import { userService, generateDefaultAvatar, likeService, movieService, episodeSerieService, statsVuesService, ContinueWatchingItem, viewService } from '../lib/firestore';
 import ContinueWatchingSection from '../components/ContinueWatchingSection';
 import InfoBar from '../components/InfoBar';
-
-type HomeViewMode = 'default' | 'prime';
 
 const MediaRow: React.FC<{ title: string; items: MediaContent[]; onSelectMedia: (item: MediaContent) => void; onPlay: (item: MediaContent) => void; variant?: 'poster' | 'thumbnail' | 'list' }> = ({ title, items, onSelectMedia, onPlay, variant }) => {
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
@@ -134,14 +134,7 @@ interface HomeScreenProps {
 }
 
 const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigateToCategory }) => {
-    const { t, user } = useAppContext();
-    const [viewMode, setViewMode] = useState<HomeViewMode>(() => {
-        if (typeof window !== 'undefined') {
-            const saved = window.localStorage.getItem('homeViewMode') as HomeViewMode;
-            return saved || 'default';
-        }
-        return 'default';
-    });
+    const { t, user, homeViewMode: viewMode } = useAppContext();
     const [activeUsers, setActiveUsers] = useState<User[]>([]);
     const [loadingUsers, setLoadingUsers] = useState(true);
     const [mostLikedItems, setMostLikedItems] = useState<Array<{ content: MediaContent; likeCount: number; viewCount?: number }>>([]);
@@ -152,13 +145,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
     const [loadingContinueWatching, setLoadingContinueWatching] = useState(true);
     const [loadingHero, setLoadingHero] = useState(true);
     const [loadingCategories, setLoadingCategories] = useState(true);
-
-    // Sauvegarder le mode d'affichage
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            window.localStorage.setItem('homeViewMode', viewMode);
-        }
-    }, [viewMode]);
 
     // Simuler le chargement du Hero
     useEffect(() => {
@@ -402,20 +388,136 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
         }
     };
 
+    // Mode Netflix - Layout inspiré de Netflix
+    if (viewMode === 'netflix') {
+        return (
+            <div className="min-h-screen bg-black">
+
+                {/* Hero Section Netflix */}
+                <div className="animate-fadeIn">
+                    {loadingHero ? (
+                        <HeroSkeleton />
+                    ) : (
+                        <HeroNetflix items={featuredContent} onSelectMedia={onSelectMedia} onPlay={onPlay} />
+                    )}
+                </div>
+
+                {/* Barre d'information déroulante */}
+                <InfoBar />
+
+                {/* Sections horizontales style Netflix */}
+                <div className="bg-black">
+                    {/* Section Continue Watching */}
+                    {continueWatchingItems.length > 0 && (
+                        <div className="py-8 md:py-12">
+                            <div className="px-4 md:px-6 lg:px-8 mb-6">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-2xl md:text-3xl font-bold text-white">
+                                        {t('continueWatching') || 'Continuer la lecture'}
+                                    </h3>
+                                    <button className="text-sm md:text-base text-red-500 hover:text-red-400 font-semibold transition-colors">
+                                        Voir plus →
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="flex space-x-3 md:space-x-4 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-4">
+                                {continueWatchingItems.slice(0, 10).map((item) => (
+                                    <div key={item.id} className="flex-shrink-0 w-56 md:w-64 lg:w-72 group cursor-pointer" onClick={() => handleContinueWatchingClick(item)}>
+                                        <div className="relative aspect-video rounded overflow-hidden mb-3 transition-transform duration-300 group-hover:scale-105">
+                                            <img
+                                                src={item.imageUrl}
+                                                alt={item.title}
+                                                className="w-full h-full object-cover"
+                                            />
+                                            {/* Progress bar */}
+                                            <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/60">
+                                                <div
+                                                    className="h-full bg-red-600 transition-all duration-300"
+                                                    style={{ width: `${item.progress}%` }}
+                                                />
+                                            </div>
+                                            {/* Overlay au hover */}
+                                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                                                <div className="w-14 h-14 rounded-full bg-white/95 flex items-center justify-center shadow-2xl">
+                                                    <PlayIcon className="w-7 h-7 text-gray-900 ml-1" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <h4 className="text-white text-sm md:text-base font-semibold truncate group-hover:text-red-500 transition-colors">
+                                            {item.title}
+                                        </h4>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Section Most Watched */}
+                    {mostWatchedItems.length > 0 && (
+                        <div className="py-6 md:py-8 lg:py-10 mt-4 md:mt-6">
+                            <div className="px-4 md:px-6 lg:px-8 mb-6">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-2xl md:text-3xl font-bold text-white">
+                                        {t('mostWatched') || 'Les plus regardés'}
+                                    </h3>
+                                    <button className="text-sm md:text-base text-red-500 hover:text-red-400 font-semibold transition-colors">
+                                        Voir plus →
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="flex space-x-4 md:space-x-5 lg:space-x-6 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-4">
+                                {mostWatchedItems.slice(0, 10).map((item, index) => (
+                                    <div key={item.content.id} className="flex-shrink-0 w-40 md:w-48 lg:w-52">
+                                        <RankedMediaCard
+                                            item={item.content}
+                                            rank={index + 1}
+                                            viewCount={item.viewCount}
+                                            onSelect={onSelectMedia}
+                                            onPlay={onPlay}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Section Most Liked */}
+                    {mostLikedItems.length > 0 && (
+                        <div className="py-6 md:py-8 lg:py-10 mt-4 md:mt-6">
+                            <div className="px-4 md:px-6 lg:px-8 mb-6">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-2xl md:text-3xl font-bold text-white">
+                                        {t('mostLiked') || 'Les plus aimés'}
+                                    </h3>
+                                    <button className="text-sm md:text-base text-red-500 hover:text-red-400 font-semibold transition-colors">
+                                        Voir plus →
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="flex space-x-4 md:space-x-5 lg:space-x-6 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-4">
+                                {mostLikedItems.slice(0, 10).map((item, index) => (
+                                    <div key={item.content.id} className="flex-shrink-0 w-40 md:w-48 lg:w-52">
+                                        <RankedMediaCard
+                                            item={item.content}
+                                            rank={index + 1}
+                                            viewCount={item.viewCount}
+                                            onSelect={onSelectMedia}
+                                            onPlay={onPlay}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
     // Mode Prime Video - Layout inspiré d'Amazon Prime Video
     if (viewMode === 'prime') {
         return (
             <div className="min-h-screen bg-black">
-                {/* Bouton de bascule de mode - Position fixe */}
-                <button
-                    onClick={() => setViewMode('default')}
-                    className="fixed top-20 right-4 z-30 p-3 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full border border-white/20 text-white transition-all duration-300 hover:scale-110 shadow-lg"
-                    title="Mode classique"
-                >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                    </svg>
-                </button>
 
                 {/* Hero Section Prime Video */}
                 <div className="animate-fadeIn">
@@ -489,17 +591,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                                     </button>
                                 </div>
                             </div>
-                            <div className="flex space-x-4 md:space-x-5 lg:space-x-6 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-4">
+                            <div className="flex space-x-3 md:space-x-4 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-4">
                                 {mostWatchedItems.slice(0, 10).map((item, index) => (
-                                    <div key={item.content.id} className="flex-shrink-0 w-40 md:w-48 lg:w-52">
-                                        <RankedMediaCard
-                                            item={item.content}
-                                            rank={index + 1}
-                                            viewCount={item.viewCount}
-                                            onSelect={onSelectMedia}
-                                            onPlay={onPlay}
-                                        />
-                                    </div>
+                                    <PrimeMediaCard
+                                        key={item.content.id}
+                                        item={item.content}
+                                        rank={index + 1}
+                                        onSelect={onSelectMedia}
+                                        onPlay={onPlay}
+                                    />
                                 ))}
                             </div>
                         </div>
@@ -518,17 +618,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                                     </button>
                                 </div>
                             </div>
-                            <div className="flex space-x-4 md:space-x-5 lg:space-x-6 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-4">
+                            <div className="flex space-x-3 md:space-x-4 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-4">
                                 {mostLikedItems.slice(0, 10).map((item, index) => (
-                                    <div key={item.content.id} className="flex-shrink-0 w-40 md:w-48 lg:w-52">
-                                        <RankedMediaCard
-                                            item={item.content}
-                                            rank={index + 1}
-                                            viewCount={item.viewCount}
-                                            onSelect={onSelectMedia}
-                                            onPlay={onPlay}
-                                        />
-                                    </div>
+                                    <PrimeMediaCard
+                                        key={item.content.id}
+                                        item={item.content}
+                                        rank={index + 1}
+                                        onSelect={onSelectMedia}
+                                        onPlay={onPlay}
+                                    />
                                 ))}
                             </div>
                         </div>
@@ -541,16 +639,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
     // Mode par défaut (existant)
     return (
         <div className="min-h-screen bg-[#FBF9F3] dark:bg-black">
-            {/* Bouton de bascule de mode - Position fixe */}
-            <button
-                onClick={() => setViewMode('prime')}
-                className="fixed top-20 right-4 z-30 p-3 bg-amber-500 hover:bg-amber-600 rounded-full text-white transition-all duration-300 hover:scale-110 shadow-xl"
-                title="Mode Prime Video"
-            >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-            </button>
 
             {/* Hero Section avec Skeleton - Animation d'entrée */}
             <div className="animate-fadeIn">

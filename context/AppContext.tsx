@@ -6,6 +6,7 @@ import { onAuthStateChanged, User } from 'firebase/auth';
 import { ActiveTab } from '../types';
 
 type Theme = 'light' | 'dark';
+type HomeViewMode = 'default' | 'prime' | 'netflix';
 
 interface AppContextType {
     theme: 'light' | 'dark';
@@ -36,7 +37,11 @@ interface AppContextType {
         daysRemaining: number | null;
     } | null;
     refreshSubscription: () => Promise<void>;
+    homeViewMode: HomeViewMode;
+    setHomeViewMode: (mode: HomeViewMode) => void;
 }
+
+export type { HomeViewMode };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
@@ -73,6 +78,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
         return false;
     });
+
+    // État pour le mode d'affichage de la page d'accueil
+    const [homeViewMode, setHomeViewModeState] = useState<HomeViewMode>(() => {
+        if (typeof window !== 'undefined') {
+            const saved = window.localStorage.getItem('homeViewMode') as HomeViewMode;
+            return saved || 'default';
+        }
+        return 'default';
+    });
+
+    // Sauvegarder le mode d'affichage
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            window.localStorage.setItem('homeViewMode', homeViewMode);
+        }
+    }, [homeViewMode]);
+
+    const setHomeViewMode = (mode: HomeViewMode) => {
+        setHomeViewModeState(mode);
+    };
 
     // États pour le statut premium
     const [isPremium, setIsPremium] = useState<boolean | null>(null); // null signifie que le chargement est en cours
@@ -313,6 +338,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isPremium,
         subscriptionDetails,
         refreshSubscription,
+        homeViewMode,
+        setHomeViewMode,
     };
 
     return (

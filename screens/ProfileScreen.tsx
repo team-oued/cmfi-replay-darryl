@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import UserAvatar from '../components/UserAvatar';
 import HistorySection from '../components/HistorySection';
+import ViewModeSelector from '../components/ViewModeSelector';
 import { statsVuesService, ContinueWatchingItem, movieService, episodeSerieService } from '../lib/firestore';
 import { MediaContent, MediaType, User, Screen } from '../types';
 import {
@@ -222,13 +223,17 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigate, onSelectMedia, 
                         <SettingsItem key={item.label} Icon={item.icon} label={item.label} onClick={item.action} />
                     ))}
                 </div>
-                {adminItems.length > 0 && (
+                {userProfile?.isAdmin && (
                     <div className="mt-4">
                         <h3 className="text-lg font-bold mb-3 text-amber-600 dark:text-amber-400">Administration</h3>
-                        <div className="border border-amber-200 dark:border-amber-800 rounded-lg overflow-hidden divide-y divide-amber-200 dark:divide-amber-800">
+                        <div className="border border-amber-200 dark:border-amber-800 rounded-lg overflow-visible divide-y divide-amber-200 dark:divide-amber-800">
                             {adminItems.map((item) => (
                                 <SettingsItem key={item.label} Icon={item.icon} label={item.label} onClick={item.action} />
                             ))}
+                            {/* Sélecteur de mode d'affichage pour les admins */}
+                            <div className="relative overflow-visible">
+                                <ViewModeSelector />
+                            </div>
                         </div>
                     </div>
                 )}

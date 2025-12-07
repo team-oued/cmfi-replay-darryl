@@ -78,13 +78,28 @@ const ManageInfoBarScreen: React.FC = () => {
     };
 
     const handleToggleActive = async (messageId: string, currentStatus: boolean) => {
+        const newStatus = !currentStatus;
+        
+        // Mise à jour optimiste de l'état local
+        setMessages(prevMessages => {
+            return prevMessages.map(msg => {
+                if (msg.id === messageId) {
+                    return { ...msg, isActive: newStatus, updatedAt: new Date() };
+                }
+                return msg;
+            });
+        });
+
         try {
-            await infoBarService.setMessageActive(messageId, !currentStatus);
-            toast.success(currentStatus ? 'Message désactivé' : 'Message activé');
+            await infoBarService.setMessageActive(messageId, newStatus);
+            toast.success(newStatus ? 'Message activé' : 'Message désactivé');
+            // Recharger pour s'assurer que tout est synchronisé
             loadMessages();
         } catch (error) {
             console.error('Error toggling message:', error);
             toast.error('Erreur lors de la modification du statut');
+            // En cas d'erreur, recharger pour restaurer l'état correct
+            loadMessages();
         }
     };
 

@@ -12,28 +12,39 @@ interface InfoBarMessage {
 
 const InfoBar: React.FC = () => {
     const { theme } = useAppContext();
-    const [message, setMessage] = useState<string>('');
+    const [messages, setMessages] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const fetchActiveMessage = async () => {
+        const fetchActiveMessages = async () => {
             try {
-                const activeMessage = await infoBarService.getActiveMessage();
-                if (activeMessage && activeMessage.message) {
-                    setMessage(activeMessage.message);
+                const activeMessages = await infoBarService.getAllActiveMessages();
+                if (activeMessages && activeMessages.length > 0) {
+                    // Extraire les textes des messages actifs
+                    const messageTexts = activeMessages
+                        .filter(msg => msg.message && msg.message.trim())
+                        .map(msg => msg.message.trim());
+                    setMessages(messageTexts);
+                } else {
+                    setMessages([]);
                 }
             } catch (error) {
-                console.error('Error fetching info bar message:', error);
+                console.error('Error fetching active info bar messages:', error);
+                setMessages([]);
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchActiveMessage();
+        fetchActiveMessages();
+        
+        // Recharger les messages toutes les 30 secondes pour avoir les mises à jour en temps réel
+        const interval = setInterval(fetchActiveMessages, 30000);
+        return () => clearInterval(interval);
     }, []);
 
-    // Ne pas afficher si pas de message ou en chargement
-    if (loading || !message) {
+    // Ne pas afficher si pas de messages ou en chargement
+    if (loading || messages.length === 0) {
         return null;
     }
 
@@ -53,7 +64,7 @@ const InfoBar: React.FC = () => {
                     </svg>
                 </div>
 
-                {/* Message déroulant */}
+                {/* Messages déroulants - Tous les messages actifs côte à côte */}
                 <div className="flex-1 overflow-hidden">
                     <div 
                         className="whitespace-nowrap animate-scroll"
@@ -61,16 +72,39 @@ const InfoBar: React.FC = () => {
                             animation: 'scroll 30s linear infinite',
                         }}
                     >
-                        <span className={`text-sm md:text-base font-medium ${
-                            theme === 'dark' ? 'text-amber-200' : 'text-amber-900'
-                        }`}>
-                            {message}
-                        </span>
-                        {/* Dupliquer le message pour un défilement continu */}
+                        {/* Afficher tous les messages actifs séparés par un séparateur */}
+                        {messages.map((msg, index) => (
+                            <React.Fragment key={index}>
+                                <span className={`text-sm md:text-base font-medium ${
+                                    theme === 'dark' ? 'text-amber-200' : 'text-amber-900'
+                                }`}>
+                                    {msg}
+                                </span>
+                                {index < messages.length - 1 && (
+                                    <span className={`mx-6 text-sm md:text-base font-medium ${
+                                        theme === 'dark' ? 'text-amber-400' : 'text-amber-600'
+                                    }`}>
+                                        •
+                                    </span>
+                                )}
+                            </React.Fragment>
+                        ))}
+                        {/* Dupliquer pour un défilement continu */}
                         <span className={`ml-8 text-sm md:text-base font-medium ${
                             theme === 'dark' ? 'text-amber-200' : 'text-amber-900'
                         }`}>
-                            {message}
+                            {messages.map((msg, index) => (
+                                <React.Fragment key={`dup-${index}`}>
+                                    {msg}
+                                    {index < messages.length - 1 && (
+                                        <span className={`mx-6 text-sm md:text-base font-medium ${
+                                            theme === 'dark' ? 'text-amber-400' : 'text-amber-600'
+                                        }`}>
+                                            •
+                                        </span>
+                                    )}
+                                </React.Fragment>
+                            ))}
                         </span>
                     </div>
                 </div>

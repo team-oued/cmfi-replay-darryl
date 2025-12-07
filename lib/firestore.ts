@@ -2086,20 +2086,31 @@ export const infoBarService = {
     /**
      * Récupère le message actif
      */
+    /**
+     * Récupère le message actif (pour compatibilité)
+     * @deprecated Utilisez getAllActiveMessages() pour récupérer tous les messages actifs
+     */
     async getActiveMessage(): Promise<InfoBarMessage | null> {
         try {
-            // Récupérer tous les messages actifs et trier côté client pour éviter l'index composite
+            const activeMessages = await this.getAllActiveMessages();
+            return activeMessages.length > 0 ? activeMessages[0] : null;
+        } catch (error) {
+            console.error('Error getting active info bar message:', error);
+            return null;
+        }
+    },
+
+    /**
+     * Récupère tous les messages actifs
+     */
+    async getAllActiveMessages(): Promise<InfoBarMessage[]> {
+        try {
             const q = query(
                 collection(db, INFO_BAR_COLLECTION),
                 where('isActive', '==', true)
             );
             const querySnapshot = await getDocs(q);
             
-            if (querySnapshot.empty) {
-                return null;
-            }
-            
-            // Trier par updatedAt côté client et prendre le plus récent
             const messages = querySnapshot.docs.map(doc => {
                 const data = doc.data();
                 return {
@@ -2112,48 +2123,38 @@ export const infoBarService = {
                 };
             });
             
-            // Trier par updatedAt décroissant et prendre le premier
+            // Trier par updatedAt décroissant
             messages.sort((a, b) => {
                 const dateA = a.updatedAt instanceof Date ? a.updatedAt.getTime() : 0;
                 const dateB = b.updatedAt instanceof Date ? b.updatedAt.getTime() : 0;
                 return dateB - dateA;
             });
             
-            return messages[0] || null;
+            return messages;
         } catch (error) {
-            console.error('Error getting active info bar message:', error);
-            return null;
+            console.error('Error getting all active info bar messages:', error);
+            return [];
         }
     },
 
     /**
      * Crée un nouveau message d'information
      */
+    /**
+     * Crée un nouveau message d'information
+     * Le nouveau message est créé comme inactif par défaut
+     */
     async createMessage(message: string, userId: string): Promise<string> {
         try {
-            // Désactiver tous les autres messages
-            const allMessagesQuery = query(
-                collection(db, INFO_BAR_COLLECTION),
-                where('isActive', '==', true)
-            );
-            const allMessagesSnapshot = await getDocs(allMessagesQuery);
-            
-            const batch = writeBatch(db);
-            allMessagesSnapshot.docs.forEach(doc => {
-                batch.update(doc.ref, { isActive: false });
-            });
-            
-            // Créer le nouveau message
             const newMessageRef = doc(collection(db, INFO_BAR_COLLECTION));
-            batch.set(newMessageRef, {
-                message,
-                isActive: true,
+            await setDoc(newMessageRef, {
+                message: message.trim(),
+                isActive: false, // Créé comme inactif par défaut
                 createdAt: Timestamp.now(),
                 updatedAt: Timestamp.now(),
                 createdBy: userId
             });
             
-            await batch.commit();
             return newMessageRef.id;
         } catch (error) {
             console.error('Error creating info bar message:', error);
@@ -2180,36 +2181,15 @@ export const infoBarService = {
 
     /**
      * Active ou désactive un message
+     * Permet maintenant plusieurs messages actifs en même temps
      */
     async setMessageActive(messageId: string, isActive: boolean): Promise<void> {
         try {
             const messageRef = doc(db, INFO_BAR_COLLECTION, messageId);
-            
-            if (isActive) {
-                // Désactiver tous les autres messages actifs
-                const activeMessagesQuery = query(
-                    collection(db, INFO_BAR_COLLECTION),
-                    where('isActive', '==', true)
-                );
-                const activeMessagesSnapshot = await getDocs(activeMessagesQuery);
-                
-                const batch = writeBatch(db);
-                activeMessagesSnapshot.docs.forEach(doc => {
-                    if (doc.id !== messageId) {
-                        batch.update(doc.ref, { isActive: false });
-                    }
-                });
-                batch.update(messageRef, { 
-                    isActive: true,
-                    updatedAt: Timestamp.now()
-                });
-                await batch.commit();
-            } else {
-                await updateDoc(messageRef, { 
-                    isActive: false,
-                    updatedAt: Timestamp.now()
-                });
-            }
+            await updateDoc(messageRef, { 
+                isActive: isActive,
+                updatedAt: Timestamp.now()
+            });
         } catch (error) {
             console.error('Error setting message active:', error);
             throw error;
