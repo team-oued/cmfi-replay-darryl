@@ -15,6 +15,10 @@ const HeroPrimeVideo: React.FC<HeroPrimeVideoProps> = ({ items: propItems, onSel
   const [isPaused, setIsPaused] = useState(false);
   const [movies, setMovies] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(true);
+  const [videoError, setVideoError] = useState(false);
+  const videoRef = React.useRef<HTMLVideoElement>(null);
+  const randomStartTimeRef = React.useRef<number>(0);
+  const isSeekingRef = React.useRef<boolean>(false);
   const { t, bookmarkedIds, toggleBookmark, isPremium } = useAppContext();
 
   // Récupérer les films populaires
@@ -47,17 +51,123 @@ const HeroPrimeVideo: React.FC<HeroPrimeVideoProps> = ({ items: propItems, onSel
     premium_text: movie.premium_text || ''
   })) : propItems || [];
 
+  // Définir currentItem tôt pour éviter les erreurs
+  const currentItem = items.length > 0 ? items[currentIndex] : null;
+
   useEffect(() => {
     if (!items || items.length <= 1 || isPaused) return;
 
     const timer = setTimeout(() => {
       setCurrentIndex((prevIndex) => (prevIndex + 1) % items.length);
-    }, 5000);
+      setVideoError(false); // Reset l'erreur vidéo lors du changement
+    }, 30000); // 30 secondes pour synchroniser avec la durée de la vidéo
 
     return () => clearTimeout(timer);
   }, [currentIndex, items, isPaused]);
 
-  if (loading || !items || items.length === 0) {
+  // Gérer la vidéo : jouer un extrait de 30 secondes aléatoire en boucle
+  useEffect(() => {
+    if (!currentItem) {
+      setVideoError(true);
+      return;
+    }
+
+    const video = videoRef.current;
+    if (!video || !currentItem.video_path_hd) {
+      setVideoError(true);
+      return;
+    }
+
+    // Réinitialiser le point de départ aléatoire pour chaque nouvel item
+    randomStartTimeRef.current = 0;
+
+    const handleTimeUpdate = () => {
+      // Éviter les modifications pendant un seek pour plus de fluidité
+      if (isSeekingRef.current) return;
+      
+      const startTime = randomStartTimeRef.current;
+      const endTime = startTime + 30;
+      const currentTime = video.currentTime;
+      
+      // Utiliser un seuil pour éviter les vérifications trop fréquentes et les saccades
+      // Si on est très proche de la fin (à 0.1 seconde près), faire la boucle
+      if (currentTime >= endTime - 0.1) {
+        isSeekingRef.current = true;
+        video.currentTime = startTime;
+      } else if (currentTime < startTime - 0.1) {
+        // Si on est avant le début (peut arriver lors du chargement), revenir au début
+        isSeekingRef.current = true;
+        video.currentTime = startTime;
+      }
+    };
+
+    const handleSeeked = () => {
+      // Réinitialiser le flag après que le seek soit terminé
+      isSeekingRef.current = false;
+    };
+
+    const handleLoadedMetadata = () => {
+      // Une fois les métadonnées chargées, choisir un point de départ aléatoire
+      const videoDuration = video.duration;
+      
+      if (videoDuration && videoDuration > 30) {
+        // Choisir un point de départ aléatoire, en s'assurant qu'il reste au moins 30 secondes après
+        const maxStartTime = videoDuration - 30;
+        randomStartTimeRef.current = Math.random() * maxStartTime;
+      } else {
+        // Si la vidéo fait moins de 30 secondes, commencer au début
+        randomStartTimeRef.current = 0;
+      }
+      
+      // Réinitialiser le flag de seek
+      isSeekingRef.current = false;
+      
+      // Démarrer la vidéo au point de départ aléatoire
+      video.currentTime = randomStartTimeRef.current;
+    };
+
+    const handleError = () => {
+      console.error('Video loading error');
+      setVideoError(true);
+    };
+
+    const handleCanPlay = () => {
+      // S'assurer que la vidéo est au bon point de départ
+      if (Math.abs(video.currentTime - randomStartTimeRef.current) > 0.5) {
+        isSeekingRef.current = true;
+        video.currentTime = randomStartTimeRef.current;
+      }
+    };
+
+    const handleLoadedData = () => {
+      // Quand les données sont chargées, essayer de jouer la vidéo
+      video.play().catch((error) => {
+        console.error('Error playing video:', error);
+        setVideoError(true);
+      });
+    };
+
+    video.addEventListener('timeupdate', handleTimeUpdate);
+    video.addEventListener('loadedmetadata', handleLoadedMetadata);
+    video.addEventListener('error', handleError);
+    video.addEventListener('canplay', handleCanPlay);
+    video.addEventListener('loadeddata', handleLoadedData);
+    video.addEventListener('seeked', handleSeeked);
+
+    // Réinitialiser l'erreur vidéo quand on change d'item
+    setVideoError(false);
+
+    return () => {
+      video.removeEventListener('timeupdate', handleTimeUpdate);
+      video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      video.removeEventListener('error', handleError);
+      video.removeEventListener('canplay', handleCanPlay);
+      video.removeEventListener('loadeddata', handleLoadedData);
+      video.removeEventListener('seeked', handleSeeked);
+    };
+  }, [currentItem.id, currentItem.video_path_hd]);
+
+  if (loading || !items || items.length === 0 || !currentItem) {
     return (
       <div className="relative w-full h-[70vh] md:h-[80vh] bg-black flex items-center justify-center">
         <div className="text-white text-lg">{t('loading') || 'Chargement...'}</div>
@@ -65,7 +175,6 @@ const HeroPrimeVideo: React.FC<HeroPrimeVideoProps> = ({ items: propItems, onSel
     );
   }
 
-  const currentItem = items[currentIndex];
   const isBookmarked = bookmarkedIds.includes(currentItem.id);
 
   const handlePrev = () => {
@@ -90,16 +199,34 @@ const HeroPrimeVideo: React.FC<HeroPrimeVideoProps> = ({ items: propItems, onSel
     );
   };
 
+  const videoUrl = currentItem.video_path_hd;
+  const showVideo = videoUrl && !videoError;
+
   return (
     <div className="relative w-full h-[70vh] md:h-[80vh] bg-black overflow-hidden">
-      {/* Image de fond avec parallax */}
+      {/* Vidéo ou Image de fond */}
       <div className="absolute inset-0">
-        <img
-          key={currentItem.id}
-          src={currentItem.imageUrl}
-          alt={currentItem.title}
-          className="w-full h-full object-cover transition-opacity duration-1000"
-        />
+        {showVideo ? (
+          <video
+            ref={videoRef}
+            key={currentItem.id}
+            src={videoUrl}
+            className="w-full h-full object-cover transition-opacity duration-1000"
+            muted
+            playsInline
+            loop
+            autoPlay
+            preload="auto"
+            style={{ objectFit: 'cover' }}
+          />
+        ) : (
+          <img
+            key={currentItem.id}
+            src={currentItem.imageUrl}
+            alt={currentItem.title}
+            className="w-full h-full object-cover transition-opacity duration-1000"
+          />
+        )}
         {/* Gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/60" />
