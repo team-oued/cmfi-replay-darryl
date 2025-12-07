@@ -13,6 +13,7 @@ import { useAppContext } from '../context/AppContext';
 import { toast } from 'react-toastify';
 import AuthPrompt from '../components/AuthPrompt';
 import PremiumPaywall from '../components/PremiumPaywall';
+import AdPlayer from '../components/AdPlayer';
 
 // --- Reusable formatter ---
 const formatNumber = (num: number) => {
@@ -663,6 +664,7 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
     const [videoIsPlaying, setVideoIsPlaying] = useState(false);
     const [isPremiumContent, setIsPremiumContent] = useState(false);
     const [isCheckingPremium, setIsCheckingPremium] = useState(true);
+    const [showAd, setShowAd] = useState(true);
 
     const handleAuthRequired = (action: string) => {
         setAuthAction(action);
@@ -749,6 +751,9 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
         };
 
         fetchLikeData();
+        
+        // Réinitialiser la pub quand l'épisode change
+        setShowAd(true);
     }, [episode.uid_episode, userProfile]);
 
     // Track view after 30 seconds of watching (only when video is playing)
@@ -1029,14 +1034,21 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
                     {/* Colonne de gauche - Lecteur vidéo et métadonnées */}
                     <div className="lg:col-span-2 space-y-6">
                         <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl ring-2 ring-black/20 dark:ring-white/5">
-                            <VideoPlayer
-                                key={episode.uid_episode || episode.title}
-                                src={episode.video_path_hd?.trim() ? episode.video_path_hd : episode.video_path_sd}
-                                poster={episode.picture_path || item.imageUrl}
-                                onUnavailable={onReturnHome}
-                                onEnded={handleVideoEnded}
-                                onPlayingStateChange={setVideoIsPlaying}
-                            />
+                            {showAd && (
+                                <AdPlayer
+                                    onAdEnd={() => setShowAd(false)}
+                                />
+                            )}
+                            {!showAd && (
+                                <VideoPlayer
+                                    key={episode.uid_episode || episode.title}
+                                    src={episode.video_path_hd?.trim() ? episode.video_path_hd : episode.video_path_sd}
+                                    poster={episode.picture_path || item.imageUrl}
+                                    onUnavailable={onReturnHome}
+                                    onEnded={handleVideoEnded}
+                                    onPlayingStateChange={setVideoIsPlaying}
+                                />
+                            )}
                         </div>
 
                         <div className="space-y-6">

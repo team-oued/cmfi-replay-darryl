@@ -13,6 +13,7 @@ import { useAppContext } from '../context/AppContext';
 import { toast } from 'react-toastify';
 import AuthPrompt from '../components/AuthPrompt';
 import PremiumPaywall from '../components/PremiumPaywall';
+import AdPlayer from '../components/AdPlayer';
 
 // --- Reusable formatter ---
 const formatNumber = (num: number) => {
@@ -641,6 +642,7 @@ const MoviePlayerScreen: React.FC<MoviePlayerScreenProps> = ({ item, onBack }) =
     const [showAuthPrompt, setShowAuthPrompt] = useState(false);
     const [authAction, setAuthAction] = useState('');
     const [videoIsPlaying, setVideoIsPlaying] = useState(false);
+    const [showAd, setShowAd] = useState(true);
 
     const handleAuthRequired = (action: string) => {
         setAuthAction(action);
@@ -667,6 +669,9 @@ const MoviePlayerScreen: React.FC<MoviePlayerScreenProps> = ({ item, onBack }) =
         if (item.type === MediaType.Movie) {
             fetchMovieData();
         }
+        
+        // Réinitialiser la pub quand le film change
+        setShowAd(true);
     }, [item.id, item.type]);
 
     // Fetch like data
@@ -943,12 +948,19 @@ const MoviePlayerScreen: React.FC<MoviePlayerScreenProps> = ({ item, onBack }) =
                     {/* Colonne de gauche - Lecteur vidéo et métadonnées */}
                     <div className="lg:col-span-2 space-y-6">
                         <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl ring-2 ring-black/20 dark:ring-white/5">
-                            <VideoPlayer
-                                src={movieData?.video_path_hd || item.video_path_hd}
-                                poster={movieData?.picture_path || item.imageUrl}
-                                onEnded={handleVideoEnded}
-                                onPlayingStateChange={setVideoIsPlaying}
-                            />
+                            {showAd && (
+                                <AdPlayer
+                                    onAdEnd={() => setShowAd(false)}
+                                />
+                            )}
+                            {!showAd && (
+                                <VideoPlayer
+                                    src={movieData?.video_path_hd || item.video_path_hd}
+                                    poster={movieData?.picture_path || item.imageUrl}
+                                    onEnded={handleVideoEnded}
+                                    onPlayingStateChange={setVideoIsPlaying}
+                                />
+                            )}
                         </div>
 
                         <div className="space-y-6">

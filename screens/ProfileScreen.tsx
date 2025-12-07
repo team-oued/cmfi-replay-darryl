@@ -160,6 +160,11 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigate, onSelectMedia, 
             label: 'Gérer les messages d\'information',
             action: () => navigateRouter('/manage-info-bar')
         },
+        {
+            icon: SettingsIcon,
+            label: 'Gérer les publicités',
+            action: () => navigateRouter('/manage-ads')
+        },
     ] : [];
 
     return (

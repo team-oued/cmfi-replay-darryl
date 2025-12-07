@@ -189,6 +189,7 @@ const COMMENTS_COLLECTION = 'comment';
 const STATS_VUES_COLLECTION = 'stats_vues';
 const USER_VIEW_COLLECTION = 'user_view';
 const APP_SETTINGS_COLLECTION = 'appSettings';
+const ADS_COLLECTION = 'ads';
 
 // Fonction utilitaire pour générer un avatar par défaut
 export const generateDefaultAvatar = (name?: string): string => {
@@ -2294,6 +2295,213 @@ export const appSettingsService = {
             }, { merge: true });
         } catch (error) {
             console.error('Error setting home view mode:', error);
+            throw error;
+        }
+    }
+};
+
+// Interface pour les publicités
+export interface Ad {
+    id: string;
+    videoUrl: string;
+    title?: string;
+    skipAfterSeconds?: number; // Nombre de secondes avant de pouvoir skip (par défaut 5)
+    isActive: boolean;
+    createdAt: Timestamp;
+    updatedAt: Timestamp;
+    createdBy?: string;
+}
+
+// Interface pour les paramètres de publicité
+export interface AdSettings {
+    enabled: boolean;
+    skipAfterSeconds: number; // Durée minimale avant de pouvoir skip (par défaut 5 secondes)
+    updatedAt: Timestamp;
+    updatedBy?: string;
+}
+
+// Service pour gérer les publicités
+export const adService = {
+    /**
+     * Récupère tous les publicités actives
+     */
+    async getActiveAds(): Promise<Ad[]> {
+        try {
+            // Filtrer seulement par isActive pour éviter le besoin d'un index composite
+            const q = query(
+                collection(db, ADS_COLLECTION),
+                where('isActive', '==', true)
+            );
+            const querySnapshot = await getDocs(q);
+            const ads = querySnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data(),
+                createdAt: doc.data().createdAt || Timestamp.now(),
+                updatedAt: doc.data().updatedAt || Timestamp.now()
+            })) as Ad[];
+            
+            // Trier côté client par createdAt (plus récent en premier)
+            ads.sort((a, b) => {
+                const aTime = a.createdAt instanceof Timestamp ? a.createdAt.toMillis() : 0;
+                const bTime = b.createdAt instanceof Timestamp ? b.createdAt.toMillis() : 0;
+                return bTime - aTime; // Tri décroissant (plus récent en premier)
+            });
+            
+            return ads;
+        } catch (error) {
+            console.error('Error getting active ads:', error);
+            return [];
+        }
+    },
+
+    /**
+     * Récupère une publicité aléatoire parmi les actives
+     */
+    async getRandomAd(): Promise<Ad | null> {
+        try {
+            const ads = await this.getActiveAds();
+            if (ads.length === 0) return null;
+            const randomIndex = Math.floor(Math.random() * ads.length);
+            return ads[randomIndex];
+        } catch (error) {
+            console.error('Error getting random ad:', error);
+            return null;
+        }
+    },
+
+    /**
+     * Récupère toutes les publicités (admin)
+     */
+    async getAllAds(): Promise<Ad[]> {
+        try {
+            const q = query(
+                collection(db, ADS_COLLECTION),
+                orderBy('createdAt', 'desc')
+            );
+            const querySnapshot = await getDocs(q);
+            return querySnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data(),
+                createdAt: doc.data().createdAt || Timestamp.now(),
+                updatedAt: doc.data().updatedAt || Timestamp.now()
+            })) as Ad[];
+        } catch (error) {
+            console.error('Error getting all ads:', error);
+            return [];
+        }
+    },
+
+    /**
+     * Crée une nouvelle publicité
+     */
+    async createAd(adData: Omit<Ad, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+        try {
+            const adRef = await addDoc(collection(db, ADS_COLLECTION), {
+                ...adData,
+                createdAt: Timestamp.now(),
+                updatedAt: Timestamp.now()
+            });
+            return adRef.id;
+        } catch (error) {
+            console.error('Error creating ad:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Met à jour une publicité
+     */
+    async updateAd(adId: string, updates: Partial<Ad>): Promise<void> {
+        try {
+            const adRef = doc(db, ADS_COLLECTION, adId);
+            await updateDoc(adRef, {
+                ...updates,
+                updatedAt: Timestamp.now()
+            });
+        } catch (error) {
+            console.error('Error updating ad:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Supprime une publicité
+     */
+    async deleteAd(adId: string): Promise<void> {
+        try {
+            const adRef = doc(db, ADS_COLLECTION, adId);
+            await deleteDoc(adRef);
+        } catch (error) {
+            console.error('Error deleting ad:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Récupère les paramètres de publicité
+     */
+    async getAdSettings(): Promise<AdSettings | null> {
+        try {
+            const settingsRef = doc(db, APP_SETTINGS_COLLECTION, 'ads');
+            const settingsDoc = await getDoc(settingsRef);
+            
+            if (settingsDoc.exists()) {
+                const data = settingsDoc.data();
+                console.log('Raw ad settings from Firestore:', data);
+                // S'assurer que enabled est bien un booléen (pas undefined)
+                const enabled = typeof data.enabled === 'boolean' ? data.enabled : false;
+                return {
+                    enabled: enabled,
+                    skipAfterSeconds: data.skipAfterSeconds || 5,
+                    updatedAt: data.updatedAt || Timestamp.now(),
+                    updatedBy: data.updatedBy
+                };
+            }
+            
+            // Paramètres par défaut
+            const defaultSettings: AdSettings = {
+                enabled: false,
+                skipAfterSeconds: 5,
+                updatedAt: Timestamp.now()
+            };
+            await setDoc(settingsRef, defaultSettings);
+            return defaultSettings;
+        } catch (error) {
+            console.error('Error getting ad settings:', error);
+            return null;
+        }
+    },
+
+    /**
+     * Met à jour les paramètres de publicité (admin uniquement)
+     */
+    async updateAdSettings(settings: Partial<AdSettings>, userId: string): Promise<void> {
+        try {
+            const settingsRef = doc(db, APP_SETTINGS_COLLECTION, 'ads');
+            const dataToSave: any = {
+                updatedAt: Timestamp.now(),
+                updatedBy: userId
+            };
+            
+            // S'assurer que enabled est bien un booléen
+            if (typeof settings.enabled === 'boolean') {
+                dataToSave.enabled = settings.enabled;
+            }
+            
+            if (typeof settings.skipAfterSeconds === 'number') {
+                dataToSave.skipAfterSeconds = settings.skipAfterSeconds;
+            }
+            
+            console.log('Saving ad settings to Firestore:', dataToSave);
+            await setDoc(settingsRef, dataToSave, { merge: true });
+            
+            // Vérifier que ça a bien été sauvegardé
+            const verifyDoc = await getDoc(settingsRef);
+            if (verifyDoc.exists()) {
+                console.log('Verified saved ad settings:', verifyDoc.data());
+            }
+        } catch (error) {
+            console.error('Error updating ad settings:', error);
             throw error;
         }
     }
