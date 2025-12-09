@@ -293,7 +293,7 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
                         )}
                         {type && (
                             <span className="px-2.5 py-1 rounded-md bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold text-xs md:text-sm">
-                                {type === MediaType.Movie ? 'Film' : type === MediaType.Series ? 'Série' : 'Podcast'}
+                                {type === MediaType.Movie ? t('movie') : type === MediaType.Series ? t('series') : t('podcast')}
                             </span>
                         )}
                     </div>

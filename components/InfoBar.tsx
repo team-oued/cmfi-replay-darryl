@@ -54,7 +54,7 @@ const InfoBar: React.FC = () => {
                 ? 'bg-gradient-to-r from-amber-900/20 via-amber-800/30 to-amber-900/20 border-y border-amber-700/30' 
                 : 'bg-gradient-to-r from-amber-50 via-amber-100 to-amber-50 border-y border-amber-200'
         }`}>
-            <div className="flex items-center py-2 md:py-3">
+            <div className={`flex items-center py-1.5 sm:py-2 md:py-3`}>
                 {/* Icône d'information */}
                 <div className={`flex-shrink-0 px-4 md:px-6 ${
                     theme === 'dark' ? 'text-amber-400' : 'text-amber-600'
@@ -65,23 +65,26 @@ const InfoBar: React.FC = () => {
                 </div>
 
                 {/* Messages déroulants - Tous les messages actifs côte à côte */}
-                <div className="flex-1 overflow-hidden">
+                <div className="flex-1 overflow-hidden relative">
                     <div 
-                        className="whitespace-nowrap animate-scroll"
+                        className="inline-flex items-center animate-scroll"
                         style={{
-                            animation: 'scroll 30s linear infinite',
+                            animation: 'scroll 40s linear infinite',
+                            whiteSpace: 'nowrap',
+                            width: 'max-content',
+                            paddingRight: '100%',
                         }}
                     >
                         {/* Afficher tous les messages actifs séparés par un séparateur */}
                         {messages.map((msg, index) => (
                             <React.Fragment key={index}>
-                                <span className={`text-sm md:text-base font-medium ${
+                                <span className={`text-xs sm:text-sm md:text-base font-medium ${
                                     theme === 'dark' ? 'text-amber-200' : 'text-amber-900'
                                 }`}>
                                     {msg}
                                 </span>
                                 {index < messages.length - 1 && (
-                                    <span className={`mx-6 text-sm md:text-base font-medium ${
+                                    <span className={`mx-3 sm:mx-4 md:mx-6 text-xs sm:text-sm md:text-base font-medium ${
                                         theme === 'dark' ? 'text-amber-400' : 'text-amber-600'
                                     }`}>
                                         •
@@ -97,7 +100,7 @@ const InfoBar: React.FC = () => {
                                 <React.Fragment key={`dup-${index}`}>
                                     {msg}
                                     {index < messages.length - 1 && (
-                                        <span className={`mx-6 text-sm md:text-base font-medium ${
+                                        <span className={`mx-3 sm:mx-4 md:mx-6 text-xs sm:text-sm md:text-base font-medium ${
                                             theme === 'dark' ? 'text-amber-400' : 'text-amber-600'
                                         }`}>
                                             •
@@ -114,10 +117,15 @@ const InfoBar: React.FC = () => {
             <style>{`
                 @keyframes scroll {
                     0% {
-                        transform: translateX(0);
+                        transform: translate3d(0, 0, 0);
                     }
                     100% {
-                        transform: translateX(-50%);
+                        transform: translate3d(-35%, 0, 0);
+                    }
+                }
+                @media (max-width: 768px) {
+                    .animate-scroll {
+                        animation-duration: 40s !important; /* Ralentir un peu sur mobile */
                     }
                 }
             `}</style>

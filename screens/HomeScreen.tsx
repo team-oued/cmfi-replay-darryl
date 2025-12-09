@@ -13,7 +13,7 @@ import { PlayIcon } from '../components/icons';
 
 import { MediaContent, User, MediaType } from '../types';
 import { useAppContext, HomeViewMode } from '../context/AppContext';
-import { userService, generateDefaultAvatar, likeService, movieService, episodeSerieService, statsVuesService, ContinueWatchingItem, viewService } from '../lib/firestore';
+import { userService, generateDefaultAvatar, likeService, movieService, episodeSerieService, statsVuesService, ContinueWatchingItem, viewService, Movie, Serie, serieService } from '../lib/firestore';
 import ContinueWatchingSection from '../components/ContinueWatchingSection';
 import InfoBar from '../components/InfoBar';
 
@@ -51,21 +51,21 @@ const MediaRow: React.FC<{ title: string; items: MediaContent[]; onSelectMedia: 
                     {title}
                 </h3>
             </div>
-            
+
             {/* Container avec gradients de fade dynamiques */}
             <div className="relative">
                 {/* Gradient gauche */}
                 {showLeftGradient && (
                     <div className="absolute left-0 top-0 bottom-0 w-20 md:w-32 lg:w-40 bg-gradient-to-r from-[#FBF9F3] dark:from-black via-[#FBF9F3]/80 dark:via-black/80 to-transparent z-20 pointer-events-none transition-opacity duration-500" />
                 )}
-                
+
                 {/* Gradient droite */}
                 {showRightGradient && (
                     <div className="absolute right-0 top-0 bottom-0 w-20 md:w-32 lg:w-40 bg-gradient-to-l from-[#FBF9F3] dark:from-black via-[#FBF9F3]/80 dark:via-black/80 to-transparent z-20 pointer-events-none transition-opacity duration-500" />
                 )}
-                
+
                 {/* Carrousel avec scroll smooth et snap */}
-                <div 
+                <div
                     ref={scrollContainerRef}
                     className="flex space-x-4 md:space-x-6 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-6 scroll-smooth snap-x snap-mandatory"
                     style={{ scrollBehavior: 'smooth', WebkitOverflowScrolling: 'touch' }}
@@ -97,7 +97,7 @@ const RankedMediaRow: React.FC<{
                     {title}
                 </h3>
             </div>
-            
+
             {/* Container simple sans effets de défilement */}
             <div className="flex space-x-4 md:space-x-6 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-6">
                 {items.map((item, index) => (
@@ -143,6 +143,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
     const [loadingMostWatched, setLoadingMostWatched] = useState(true);
     const [continueWatchingItems, setContinueWatchingItems] = useState<ContinueWatchingItem[]>([]);
     const [loadingContinueWatching, setLoadingContinueWatching] = useState(true);
+    const [movies, setMovies] = useState<Movie[]>([]);
+    const [loadingMovies, setLoadingMovies] = useState(true);
+    const [series, setSeries] = useState<Serie[]>([]);
+    const [loadingSeries, setLoadingSeries] = useState(true);
+    const [podcasts, setPodcasts] = useState<Serie[]>([]);
+    const [loadingPodcasts, setLoadingPodcasts] = useState(true);
     const [loadingHero, setLoadingHero] = useState(true);
     const [loadingCategories, setLoadingCategories] = useState(true);
 
@@ -329,6 +335,54 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
         fetchContinueWatching();
     }, [user]);
 
+    // Récupérer les films
+    useEffect(() => {
+        const fetchMovies = async () => {
+            try {
+                const moviesData = await movieService.getTenHomeMovies();
+                setMovies(moviesData);
+            } catch (error) {
+                console.error('Error fetching movies:', error);
+            } finally {
+                setLoadingMovies(false);
+            }
+        };
+
+        fetchMovies();
+    }, []);
+
+    // Récupérer les séries
+    useEffect(() => {
+        const fetchSeries = async () => {
+            try {
+                const seriesData = await serieService.getTenHomeSeries();
+                setSeries(seriesData);
+            } catch (error) {
+                console.error('Error fetching series:', error);
+            } finally {
+                setLoadingSeries(false);
+            }
+        };
+
+        fetchSeries();
+    }, []);
+
+    // Récupérer les podcasts
+    useEffect(() => {
+        const fetchPodcasts = async () => {
+            try {
+                const podcastsData = await serieService.getTenHomePodcasts();
+                setPodcasts(podcastsData);
+            } catch (error) {
+                console.error('Error fetching podcasts:', error);
+            } finally {
+                setLoadingPodcasts(false);
+            }
+        };
+
+        fetchPodcasts();
+    }, []);
+
     const handleContinueWatchingClick = async (item: ContinueWatchingItem) => {
         if (item.type === 'movie') {
             // C'est un film
@@ -452,6 +506,171 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                         </div>
                     )}
 
+                    {/* Section Films */}
+                    {movies.length > 0 && (
+                        <div className="py-6 md:py-8 lg:py-10 mt-4 md:mt-6">
+                            <div className="px-4 md:px-6 lg:px-8 mb-6">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-2xl md:text-3xl font-bold text-white">
+                                        {t('films') || 'Films'}
+                                    </h3>
+                                    <button
+                                        onClick={() => navigateToCategory(MediaType.Movie)}
+                                        className="text-sm md:text-base text-red-500 hover:text-red-400 font-semibold transition-colors"
+                                    >
+                                        {t('viewAll') || 'Voir plus'} →
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="flex space-x-3 md:space-x-4 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-4">
+                                {movies.map((movie) => {
+                                    const mediaContent: MediaContent = {
+                                        id: movie.uid,
+                                        type: MediaType.Movie,
+                                        title: movie.title,
+                                        author: movie.original_title,
+                                        theme: '',
+                                        imageUrl: movie.backdrop_path || movie.picture_path || movie.poster_path,
+                                        duration: movie.runtime_h_m,
+                                        description: movie.overview,
+                                        languages: [movie.original_language],
+                                        video_path_hd: movie.video_path_hd
+                                    };
+                                    return (
+                                        <div key={movie.uid} className="flex-shrink-0 w-40 md:w-48 lg:w-52 group cursor-pointer" onClick={() => onSelectMedia(mediaContent)}>
+                                            <div className="relative aspect-[2/3] rounded overflow-hidden mb-3 transition-transform duration-300 group-hover:scale-105">
+                                                <img
+                                                    src={mediaContent.imageUrl}
+                                                    alt={mediaContent.title}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                                {/* Overlay au hover */}
+                                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                                                    <div className="w-14 h-14 rounded-full bg-white/95 flex items-center justify-center shadow-2xl">
+                                                        <PlayIcon className="w-7 h-7 text-gray-900 ml-1" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <h4 className="text-white text-sm md:text-base font-semibold truncate group-hover:text-red-500 transition-colors">
+                                                {mediaContent.title}
+                                            </h4>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Section Séries */}
+                    {series.length > 0 && (
+                        <div className="py-6 md:py-8 lg:py-10 mt-4 md:mt-6">
+                            <div className="px-4 md:px-6 lg:px-8 mb-6">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-2xl md:text-3xl font-bold text-white">
+                                        {t('seriesTitle') || 'Séries'}
+                                    </h3>
+                                    <button
+                                        onClick={() => navigateToCategory(MediaType.Series)}
+                                        className="text-sm md:text-base text-red-500 hover:text-red-400 font-semibold transition-colors"
+                                    >
+                                        {t('viewAll') || 'Voir plus'} →
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="flex space-x-3 md:space-x-4 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-4">
+                                {series.map((serie) => {
+                                    const mediaContent: MediaContent = {
+                                        id: serie.uid_serie,
+                                        type: MediaType.Series,
+                                        title: serie.title_serie,
+                                        author: '',
+                                        theme: '',
+                                        imageUrl: serie.back_path || serie.image_path,
+                                        duration: serie.runtime_h_m,
+                                        description: serie.overview_serie,
+                                        languages: [],
+                                        video_path_hd: ''
+                                    };
+                                    return (
+                                        <div key={serie.uid_serie} className="flex-shrink-0 w-40 md:w-48 lg:w-52 group cursor-pointer" onClick={() => onSelectMedia(mediaContent)}>
+                                            <div className="relative aspect-[2/3] rounded overflow-hidden mb-3 transition-transform duration-300 group-hover:scale-105">
+                                                <img
+                                                    src={mediaContent.imageUrl}
+                                                    alt={mediaContent.title}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                                {/* Overlay au hover */}
+                                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                                                    <div className="w-14 h-14 rounded-full bg-white/95 flex items-center justify-center shadow-2xl">
+                                                        <PlayIcon className="w-7 h-7 text-gray-900 ml-1" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <h4 className="text-white text-sm md:text-base font-semibold truncate group-hover:text-red-500 transition-colors">
+                                                {mediaContent.title}
+                                            </h4>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Section Podcasts */}
+                    {podcasts.length > 0 && (
+                        <div className="py-6 md:py-8 lg:py-10 mt-4 md:mt-6">
+                            <div className="px-4 md:px-6 lg:px-8 mb-6">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-2xl md:text-3xl font-bold text-white">
+                                        {t('podcastsTitle') || 'Podcasts'}
+                                    </h3>
+                                    <button
+                                        onClick={() => navigateToCategory(MediaType.Podcast)}
+                                        className="text-sm md:text-base text-red-500 hover:text-red-400 font-semibold transition-colors"
+                                    >
+                                        {t('viewAll') || 'Voir plus'} →
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="flex space-x-3 md:space-x-4 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-4">
+                                {podcasts.map((podcast) => {
+                                    const mediaContent: MediaContent = {
+                                        id: podcast.uid_serie,
+                                        type: MediaType.Podcast,
+                                        title: podcast.title_serie,
+                                        author: '',
+                                        theme: '',
+                                        imageUrl: podcast.back_path || podcast.image_path,
+                                        duration: podcast.runtime_h_m,
+                                        description: podcast.overview_serie,
+                                        languages: [],
+                                        video_path_hd: ''
+                                    };
+                                    return (
+                                        <div key={podcast.uid_serie} className="flex-shrink-0 w-40 md:w-48 lg:w-52 group cursor-pointer" onClick={() => onSelectMedia(mediaContent)}>
+                                            <div className="relative aspect-[2/3] rounded overflow-hidden mb-3 transition-transform duration-300 group-hover:scale-105">
+                                                <img
+                                                    src={mediaContent.imageUrl}
+                                                    alt={mediaContent.title}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                                {/* Overlay au hover */}
+                                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                                                    <div className="w-14 h-14 rounded-full bg-white/95 flex items-center justify-center shadow-2xl">
+                                                        <PlayIcon className="w-7 h-7 text-gray-900 ml-1" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <h4 className="text-white text-sm md:text-base font-semibold truncate group-hover:text-red-500 transition-colors">
+                                                {mediaContent.title}
+                                            </h4>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Section Most Watched */}
                     {mostWatchedItems.length > 0 && (
                         <div className="py-6 md:py-8 lg:py-10 mt-4 md:mt-6">
@@ -517,7 +736,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
     // Mode Prime Video - Layout inspiré d'Amazon Prime Video
     if (viewMode === 'prime') {
         return (
-            <div className="min-h-screen bg-black">
+            <div className="min-h-screen bg-[#FBF9F3] dark:bg-black">
 
                 {/* Hero Section Prime Video */}
                 <div className="animate-fadeIn">
@@ -532,18 +751,30 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                 <InfoBar />
 
                 {/* Sections horizontales style Prime Video */}
-                <div className="bg-black">
+                <div className="bg-[#FBF9F3] dark:bg-black">
                     {/* Section Continue Watching */}
+                    {loadingContinueWatching && (
+                        <div className="py-8 md:py-12">
+                            <div className="px-4 md:px-6 lg:px-8 mb-6">
+                                <div className="h-8 w-64 bg-gray-200 dark:bg-gray-800 rounded animate-pulse"></div>
+                            </div>
+                            <div className="flex space-x-4 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-4">
+                                {[...Array(3)].map((_, i) => (
+                                    <div key={i} className="flex-shrink-0 w-56 md:w-64 lg:w-72">
+                                        <div className="aspect-video bg-gray-200 dark:bg-gray-800 rounded-lg animate-pulse mb-3"></div>
+                                        <div className="h-4 w-3/4 bg-gray-200 dark:bg-gray-800 rounded animate-pulse"></div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                     {continueWatchingItems.length > 0 && (
                         <div className="py-8 md:py-12">
                             <div className="px-4 md:px-6 lg:px-8 mb-6">
                                 <div className="flex items-center justify-between">
-                                    <h3 className="text-2xl md:text-3xl font-bold text-white">
+                                    <h3 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
                                         {t('continueWatching') || 'Continuer la lecture'}
                                     </h3>
-                                    <button className="text-sm md:text-base text-blue-400 hover:text-blue-300 font-semibold transition-colors">
-                                        Voir plus →
-                                    </button>
                                 </div>
                             </div>
                             <div className="flex space-x-3 md:space-x-4 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-4">
@@ -569,7 +800,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                                                 </div>
                                             </div>
                                         </div>
-                                        <h4 className="text-white text-sm md:text-base font-semibold truncate group-hover:text-blue-400 transition-colors">
+                                        <h4 className="text-gray-900 dark:text-white text-sm md:text-base font-semibold truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                                             {item.title}
                                         </h4>
                                     </div>
@@ -578,17 +809,158 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                         </div>
                     )}
 
+                    {/* Section Films */}
+                    {movies.length > 0 && (
+                        <div className="py-6 md:py-8 lg:py-10 mt-4 md:mt-6">
+                            <div className="px-4 md:px-6 lg:px-8 mb-6">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
+                                        {t('films') || 'Films'}
+                                    </h3>
+                                    <button
+                                        onClick={() => navigateToCategory(MediaType.Movie)}
+                                        className="text-sm md:text-base text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold transition-colors"
+                                    >
+                                        {t('viewAll') || 'Voir plus'} →
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="flex space-x-3 md:space-x-4 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-4">
+                                {movies.map((movie) => {
+                                    const mediaContent: MediaContent = {
+                                        id: movie.uid,
+                                        type: MediaType.Movie,
+                                        title: movie.title,
+                                        author: movie.original_title,
+                                        theme: '',
+                                        imageUrl: movie.backdrop_path || movie.picture_path || movie.poster_path,
+                                        duration: movie.runtime_h_m,
+                                        description: movie.overview,
+                                        languages: [movie.original_language],
+                                        video_path_hd: movie.video_path_hd
+                                    };
+                                    return (
+                                        <PrimeMediaCard
+                                            key={movie.uid}
+                                            item={mediaContent}
+                                            onSelect={onSelectMedia}
+                                            onPlay={onPlay}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Section Séries */}
+                    {series.length > 0 && (
+                        <div className="py-6 md:py-8 lg:py-10 mt-4 md:mt-6">
+                            <div className="px-4 md:px-6 lg:px-8 mb-6">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
+                                        {t('seriesTitle') || 'Séries'}
+                                    </h3>
+                                    <button
+                                        onClick={() => navigateToCategory(MediaType.Series)}
+                                        className="text-sm md:text-base text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold transition-colors"
+                                    >
+                                        {t('viewAll') || 'Voir plus'} →
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="flex space-x-3 md:space-x-4 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-4">
+                                {series.map((serie) => {
+                                    const mediaContent: MediaContent = {
+                                        id: serie.uid_serie,
+                                        type: MediaType.Series,
+                                        title: serie.title_serie,
+                                        author: '',
+                                        theme: '',
+                                        imageUrl: serie.back_path || serie.image_path,
+                                        duration: serie.runtime_h_m,
+                                        description: serie.overview_serie,
+                                        languages: [],
+                                        video_path_hd: ''
+                                    };
+                                    return (
+                                        <PrimeMediaCard
+                                            key={serie.uid_serie}
+                                            item={mediaContent}
+                                            onSelect={onSelectMedia}
+                                            onPlay={onPlay}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Section Podcasts */}
+                    {podcasts.length > 0 && (
+                        <div className="py-6 md:py-8 lg:py-10 mt-4 md:mt-6">
+                            <div className="px-4 md:px-6 lg:px-8 mb-6">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
+                                        {t('podcastsTitle') || 'Podcasts'}
+                                    </h3>
+                                    <button
+                                        onClick={() => navigateToCategory(MediaType.Podcast)}
+                                        className="text-sm md:text-base text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold transition-colors"
+                                    >
+                                        {t('viewAll') || 'Voir plus'} →
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="flex space-x-3 md:space-x-4 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-4">
+                                {podcasts.map((podcast) => {
+                                    const mediaContent: MediaContent = {
+                                        id: podcast.uid_serie,
+                                        type: MediaType.Podcast,
+                                        title: podcast.title_serie,
+                                        author: '',
+                                        theme: '',
+                                        imageUrl: podcast.back_path || podcast.image_path,
+                                        duration: podcast.runtime_h_m,
+                                        description: podcast.overview_serie,
+                                        languages: [],
+                                        video_path_hd: ''
+                                    };
+                                    return (
+                                        <PrimeMediaCard
+                                            key={podcast.uid_serie}
+                                            item={mediaContent}
+                                            onSelect={onSelectMedia}
+                                            onPlay={onPlay}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Section Most Watched */}
+                    {loadingMostWatched && (
+                        <div className="py-6 md:py-8 lg:py-10 mt-4 md:mt-6">
+                            <div className="px-4 md:px-6 lg:px-8 mb-6">
+                                <div className="h-8 w-64 bg-gray-200 dark:bg-gray-800 rounded animate-pulse"></div>
+                            </div>
+                            <div className="flex space-x-3 md:space-x-4 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-4">
+                                {[...Array(5)].map((_, i) => (
+                                    <div key={i} className="flex-shrink-0 w-40 md:w-48 lg:w-52">
+                                        <div className="aspect-[2/3] bg-gray-200 dark:bg-gray-800 rounded animate-pulse mb-3"></div>
+                                        <div className="h-4 w-3/4 bg-gray-200 dark:bg-gray-800 rounded animate-pulse"></div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                     {mostWatchedItems.length > 0 && (
                         <div className="py-6 md:py-8 lg:py-10 mt-4 md:mt-6">
                             <div className="px-4 md:px-6 lg:px-8 mb-6">
                                 <div className="flex items-center justify-between">
-                                    <h3 className="text-2xl md:text-3xl font-bold text-white">
+                                    <h3 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
                                         {t('mostWatched') || 'Les plus regardés'}
                                     </h3>
-                                    <button className="text-sm md:text-base text-blue-400 hover:text-blue-300 font-semibold transition-colors">
-                                        Voir plus →
-                                    </button>
                                 </div>
                             </div>
                             <div className="flex space-x-3 md:space-x-4 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-4">
@@ -606,16 +978,28 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                     )}
 
                     {/* Section Most Liked */}
+                    {loadingMostLiked && (
+                        <div className="py-6 md:py-8 lg:py-10 mt-4 md:mt-6">
+                            <div className="px-4 md:px-6 lg:px-8 mb-6">
+                                <div className="h-8 w-64 bg-gray-200 dark:bg-gray-800 rounded animate-pulse"></div>
+                            </div>
+                            <div className="flex space-x-3 md:space-x-4 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-4">
+                                {[...Array(5)].map((_, i) => (
+                                    <div key={i} className="flex-shrink-0 w-40 md:w-48 lg:w-52">
+                                        <div className="aspect-[2/3] bg-gray-200 dark:bg-gray-800 rounded animate-pulse mb-3"></div>
+                                        <div className="h-4 w-3/4 bg-gray-200 dark:bg-gray-800 rounded animate-pulse"></div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                     {mostLikedItems.length > 0 && (
                         <div className="py-6 md:py-8 lg:py-10 mt-4 md:mt-6">
                             <div className="px-4 md:px-6 lg:px-8 mb-6">
                                 <div className="flex items-center justify-between">
-                                    <h3 className="text-2xl md:text-3xl font-bold text-white">
+                                    <h3 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
                                         {t('mostLiked') || 'Les plus aimés'}
                                     </h3>
-                                    <button className="text-sm md:text-base text-blue-400 hover:text-blue-300 font-semibold transition-colors">
-                                        Voir plus →
-                                    </button>
                                 </div>
                             </div>
                             <div className="flex space-x-3 md:space-x-4 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-4">
@@ -674,8 +1058,191 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                 ) : null}
             </div>
 
-            {/* Section Most Liked - Animation d'entrée décalée */}
+            {/* Section Films - Animation d'entrée décalée */}
+            <div className="animate-fadeIn" style={{ animationDelay: '375ms' }}>
+                {loadingMovies ? (
+                    <section className="py-8 md:py-12 relative group">
+                        <div className="px-4 md:px-6 lg:px-8 mb-6">
+                            <h3 className="text-2xl md:text-3xl lg:text-4xl font-black text-gray-900 dark:text-white tracking-tight">
+                                {t('films') || 'Films'}
+                            </h3>
+                        </div>
+                        <div className="flex space-x-4 md:space-x-6 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-6">
+                            {[...Array(10)].map((_, i) => (
+                                <MediaCardSkeleton key={i} />
+                            ))}
+                        </div>
+                    </section>
+                ) : movies.length > 0 && (
+                    <section className="py-8 md:py-12 relative group">
+                        {/* Titre avec bouton Voir tout */}
+                        <div className="px-4 md:px-6 lg:px-8 mb-6">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-2xl md:text-3xl lg:text-4xl font-black text-gray-900 dark:text-white tracking-tight">
+                                    {t('films') || 'Films'}
+                                </h3>
+                                <button
+                                    onClick={() => navigateToCategory(MediaType.Movie)}
+                                    className="text-sm md:text-base font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors flex items-center gap-2"
+                                >
+                                    {t('viewAll') || 'Voir tout'}
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Carrousel de films */}
+                        <div className="flex space-x-4 md:space-x-6 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-6 scroll-smooth snap-x snap-mandatory">
+                            {movies.map((movie) => {
+                                const mediaContent: MediaContent = {
+                                    id: movie.uid,
+                                    type: MediaType.Movie,
+                                    title: movie.title,
+                                    author: movie.original_title,
+                                    theme: '',
+                                    imageUrl: movie.backdrop_path || movie.picture_path || movie.poster_path,
+                                    duration: movie.runtime_h_m,
+                                    description: movie.overview,
+                                    languages: [movie.original_language],
+                                    video_path_hd: movie.video_path_hd
+                                };
+                                return (
+                                    <div key={movie.uid} className="snap-start flex-shrink-0">
+                                        <MediaCard item={mediaContent} variant="poster" onSelect={onSelectMedia} onPlay={onPlay} />
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </section>
+                )}
+            </div>
+
+            {/* Section Séries - Animation d'entrée décalée */}
             <div className="animate-fadeIn" style={{ animationDelay: '450ms' }}>
+                {loadingSeries ? (
+                    <section className="py-8 md:py-12 relative group">
+                        <div className="px-4 md:px-6 lg:px-8 mb-6">
+                            <h3 className="text-2xl md:text-3xl lg:text-4xl font-black text-gray-900 dark:text-white tracking-tight">
+                                {t('seriesTitle') || 'Séries'}
+                            </h3>
+                        </div>
+                        <div className="flex space-x-4 md:space-x-6 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-6">
+                            {[...Array(10)].map((_, i) => (
+                                <MediaCardSkeleton key={i} />
+                            ))}
+                        </div>
+                    </section>
+                ) : series.length > 0 && (
+                    <section className="py-8 md:py-12 relative group">
+                        {/* Titre avec bouton Voir tout */}
+                        <div className="px-4 md:px-6 lg:px-8 mb-6">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-2xl md:text-3xl lg:text-4xl font-black text-gray-900 dark:text-white tracking-tight">
+                                    {t('seriesTitle') || 'Séries'}
+                                </h3>
+                                <button
+                                    onClick={() => navigateToCategory(MediaType.Series)}
+                                    className="text-sm md:text-base font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors flex items-center gap-2"
+                                >
+                                    {t('viewAll') || 'Voir tout'}
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Carrousel de séries */}
+                        <div className="flex space-x-4 md:space-x-6 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-6 scroll-smooth snap-x snap-mandatory">
+                            {series.map((serie) => {
+                                const mediaContent: MediaContent = {
+                                    id: serie.uid_serie,
+                                    type: MediaType.Series,
+                                    title: serie.title_serie,
+                                    author: '',
+                                    theme: '',
+                                    imageUrl: serie.back_path || serie.image_path,
+                                    duration: serie.runtime_h_m,
+                                    description: serie.overview_serie,
+                                    languages: [],
+                                    video_path_hd: ''
+                                };
+                                return (
+                                    <div key={serie.uid_serie} className="snap-start flex-shrink-0">
+                                        <MediaCard item={mediaContent} variant="poster" onSelect={onSelectMedia} onPlay={onPlay} />
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </section>
+                )}
+            </div>
+
+            {/* Section Podcasts - Animation d'entrée décalée */}
+            <div className="animate-fadeIn" style={{ animationDelay: '525ms' }}>
+                {loadingPodcasts ? (
+                    <section className="py-8 md:py-12 relative group">
+                        <div className="px-4 md:px-6 lg:px-8 mb-6">
+                            <h3 className="text-2xl md:text-3xl lg:text-4xl font-black text-gray-900 dark:text-white tracking-tight">
+                                {t('podcastsTitle') || 'Podcasts'}
+                            </h3>
+                        </div>
+                        <div className="flex space-x-4 md:space-x-6 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-6">
+                            {[...Array(10)].map((_, i) => (
+                                <MediaCardSkeleton key={i} />
+                            ))}
+                        </div>
+                    </section>
+                ) : podcasts.length > 0 && (
+                    <section className="py-8 md:py-12 relative group">
+                        {/* Titre avec bouton Voir tout */}
+                        <div className="px-4 md:px-6 lg:px-8 mb-6">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-2xl md:text-3xl lg:text-4xl font-black text-gray-900 dark:text-white tracking-tight">
+                                    {t('podcastsTitle') || 'Podcasts'}
+                                </h3>
+                                <button
+                                    onClick={() => navigateToCategory(MediaType.Podcast)}
+                                    className="text-sm md:text-base font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors flex items-center gap-2"
+                                >
+                                    {t('viewAll') || 'Voir tout'}
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Carrousel de podcasts */}
+                        <div className="flex space-x-4 md:space-x-6 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-6 scroll-smooth snap-x snap-mandatory">
+                            {podcasts.map((podcast) => {
+                                const mediaContent: MediaContent = {
+                                    id: podcast.uid_serie,
+                                    type: MediaType.Podcast,
+                                    title: podcast.title_serie,
+                                    author: '',
+                                    theme: '',
+                                    imageUrl: podcast.back_path || podcast.image_path,
+                                    duration: podcast.runtime_h_m,
+                                    description: podcast.overview_serie,
+                                    languages: [],
+                                    video_path_hd: ''
+                                };
+                                return (
+                                    <div key={podcast.uid_serie} className="snap-start flex-shrink-0">
+                                        <MediaCard item={mediaContent} variant="poster" onSelect={onSelectMedia} onPlay={onPlay} />
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </section>
+                )}
+            </div>
+
+            {/* Section Most Liked - Animation d'entrée décalée */}
+            <div className="animate-fadeIn" style={{ animationDelay: '600ms' }}>
                 {loadingMostLiked ? (
                     <MostLikedSkeleton />
                 ) : mostLikedItems.length > 0 && (
@@ -689,7 +1256,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
             </div>
 
             {/* Section Most Watched - Animation d'entrée décalée */}
-            <div className="animate-fadeIn" style={{ animationDelay: '600ms' }}>
+            <div className="animate-fadeIn" style={{ animationDelay: '675ms' }}>
                 {loadingMostWatched ? (
                     <MostLikedSkeleton />
                 ) : mostWatchedItems.length > 0 && (
@@ -703,7 +1270,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
             </div>
 
             {/* Section Active Now - Visible uniquement pour les administrateurs */}
-{/*             {user?.isAdmin && (
+            {/*             {user?.isAdmin && (
                 <div className="space-y-4">
                     {loadingUsers ? (
                         <section className="py-4">

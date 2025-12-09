@@ -11,11 +11,11 @@ interface HistoryCardProps {
 
 export const HistoryCard: React.FC<HistoryCardProps> = ({ item, onClick }) => {
     return (
-        <div 
-            onClick={onClick}
-            className="h-full flex flex-col group"
-        >
-            <div className="relative flex-1 flex flex-col rounded-xl overflow-hidden bg-[#f5f5f5] dark:bg-gray-900/70 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-200 dark:border-gray-700 hover:border-amber-500/30">
+        <div className="h-full flex flex-col">
+            <div 
+                onClick={onClick}
+                className="relative flex-1 flex flex-col rounded-xl overflow-hidden bg-[#f5f5f5] dark:bg-gray-900/70 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-200 dark:border-gray-700 hover:border-amber-500/30 group"
+            >
                 {/* Image container */}
                 <div className="relative w-full aspect-video overflow-hidden">
                     <img
@@ -68,6 +68,7 @@ interface HistorySectionProps {
     title?: string;
     showViewAll?: boolean;
     onViewAll?: () => void;
+    isLoading?: boolean;
 }
 
 const HistorySection: React.FC<HistorySectionProps> = ({
@@ -75,31 +76,32 @@ const HistorySection: React.FC<HistorySectionProps> = ({
     onItemClick,
     title = 'Mon historique',
     showViewAll = false,
-    onViewAll
+    onViewAll,
+    isLoading = false
 }) => {
-    if (items.length === 0) {
+    if (items.length === 0 && !isLoading) {
         return null;
     }
 
     return (
-        <div className="mb-12">
-            <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
-                        {title}
-                    </h2>
-                    {showViewAll && onViewAll && (
-                        <button
-                            onClick={onViewAll}
-                            className="flex items-center text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 font-medium text-sm md:text-base transition-colors group"
-                        >
-                            Voir tout
-                            <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                        </button>
-                    )}
-                </div>
+        <section className="px-4 py-4">
+            <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                    {title}
+                </h3>
+                {showViewAll && onViewAll && (
+                    <button
+                        onClick={onViewAll}
+                        className="flex items-center text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 font-medium text-sm transition-colors group"
+                    >
+                        Voir tout
+                        <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                    </button>
+                )}
+            </div>
+            <div className="border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
 
                 <div className="relative group overflow-hidden">
                     <div 
@@ -112,22 +114,48 @@ const HistorySection: React.FC<HistorySectionProps> = ({
                         }}
                     >
                         <div className="flex space-x-4 px-2 py-1">
-                            {items.map((item) => (
-                                <div 
-                                    key={item.id} 
-                                    className="flex-none w-48 sm:w-56 md:w-64 lg:w-72 xl:w-80 2xl:w-96 transition-all duration-300 hover:scale-[1.02]"
-                                >
-                                    <HistoryCard
-                                        item={item}
-                                        onClick={() => onItemClick(item)}
-                                    />
-                                </div>
-                            ))}
+                            {isLoading ? (
+                                // Skeleton loaders
+                                [...Array(5)].map((_, i) => (
+                                    <div 
+                                        key={`skeleton-${i}`} 
+                                        className="flex-none w-48 sm:w-56 md:w-64 lg:w-72 xl:w-80 2xl:w-96"
+                                    >
+                                        <div className="h-full flex flex-col">
+                                            <div className="relative aspect-video bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-800 dark:via-gray-700 dark:to-gray-800 rounded-lg overflow-hidden animate-shimmer bg-[length:200%_100%]">
+                                                <div className="absolute inset-0 flex items-center justify-center">
+                                                    <div className="w-12 h-12 rounded-full bg-white/20 dark:bg-black/20 animate-pulse" />
+                                                </div>
+                                                <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-gray-300 dark:bg-gray-700">
+                                                    <div className="h-full bg-gray-400 dark:bg-gray-600 w-1/2" />
+                                                </div>
+                                            </div>
+                                            <div className="mt-2 space-y-1">
+                                                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 animate-pulse" />
+                                                <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2 animate-pulse" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                // Contenu réel
+                                items.map((item) => (
+                                    <div 
+                                        key={item.id} 
+                                        className="flex-none w-48 sm:w-56 md:w-64 lg:w-72 xl:w-80 2xl:w-96 transition-all duration-300 hover:scale-[1.02]"
+                                    >
+                                        <HistoryCard
+                                            item={item}
+                                            onClick={() => onItemClick(item)}
+                                        />
+                                    </div>
+                                ))
+                            )}
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </section>
     );
 };
 

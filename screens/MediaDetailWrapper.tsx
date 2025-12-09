@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { MediaContent, MediaType } from '../types';
 import { movieService, serieService } from '../lib/firestore';
 import MediaDetailScreen from './MediaDetailScreen';
+import { useAppContext } from '../context/AppContext';
 
 interface MediaDetailWrapperProps {
     onPlay: (media: MediaContent) => void;
@@ -10,6 +11,7 @@ interface MediaDetailWrapperProps {
 }
 
 const MediaDetailWrapper: React.FC<MediaDetailWrapperProps> = ({ onPlay, playingItem }) => {
+    const { t } = useAppContext();
     const { uid } = useParams<{ uid: string }>();
     const navigate = useNavigate();
     const [media, setMedia] = useState<MediaContent | null>(null);
@@ -106,7 +108,7 @@ const MediaDetailWrapper: React.FC<MediaDetailWrapperProps> = ({ onPlay, playing
     if (loading) {
         return (
             <div className="min-h-screen bg-black flex items-center justify-center">
-                <div className="text-white text-xl">Chargement...</div>
+                <div className="text-white text-xl">{t('loading') || 'Chargement...'}</div>
             </div>
         );
     }

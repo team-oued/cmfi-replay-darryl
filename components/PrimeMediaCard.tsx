@@ -66,8 +66,16 @@ const PrimeMediaCard: React.FC<PrimeMediaCardProps> = ({
 
                 {/* Numéro de classement en haut à droite */}
                 {rank && (
-                    <div className={`absolute top-3 right-3 z-10 px-3 py-1.5 text-white text-base md:text-lg font-bold rounded shadow-xl ${
-                        theme === 'dark' ? 'bg-amber-600' : 'bg-amber-500'
+                    <div className={`absolute top-3 right-3 z-10 w-8 h-8 flex items-center justify-center text-white text-base md:text-lg font-bold rounded-full shadow-xl ${
+                        rank === 1 
+                            ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-yellow-900' // Or
+                            : rank === 2 
+                                ? 'bg-gradient-to-br from-gray-300 to-gray-500 text-gray-800' // Argent
+                                : rank === 3 
+                                    ? 'bg-gradient-to-br from-amber-600 to-amber-800 text-amber-100' // Bronze
+                                    : theme === 'dark' 
+                                        ? 'bg-blue-600' 
+                                        : 'bg-blue-500'
                     }`}>
                         {rank}
                     </div>
@@ -98,16 +106,6 @@ const PrimeMediaCard: React.FC<PrimeMediaCardProps> = ({
                     <h3 className="text-white text-lg md:text-xl lg:text-2xl font-bold mb-3 line-clamp-2 drop-shadow-2xl leading-tight">
                         {title}
                     </h3>
-                    
-                    {/* Logo CMFI Replay */}
-                    <div className="flex items-center">
-                        {/* Logo CMFI Replay style Amazon */}
-                        <div className={`px-3 py-1 rounded flex items-center justify-center ${
-                            theme === 'dark' ? 'bg-amber-600' : 'bg-amber-500'
-                        }`}>
-                            <span className="text-white text-[10px] md:text-xs font-bold tracking-wide">cmfireplay</span>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>

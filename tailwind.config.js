@@ -13,6 +13,9 @@ module.exports = {
           dark: '#000000', // Noir pour le mode sombre
         },
       },
+      fontFamily: {
+        sans: ['Poppins', 'sans-serif'],
+      },
     },
   },
   plugins: [],

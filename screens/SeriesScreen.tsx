@@ -13,7 +13,7 @@ interface SeriesScreenProps {
 
 type ViewMode = 'grid' | 'list';
 type SortOption = 'title' | 'newest' | 'oldest' | 'seasons';
-type FilterOption = 'all' | 'premium' | 'free';
+type FilterOption = 'all' | 'premiumContent' | 'free';
 
 interface SerieWithStats extends MediaContent {
     seasonsCount?: number;
@@ -288,7 +288,7 @@ const SeriesScreen: React.FC<SeriesScreenProps> = ({ onSelectMedia, onPlay }) =>
         }
 
         // Filtre Premium/Free
-        if (filterOption === 'premium') {
+        if (filterOption === 'premiumContent') {
             filtered = filtered.filter(serie => serie.is_premium);
         } else if (filterOption === 'free') {
             filtered = filtered.filter(serie => !serie.is_premium);
@@ -320,7 +320,7 @@ const SeriesScreen: React.FC<SeriesScreenProps> = ({ onSelectMedia, onPlay }) =>
     return (
         <div className="min-h-screen bg-[#FBF9F3] dark:bg-black animate-fadeIn pb-8">
             {/* Header avec recherche et contrôles */}
-            <div className="sticky top-16 z-10 bg-[#FBF9F3] dark:bg-black border-b border-gray-200 dark:border-gray-800 backdrop-blur-sm">
+            <div className="sticky top-16 z-30 bg-[#FBF9F3] dark:bg-black border-b border-gray-200 dark:border-gray-800 backdrop-blur-md shadow-sm">
                 <div className="px-4 md:px-6 lg:px-8 py-4 space-y-4">
                     {/* Barre de navigation supérieure */}
                     <div className="flex items-center justify-between">
@@ -370,7 +370,7 @@ const SeriesScreen: React.FC<SeriesScreenProps> = ({ onSelectMedia, onPlay }) =>
                             <span className="text-sm">{t('filters') || 'Filtres'}</span>
                             {filterOption !== 'all' && (
                                 <span className="ml-1 px-1.5 py-0.5 bg-gray-900 text-white text-xs rounded-full">
-                                    {filterOption === 'premium' ? 'Premium' : 'Gratuit'}
+                                    {filterOption === 'premiumContent' ? 'Premium' : 'Gratuit'}
                                 </span>
                             )}
                         </button>
@@ -440,9 +440,9 @@ const SeriesScreen: React.FC<SeriesScreenProps> = ({ onSelectMedia, onPlay }) =>
                                     {t('all') || 'Toutes'}
                                 </button>
                                 <button
-                                    onClick={() => setFilterOption('premium')}
+                                    onClick={() => setFilterOption('premiumContent')}
                                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                                        filterOption === 'premium'
+                                        filterOption === 'premiumContent'
                                             ? 'bg-amber-500 text-gray-900'
                                             : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
                                     }`}
@@ -451,7 +451,7 @@ const SeriesScreen: React.FC<SeriesScreenProps> = ({ onSelectMedia, onPlay }) =>
                                         <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                                             <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
                                         </svg>
-                                        {t('premium') || 'Premium'}
+                                        {t('premiumContent') || 'Premium'}
                                     </span>
                                 </button>
                                 <button
@@ -471,7 +471,7 @@ const SeriesScreen: React.FC<SeriesScreenProps> = ({ onSelectMedia, onPlay }) =>
             </div>
 
             {/* Contenu principal */}
-            <div className="px-4 md:px-6 lg:px-8 pt-6">
+            <div className="relative px-4 md:px-6 lg:px-8 pt-6 z-10">
                 {loading ? (
                     <div className="flex items-center justify-center py-20">
                         <div className="text-center space-y-4">
@@ -486,7 +486,7 @@ const SeriesScreen: React.FC<SeriesScreenProps> = ({ onSelectMedia, onPlay }) =>
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                                {searchTerm ? t('noResults') || 'Aucun résultat' : t('noSeries') || 'Aucune série'}
+                                {searchTerm ? t('noSearchResults') || 'Aucun résultat' : t('noSeries') || 'Aucune série'}
                             </h3>
                             <p className="text-gray-600 dark:text-gray-400">
                                 {searchTerm
@@ -515,7 +515,7 @@ const SeriesScreen: React.FC<SeriesScreenProps> = ({ onSelectMedia, onPlay }) =>
 
                         {/* Grille ou Liste selon le mode */}
                         {viewMode === 'grid' ? (
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6">
+                            <div className="relative grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6 z-0">
                                 {filteredAndSortedSeries.map((serie) => (
                                     <SeriesCard
                                         key={serie.id}
@@ -527,7 +527,7 @@ const SeriesScreen: React.FC<SeriesScreenProps> = ({ onSelectMedia, onPlay }) =>
                                 ))}
                             </div>
                         ) : (
-                            <div className="space-y-2">
+                            <div className="relative space-y-2 z-0">
                                 {filteredAndSortedSeries.map((serie) => (
                                     <SeriesCard
                                         key={serie.id}

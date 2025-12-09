@@ -31,18 +31,18 @@ const MediaCard: React.FC<MediaCardProps> = ({ item, variant = 'thumbnail', onSe
 
   if (variant === 'poster') {
     return (
-      <div onClick={handleSelect} className="flex-shrink-0 w-36 md:w-48 space-y-2.5 cursor-pointer group">
+      <div onClick={handleSelect} className="flex-shrink-0 w-36 md:w-48 space-y-2.5 cursor-pointer group relative">
         <div className={`relative aspect-[2/3] bg-gray-200 dark:bg-gray-700 rounded-lg md:rounded-xl overflow-hidden ${
           is_premium ? 'ring-2 ring-amber-400/60' : ''
         }`}>
           {is_premium && (
             <>
               {/* Effet de brillance sur la bordure */}
-              <div className="absolute inset-0 rounded-lg md:rounded-xl border-2 border-transparent bg-gradient-to-br from-amber-300 via-yellow-400 to-amber-500 opacity-60 pointer-events-none" style={{ padding: '2px' }}>
+              <div className="absolute inset-0 z-0 rounded-lg md:rounded-xl border-2 border-transparent bg-gradient-to-br from-amber-300 via-yellow-400 to-amber-500 opacity-60 pointer-events-none">
                 <div className="w-full h-full bg-gray-900 dark:bg-black rounded-lg md:rounded-xl"></div>
               </div>
               {/* Badge Premium */}
-              <div className="absolute top-2 right-2 z-10 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-black/90 border border-amber-400/50">
+              <div className="absolute top-2 right-2 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-black/90 border border-amber-400/50 backdrop-blur-sm">
                 <CrownIcon />
                 <span className="text-xs font-semibold text-amber-300">Premium</span>
               </div>
@@ -51,13 +51,13 @@ const MediaCard: React.FC<MediaCardProps> = ({ item, variant = 'thumbnail', onSe
           <img 
             src={imageUrl} 
             alt={title} 
-            className="w-full h-full object-cover relative z-0 transition-transform duration-700 group-hover:scale-110" 
+            className="w-full h-full object-cover relative z-10 transition-transform duration-700 group-hover:scale-110" 
           />
           <div
             onClick={handlePlay}
-            className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-500 z-10"
+            className="absolute inset-0 z-30 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-500"
           >
-            <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-white/20 flex items-center justify-center border-2 border-white/40 transition-transform duration-300">
+            <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-white/20 flex items-center justify-center border-2 border-white/40 transition-transform duration-300 group-hover:scale-110">
               <PlayIcon className="w-8 h-8 md:w-10 md:h-10 text-white ml-1" />
             </div>
           </div>
@@ -84,19 +84,19 @@ const MediaCard: React.FC<MediaCardProps> = ({ item, variant = 'thumbnail', onSe
           is_premium ? 'ring-1 ring-amber-400/50' : ''
         }`}>
           {is_premium && (
-            <div className="absolute top-1.5 right-1.5 z-10 p-1 bg-black/85 backdrop-blur-sm rounded-md">
+            <div className="absolute top-1.5 right-1.5 z-20 p-1 bg-black/85 backdrop-blur-sm rounded-md">
               <CrownIcon />
             </div>
           )}
           <img 
             src={imageUrl} 
             alt={title} 
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+            className="w-full h-full object-cover relative z-10 transition-transform duration-500 group-hover:scale-110" 
           />
           {/* Overlay au hover */}
           <div
             onClick={handlePlay}
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300"
+            className="absolute inset-0 z-30 bg-black/60 backdrop-blur-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300"
           >
             <div className="w-12 h-12 rounded-full bg-white/95 flex items-center justify-center shadow-2xl transform group-hover:scale-110 transition-transform duration-300">
               <PlayIcon className="w-6 h-6 text-gray-900 ml-0.5" />
@@ -148,18 +148,18 @@ const MediaCard: React.FC<MediaCardProps> = ({ item, variant = 'thumbnail', onSe
 
   // Default variant: 'thumbnail'
   return (
-    <div onClick={handleSelect} className="flex-shrink-0 w-64 md:w-80 space-y-2.5 cursor-pointer group">
+    <div onClick={handleSelect} className="flex-shrink-0 w-64 md:w-80 space-y-2.5 cursor-pointer group relative">
       <div className={`relative aspect-video bg-gray-300 dark:bg-gray-700 rounded-lg md:rounded-xl overflow-hidden ${
         is_premium ? 'ring-2 ring-amber-400/60' : ''
       }`}>
         {is_premium && (
           <>
             {/* Effet de brillance animé sur la bordure */}
-            <div className="absolute inset-0 rounded-lg md:rounded-xl pointer-events-none z-20">
+            <div className="absolute inset-0 z-0 rounded-lg md:rounded-xl pointer-events-none">
               <div className="absolute inset-0 rounded-lg md:rounded-xl border-2 border-transparent bg-gradient-to-br from-amber-300 via-yellow-400 to-amber-500 opacity-50 animate-pulse"></div>
             </div>
             {/* Badge Premium Content avec icône couronne */}
-            <div className="absolute top-3 left-3 z-30 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/90 border border-amber-400/60">
+            <div className="absolute top-3 left-3 z-20 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/90 border border-amber-400/60 backdrop-blur-sm">
               <CrownIcon />
               <span className="text-sm font-semibold bg-gradient-to-r from-amber-300 to-yellow-400 bg-clip-text text-transparent">
                 Premium Content
@@ -170,13 +170,13 @@ const MediaCard: React.FC<MediaCardProps> = ({ item, variant = 'thumbnail', onSe
         <img 
           src={imageUrl} 
           alt={title} 
-          className="w-full h-full object-cover relative z-0 transition-transform duration-700 group-hover:scale-110" 
+          className="w-full h-full object-cover relative z-10 transition-transform duration-700 group-hover:scale-110" 
         />
         <div
           onClick={handlePlay}
-          className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-500 z-10"
+          className="absolute inset-0 z-30 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-500"
         >
-          <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-white/20 flex items-center justify-center border-2 border-white/40 transition-transform duration-300">
+          <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-white/20 flex items-center justify-center border-2 border-white/40 transition-transform duration-300 group-hover:scale-110">
             <PlayIcon className="w-10 h-10 md:w-12 md:h-12 text-white ml-1" />
           </div>
         </div>

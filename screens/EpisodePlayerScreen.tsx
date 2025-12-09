@@ -426,7 +426,7 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
                         <div className="glide-spinner__circle"></div>
                         <div className="glide-spinner__circle"></div>
                     </div>
-                    <div className="glide-spinner__label text-amber-400 text-sm font-medium mt-6">Chargement en cours</div>
+                    <div className="glide-spinner__label text-amber-400 text-sm font-medium mt-6">{t('loadingInProgress') || 'Chargement en cours'}</div>
                 </div>
             </div>
             <video ref={videoRef} src={src} poster={poster} className="w-full h-full" onClick={togglePlay} onError={() => setUnavailable(true)} />
@@ -515,10 +515,10 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
 const CommentItem: React.FC<{ comment: Comment }> = ({ comment }) => (
     <div className="flex items-start space-x-3 group">
         <div className="relative flex-shrink-0">
-            <img 
-                src={comment.user_photo_url || generateDefaultAvatar(comment.created_by)} 
-                alt={comment.created_by} 
-                className="w-12 h-12 rounded-full ring-2 ring-amber-500/20 group-hover:ring-amber-500/40 transition-all duration-300" 
+            <img
+                src={comment.user_photo_url || generateDefaultAvatar(comment.created_by)}
+                alt={comment.created_by}
+                className="w-12 h-12 rounded-full ring-2 ring-amber-500/20 group-hover:ring-amber-500/40 transition-all duration-300"
             />
         </div>
         <div className="flex-1 min-w-0">
@@ -537,14 +537,19 @@ const CommentSection: React.FC<{ itemUid: string, onAuthRequired: (action: strin
     const { t, userProfile } = useAppContext();
     const [comments, setComments] = useState<Comment[]>([]);
     const [newComment, setNewComment] = useState('');
-    const [sortBy, setSortBy] = useState<'recent' | 'top'>('recent');
     const MAX_COMMENT_LENGTH = 280;
 
     useEffect(() => {
         const fetchComments = async () => {
             if (!itemUid) return;
             const fetchedComments = await commentService.getComments(itemUid);
-            setComments(fetchedComments.reverse());
+            // Tri par date décroissante
+            const sortedComments = [...fetchedComments].sort((a, b) => {
+                const dateA = new Date(a.created_at).getTime();
+                const dateB = new Date(b.created_at).getTime();
+                return dateB - dateA; // Tri décroissant
+            });
+            setComments(sortedComments);
         };
         fetchComments();
     }, [itemUid]);
@@ -574,10 +579,6 @@ const CommentSection: React.FC<{ itemUid: string, onAuthRequired: (action: strin
     };
 
 
-    const sortedComments = useMemo(() => {
-        return comments;
-    }, [comments, sortBy]);
-
     const charCountColor = newComment.length > MAX_COMMENT_LENGTH
         ? 'text-red-500'
         : newComment.length > MAX_COMMENT_LENGTH - 20
@@ -586,24 +587,10 @@ const CommentSection: React.FC<{ itemUid: string, onAuthRequired: (action: strin
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between pb-2 border-b border-gray-200 dark:border-gray-800">
+            <div className="pb-2 border-b border-gray-200 dark:border-gray-800">
                 <h3 className="text-2xl font-black text-gray-900 dark:text-white">
                     {t('comments')} <span className="text-amber-500">({comments.length})</span>
                 </h3>
-                <div className="flex items-center space-x-2 bg-gray-100 dark:bg-gray-800 p-1 rounded-full">
-                    <button
-                        onClick={() => setSortBy('recent')}
-                        className={`text-sm font-bold px-4 py-1.5 rounded-full transition-all duration-300 ${sortBy === 'recent' ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/30' : 'text-gray-600 dark:text-gray-300 hover:text-amber-500'}`}
-                    >
-                        {t('mostRecent')}
-                    </button>
-                    <button
-                        onClick={() => setSortBy('top')}
-                        className={`text-sm font-bold px-4 py-1.5 rounded-full transition-all duration-300 ${sortBy === 'top' ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/30' : 'text-gray-600 dark:text-gray-300 hover:text-amber-500'}`}
-                    >
-                        {t('topComments')}
-                    </button>
-                </div>
             </div>
 
             <form onSubmit={handleSubmit} className="flex items-start space-x-3 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 p-4 rounded-2xl border border-gray-200/50 dark:border-gray-700/50 shadow-sm">
@@ -618,9 +605,9 @@ const CommentSection: React.FC<{ itemUid: string, onAuthRequired: (action: strin
                             rows={3}
                             maxLength={MAX_COMMENT_LENGTH + 1}
                         />
-                        <button 
-                            type="submit" 
-                            className="absolute right-3 bottom-3 p-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full hover:from-amber-600 hover:to-orange-600 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-110 disabled:hover:scale-100" 
+                        <button
+                            type="submit"
+                            className="absolute right-3 bottom-3 p-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full hover:from-amber-600 hover:to-orange-600 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-110 disabled:hover:scale-100"
                             disabled={!newComment.trim() || newComment.length > MAX_COMMENT_LENGTH}
                         >
                             <PaperAirplaneIcon className="w-5 h-5" />
@@ -632,8 +619,8 @@ const CommentSection: React.FC<{ itemUid: string, onAuthRequired: (action: strin
                 </div>
             </form>
             <div className="space-y-4">
-                {sortedComments.length > 0 ? (
-                    sortedComments.map((c, idx) => <CommentItem key={`${c.uid}-${idx}-${c.created_at}`} comment={c} />)
+                {comments.length > 0 ? (
+                    comments.map((comment, index) => <CommentItem key={`${comment.uid}-${index}-${comment.created_at}`} comment={comment} />)
                 ) : (
                     <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                         <p className="text-lg font-semibold">Aucun commentaire pour le moment</p>
@@ -696,7 +683,7 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
                 console.log('Contenu premium:', isContentPremium);
                 console.log('Utilisateur premium:', isPremium);
                 setIsPremiumContent(isContentPremium);
-                
+
                 // Si c'est du contenu premium et que l'utilisateur n'est pas premium, afficher le paywall
                 if (isContentPremium && (!userProfile?.uid || !isPremium)) {
                     if (!userProfile?.uid) {
@@ -751,7 +738,7 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
         };
 
         fetchLikeData();
-        
+
         // Réinitialiser la pub quand l'épisode change
         setShowAd(true);
     }, [episode.uid_episode, userProfile]);
@@ -1005,7 +992,7 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
                     </button>
                 </header>
                 <div className="container mx-auto px-4 py-20">
-                    <PremiumPaywall 
+                    <PremiumPaywall
                         contentTitle={episode.title}
                         contentType="episode"
                     />
@@ -1037,6 +1024,7 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
                             {showAd && (
                                 <AdPlayer
                                     onAdEnd={() => setShowAd(false)}
+                                    onSkip={() => setShowAd(false)}
                                 />
                             )}
                             {!showAd && (

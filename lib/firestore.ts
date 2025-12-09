@@ -357,15 +357,27 @@ export const commentService = {
 
     async addComment(itemUid: string, text: string, user: UserProfile): Promise<Comment | null> {
         try {
-            const newComment: Comment = {
+            const commentData: Omit<Comment, 'uid'> = {
                 comment: text,
                 created_at: new Date().toLocaleString('fr-FR', { timeZoneName: 'short' }),
                 created_by: user.display_name || user.email.split('@')[0],
-                uid: itemUid,
-                user_photo_url: user.photo_url,
             };
-            await setDoc(doc(collection(db, COMMENTS_COLLECTION)), newComment);
-            return newComment;
+
+            // Ajouter user_photo_url uniquement s'il a une valeur
+            if (user.photo_url) {
+                commentData.user_photo_url = user.photo_url;
+            }
+
+            const docRef = doc(collection(db, COMMENTS_COLLECTION));
+            await setDoc(docRef, {
+                ...commentData,
+                uid: itemUid,
+            });
+
+            return {
+                ...commentData,
+                uid: itemUid,
+            } as Comment;
         } catch (error) {
             console.error('Error adding comment:', error);
             return null;
@@ -460,6 +472,31 @@ export const movieService = {
             return querySnapshot.docs.map(doc => doc.data() as Movie);
         } catch (error) {
             console.error('Error getting home display movies:', error);
+            return [];
+        }
+    },
+
+    async getTenHomeMovies(): Promise<Movie[]> {
+        try {
+            // Récupérer tous les films non cachés
+            const q = query(
+                collection(db, MOVIES_COLLECTION),
+                where('hidden', '==', false)
+            );
+            const querySnapshot = await getDocs(q);
+            const allMovies = querySnapshot.docs.map(doc => doc.data() as Movie);
+
+            // Mélanger aléatoirement les films (Fisher-Yates shuffle)
+            const shuffled = [...allMovies];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+
+            // Retourner 10 films aléatoires
+            return shuffled.slice(0, 10);
+        } catch (error) {
+            console.error('Error getting ten home movies:', error);
             return [];
         }
     },
@@ -681,6 +718,59 @@ export const serieService = {
         } catch (error) {
             console.error('Error getting podcast by ID:', error);
             return null;
+        }
+    },
+
+    async getTenHomeSeries(): Promise<Serie[]> {
+        try {
+            // Récupérer toutes les séries non cachées (exclure les podcasts)
+            const q = query(
+                collection(db, SERIES_COLLECTION),
+                where('is_hidden', '==', false)
+            );
+            const querySnapshot = await getDocs(q);
+            const allSeries = querySnapshot.docs
+                .map(doc => doc.data() as Serie)
+                .filter(serie => !serie.serie_type || serie.serie_type === 'serie');
+
+            // Mélanger aléatoirement les séries (Fisher-Yates shuffle)
+            const shuffled = [...allSeries];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+
+            // Retourner 10 séries aléatoires
+            return shuffled.slice(0, 10);
+        } catch (error) {
+            console.error('Error getting ten home series:', error);
+            return [];
+        }
+    },
+
+    async getTenHomePodcasts(): Promise<Serie[]> {
+        try {
+            // Récupérer tous les podcasts non cachés
+            const q = query(
+                collection(db, SERIES_COLLECTION),
+                where('serie_type', '==', 'podcast'),
+                where('is_hidden', '==', false)
+            );
+            const querySnapshot = await getDocs(q);
+            const allPodcasts = querySnapshot.docs.map(doc => doc.data() as Serie);
+
+            // Mélanger aléatoirement les podcasts (Fisher-Yates shuffle)
+            const shuffled = [...allPodcasts];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+
+            // Retourner 10 podcasts aléatoires
+            return shuffled.slice(0, 10);
+        } catch (error) {
+            console.error('Error getting ten home podcasts:', error);
+            return [];
         }
     }
 };
@@ -1518,7 +1608,7 @@ export const statsVuesService = {
             );
 
             const querySnapshot = await getDocs(q);
-            
+
             if (!querySnapshot.empty) {
                 // Mise à jour de l'entrée existante
                 const docRef = querySnapshot.docs[0].ref;
@@ -1537,7 +1627,7 @@ export const statsVuesService = {
                     nombreLectures: 1, // Première lecture
                     ...(isEpisode && { idEpisodeSerie: episodeRef })
                 };
-                
+
                 await addDoc(collection(db, STATS_VUES_COLLECTION), newViewData);
             }
         } catch (error) {
@@ -2112,7 +2202,7 @@ export const infoBarService = {
                 where('isActive', '==', true)
             );
             const querySnapshot = await getDocs(q);
-            
+
             const messages = querySnapshot.docs.map(doc => {
                 const data = doc.data();
                 return {
@@ -2124,14 +2214,14 @@ export const infoBarService = {
                     createdBy: data.createdBy
                 };
             });
-            
+
             // Trier par updatedAt décroissant
             messages.sort((a, b) => {
                 const dateA = a.updatedAt instanceof Date ? a.updatedAt.getTime() : 0;
                 const dateB = b.updatedAt instanceof Date ? b.updatedAt.getTime() : 0;
                 return dateB - dateA;
             });
-            
+
             return messages;
         } catch (error) {
             console.error('Error getting all active info bar messages:', error);
@@ -2156,7 +2246,7 @@ export const infoBarService = {
                 updatedAt: Timestamp.now(),
                 createdBy: userId
             });
-            
+
             return newMessageRef.id;
         } catch (error) {
             console.error('Error creating info bar message:', error);
@@ -2188,7 +2278,7 @@ export const infoBarService = {
     async setMessageActive(messageId: string, isActive: boolean): Promise<void> {
         try {
             const messageRef = doc(db, INFO_BAR_COLLECTION, messageId);
-            await updateDoc(messageRef, { 
+            await updateDoc(messageRef, {
                 isActive: isActive,
                 updatedAt: Timestamp.now()
             });
@@ -2208,7 +2298,7 @@ export const infoBarService = {
                 orderBy('updatedAt', 'desc')
             );
             const querySnapshot = await getDocs(q);
-            
+
             return querySnapshot.docs.map(doc => {
                 const data = doc.data();
                 return {
@@ -2256,7 +2346,7 @@ export const appSettingsService = {
         try {
             const settingsRef = doc(db, APP_SETTINGS_COLLECTION, 'global');
             const settingsDoc = await getDoc(settingsRef);
-            
+
             if (settingsDoc.exists()) {
                 const data = settingsDoc.data();
                 return {
@@ -2265,7 +2355,7 @@ export const appSettingsService = {
                     updatedBy: data.updatedBy
                 };
             }
-            
+
             // Si aucun paramètre n'existe, créer les paramètres par défaut
             const defaultSettings: AppSettings = {
                 homeViewMode: 'default',
@@ -2339,14 +2429,14 @@ export const adService = {
                 createdAt: doc.data().createdAt || Timestamp.now(),
                 updatedAt: doc.data().updatedAt || Timestamp.now()
             })) as Ad[];
-            
+
             // Trier côté client par createdAt (plus récent en premier)
             ads.sort((a, b) => {
                 const aTime = a.createdAt instanceof Timestamp ? a.createdAt.toMillis() : 0;
                 const bTime = b.createdAt instanceof Timestamp ? b.createdAt.toMillis() : 0;
                 return bTime - aTime; // Tri décroissant (plus récent en premier)
             });
-            
+
             return ads;
         } catch (error) {
             console.error('Error getting active ads:', error);
@@ -2444,7 +2534,7 @@ export const adService = {
         try {
             const settingsRef = doc(db, APP_SETTINGS_COLLECTION, 'ads');
             const settingsDoc = await getDoc(settingsRef);
-            
+
             if (settingsDoc.exists()) {
                 const data = settingsDoc.data();
                 console.log('Raw ad settings from Firestore:', data);
@@ -2457,7 +2547,7 @@ export const adService = {
                     updatedBy: data.updatedBy
                 };
             }
-            
+
             // Paramètres par défaut
             const defaultSettings: AdSettings = {
                 enabled: false,
@@ -2482,19 +2572,19 @@ export const adService = {
                 updatedAt: Timestamp.now(),
                 updatedBy: userId
             };
-            
+
             // S'assurer que enabled est bien un booléen
             if (typeof settings.enabled === 'boolean') {
                 dataToSave.enabled = settings.enabled;
             }
-            
+
             if (typeof settings.skipAfterSeconds === 'number') {
                 dataToSave.skipAfterSeconds = settings.skipAfterSeconds;
             }
-            
+
             console.log('Saving ad settings to Firestore:', dataToSave);
             await setDoc(settingsRef, dataToSave, { merge: true });
-            
+
             // Vérifier que ça a bien été sauvegardé
             const verifyDoc = await getDoc(settingsRef);
             if (verifyDoc.exists()) {

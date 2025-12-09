@@ -211,7 +211,7 @@ const HeroPrimeVideo: React.FC<HeroPrimeVideoProps> = ({ items: propItems, onSel
             ref={videoRef}
             key={currentItem.id}
             src={videoUrl}
-            className="w-full h-full object-cover transition-opacity duration-1000"
+            className="w-full h-full object-cover object-left transition-opacity duration-1000"
             muted
             playsInline
             loop
@@ -224,7 +224,7 @@ const HeroPrimeVideo: React.FC<HeroPrimeVideoProps> = ({ items: propItems, onSel
             key={currentItem.id}
             src={currentItem.imageUrl}
             alt={currentItem.title}
-            className="w-full h-full object-cover transition-opacity duration-1000"
+            className="w-full h-full object-cover object-left transition-opacity duration-1000"
           />
         )}
         {/* Gradient overlay */}
@@ -233,8 +233,8 @@ const HeroPrimeVideo: React.FC<HeroPrimeVideoProps> = ({ items: propItems, onSel
       </div>
 
       {/* Contenu principal - Layout Prime Video */}
-      <div className="relative z-10 h-full flex items-center">
-        <div className="container mx-auto px-4 md:px-8 lg:px-12">
+      <div className="relative z-10 h-full flex items-center w-full max-w-[100vw] overflow-hidden">
+        <div className="w-full max-w-[100%] px-4 md:px-8 lg:px-12 mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
             {/* Colonne gauche - Contenu textuel */}
             <div className="space-y-6 md:space-y-8">
@@ -249,9 +249,23 @@ const HeroPrimeVideo: React.FC<HeroPrimeVideoProps> = ({ items: propItems, onSel
               )}
 
               {/* Titre principal */}
-              <h1 className="text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-black text-white leading-tight">
-                {currentItem.title.toUpperCase()}
-              </h1>
+              <div className="w-full max-w-4xl overflow-hidden">
+                <h1 
+                  className="text-4xl md:text-5xl lg:text-5xl xl:text-6xl 2xl:text-6xl font-black text-white leading-tight break-words overflow-visible"
+                  style={{
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    textOverflow: 'ellipsis',
+                    maxHeight: '3.5em',
+                    lineHeight: '1.2',
+                    overflow: 'hidden',
+                    wordBreak: 'break-word'
+                  }}
+                >
+                  {currentItem.title.toUpperCase()}
+                </h1>
+              </div>
 
               {/* Métadonnées */}
               <div className="flex items-center gap-4 text-white/80 text-sm md:text-base">
@@ -319,46 +333,43 @@ const HeroPrimeVideo: React.FC<HeroPrimeVideoProps> = ({ items: propItems, onSel
         </div>
       </div>
 
-      {/* Contrôles de navigation */}
+      {/* Contrôles de navigation et indicateurs de carrousel */}
       {items.length > 1 && (
-        <>
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex items-center gap-4">
           <button
             onClick={handlePrev}
-            className="absolute left-4 top-1/2 -translate-y-1/2 z-20 p-3 bg-black/60 hover:bg-black/80 backdrop-blur-sm rounded-full border border-white/20 transition-all duration-300 hover:scale-110"
+            className="p-2.5 bg-black/60 hover:bg-black/80 backdrop-blur-sm rounded-full border border-white/20 transition-all duration-300 hover:scale-110"
             aria-label="Précédent"
           >
-            <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
 
+          <div className="flex items-center gap-2">
+            {items.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => setCurrentIndex(index)}
+                className={`h-2 rounded-full transition-all duration-300 ${
+                  index === currentIndex
+                    ? 'w-6 bg-white'
+                    : 'w-2 bg-white/40 hover:bg-white/60'
+                }`}
+                aria-label={`Aller à la slide ${index + 1}`}
+              />
+            ))}
+          </div>
+
           <button
             onClick={handleNext}
-            className="absolute right-4 top-1/2 -translate-y-1/2 z-20 p-3 bg-black/60 hover:bg-black/80 backdrop-blur-sm rounded-full border border-white/20 transition-all duration-300 hover:scale-110"
+            className="p-2.5 bg-black/60 hover:bg-black/80 backdrop-blur-sm rounded-full border border-white/20 transition-all duration-300 hover:scale-110"
             aria-label="Suivant"
           >
-            <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </button>
-        </>
-      )}
-
-      {/* Indicateurs de carrousel */}
-      {items.length > 1 && (
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
-          {items.map((_, index) => (
-            <button
-              key={index}
-              onClick={() => setCurrentIndex(index)}
-              className={`h-2 rounded-full transition-all duration-300 ${
-                index === currentIndex
-                  ? 'w-8 bg-white'
-                  : 'w-2 bg-white/40 hover:bg-white/60'
-              }`}
-              aria-label={`Aller à la slide ${index + 1}`}
-            />
-          ))}
         </div>
       )}
     </div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Ad, adService } from '../lib/firestore';
-import { XMarkIcon } from './icons';
+import { ForwardIcon } from './icons';
+import { useAppContext } from '../context/AppContext';
 
 interface AdPlayerProps {
   onAdEnd: () => void;
@@ -8,6 +9,7 @@ interface AdPlayerProps {
 }
 
 const AdPlayer: React.FC<AdPlayerProps> = ({ onAdEnd, onSkip }) => {
+  const { t } = useAppContext();
   const [ad, setAd] = useState<Ad | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -24,7 +26,7 @@ const AdPlayer: React.FC<AdPlayerProps> = ({ onAdEnd, onSkip }) => {
         // Vérifier si les publicités sont activées
         const settings = await adService.getAdSettings();
         console.log('Ad settings:', settings);
-        
+
         if (!settings || !settings.enabled) {
           console.log('Ads are disabled or settings not found');
           setLoading(false);
@@ -37,7 +39,7 @@ const AdPlayer: React.FC<AdPlayerProps> = ({ onAdEnd, onSkip }) => {
         // Charger une publicité aléatoire
         const randomAd = await adService.getRandomAd();
         console.log('Random ad loaded:', randomAd);
-        
+
         if (!randomAd) {
           console.log('No active ads available');
           setLoading(false);
@@ -65,7 +67,7 @@ const AdPlayer: React.FC<AdPlayerProps> = ({ onAdEnd, onSkip }) => {
   useEffect(() => {
     if (ad && adSettings) {
       const skipTime = ad.skipAfterSeconds || adSettings.skipAfterSeconds || 5;
-      
+
       // Démarrer le compte à rebours pour le skip
       countdownIntervalRef.current = setInterval(() => {
         setSkipCountdown((prev) => {
@@ -111,7 +113,7 @@ const AdPlayer: React.FC<AdPlayerProps> = ({ onAdEnd, onSkip }) => {
   if (loading) {
     return (
       <div className="absolute inset-0 bg-black flex items-center justify-center z-50">
-        <div className="text-white text-lg">Chargement de la publicité...</div>
+        <div className="text-white text-lg">{t('adLoading') || 'Chargement de la publicité...'}</div>
       </div>
     );
   }
@@ -135,23 +137,25 @@ const AdPlayer: React.FC<AdPlayerProps> = ({ onAdEnd, onSkip }) => {
           onError={handleError}
         />
 
-        {/* Overlay avec bouton skip */}
-        <div className="absolute top-4 right-4 flex items-center gap-2">
-          {!canSkip && skipCountdown > 0 && (
-            <div className="px-4 py-2 bg-black/70 backdrop-blur-sm rounded-lg text-white text-sm font-medium">
-              Publicité - {skipCountdown}s
-            </div>
-          )}
-          {canSkip && (
+        {/* Compteur de publicité en haut à droite */}
+        {!canSkip && skipCountdown > 0 && (
+          <div className="absolute top-4 right-4 px-4 py-2 bg-black/70 backdrop-blur-sm rounded-lg text-white text-sm font-medium">
+            {t('ad') || 'Publicité'} - {skipCountdown}s
+          </div>
+        )}
+
+        {/* Bouton passer en bas à droite */}
+        {canSkip && (
+          <div className="absolute bottom-4 right-4">
             <button
               onClick={handleSkip}
               className="px-6 py-2 bg-black/70 hover:bg-black/90 backdrop-blur-sm rounded-lg text-white text-sm font-medium transition-colors flex items-center gap-2"
             >
-              <span>Passer</span>
-              <XMarkIcon className="w-4 h-4" />
+              <span>{t('skip') || 'Passer'}</span>
+              <ForwardIcon className="w-5 h-5" />
             </button>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Titre de la publicité (optionnel) */}
         {ad.title && (

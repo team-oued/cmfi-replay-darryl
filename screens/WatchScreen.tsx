@@ -4,12 +4,14 @@ import { MediaContent, MediaType } from '../types';
 import { movieService, serieService, episodeSerieService, seasonSerieService, EpisodeSerie } from '../lib/firestore';
 import MoviePlayerScreen from './MoviePlayerScreen';
 import EpisodePlayerScreen from './EpisodePlayerScreen';
+import { useAppContext } from '../context/AppContext';
 
 interface WatchScreenProps {
     onReturnHome: () => void;
 }
 
 const WatchScreen: React.FC<WatchScreenProps> = ({ onReturnHome }) => {
+    const { t } = useAppContext();
     const { uid } = useParams<{ uid: string }>();
     const navigate = useNavigate();
     const [media, setMedia] = useState<MediaContent | null>(null);
@@ -142,7 +144,7 @@ const WatchScreen: React.FC<WatchScreenProps> = ({ onReturnHome }) => {
     if (loading) {
         return (
             <div className="min-h-screen bg-black flex items-center justify-center">
-                <div className="text-white text-xl">Chargement...</div>
+                <div className="text-white text-xl">{t('loading') || 'Chargement...'}</div>
             </div>
         );
     }
