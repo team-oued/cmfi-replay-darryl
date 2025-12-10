@@ -56,6 +56,14 @@ export const subscriptionService = {
      */
     async isUserPremium(userUid: string): Promise<boolean> {
         try {
+            // Vérifier d'abord si l'accès premium est activé pour tous
+            const { appSettingsService } = await import('./appSettingsService');
+            const isPremiumForAll = await appSettingsService.isPremiumForAll();
+            
+            if (isPremiumForAll) {
+                return true;
+            }
+
             const subscription = await this.getUserSubscription(userUid);
 
             if (!subscription) {

@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { MediaType } from '../types';
 import { Movie, movieService, likeService, commentService, Comment, generateDefaultAvatar, viewService } from '../lib/firestore';
+import { appSettingsService } from '../lib/appSettingsService';
 import {
     PlayIcon, PauseIcon, ArrowLeftIcon,
     LikeIcon, ShareIcon, PlusIcon,
@@ -909,8 +910,23 @@ const MoviePlayerScreen: React.FC<MoviePlayerScreenProps> = ({ item, onBack }) =
         </button>
     );
 
-    // Vérifier si le contenu est premium et si l'utilisateur n'est pas premium
-    if (movieData?.is_premium && !isPremium) {
+    const [premiumForAll, setPremiumForAll] = useState(false);
+
+    // Charger l'état de premiumForAll
+    useEffect(() => {
+        const loadPremiumForAll = async () => {
+            try {
+                const isEnabled = await appSettingsService.isPremiumForAll();
+                setPremiumForAll(isEnabled);
+            } catch (error) {
+                console.error('Error loading premiumForAll setting:', error);
+            }
+        };
+        loadPremiumForAll();
+    }, []);
+
+    // Vérifier si le contenu est premium et si l'utilisateur n'a pas accès
+    if (movieData?.is_premium && !isPremium && !premiumForAll) {
         return <PremiumPaywall contentTitle={movieData.title} contentType="movie" />;
     }
 
@@ -968,7 +984,7 @@ const MoviePlayerScreen: React.FC<MoviePlayerScreenProps> = ({ item, onBack }) =
 
                             <div className="flex items-center justify-around py-4 px-2 bg-white/50 dark:bg-gray-900/50 rounded-2xl backdrop-blur-sm border border-gray-200/50 dark:border-gray-800/50 shadow-lg">
                                 <LikeButton
-                                    label={t('like')}
+                                    label={t('likeVideo')}
                                     value={likeCount}
                                     onClick={handleLike}
                                     isActive={hasLiked}

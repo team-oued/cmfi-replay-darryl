@@ -2335,6 +2335,7 @@ export interface AppSettings {
     homeViewMode: 'default' | 'prime' | 'netflix';
     updatedAt: Date | Timestamp;
     updatedBy?: string;
+    premiumForAll?: boolean;
 }
 
 // Service pour gérer les paramètres globaux de l'application
@@ -2359,6 +2360,7 @@ export const appSettingsService = {
             // Si aucun paramètre n'existe, créer les paramètres par défaut
             const defaultSettings: AppSettings = {
                 homeViewMode: 'default',
+                premiumForAll: false,
                 updatedAt: new Date()
             };
             await setDoc(settingsRef, {
@@ -2387,6 +2389,19 @@ export const appSettingsService = {
             console.error('Error setting home view mode:', error);
             throw error;
         }
+    }
+};
+
+export const updateAppSettings = async (updates: Partial<AppSettings>): Promise<void> => {
+    try {
+        const settingsRef = doc(db, 'appSettings', 'global');
+        await setDoc(settingsRef, {
+            ...updates,
+            updatedAt: Timestamp.now()
+        }, { merge: true });
+    } catch (error) {
+        console.error('Error updating app settings:', error);
+        throw error;
     }
 };
 

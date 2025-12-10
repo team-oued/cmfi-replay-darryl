@@ -18,6 +18,7 @@ import {
 } from '../components/icons';
 import { useAppContext } from '../context/AppContext';
 import { userService, UserProfile, generateDefaultAvatar } from '../lib/firestore';
+import { appSettingsService } from '../lib/appSettingsService';
 import PremiumBadge from '../components/PremiumBadge';
 
 const SettingsItem: React.FC<{
@@ -46,8 +47,40 @@ interface ProfileScreenProps {
     onPlay: (item: MediaContent) => void;
 }
 
+const ToggleSwitch: React.FC<{ enabled: boolean; onChange: (enabled: boolean) => void }> = ({ enabled, onChange }) => (
+    <div className="flex items-center">
+        <button
+            type="button"
+            className={`${enabled ? 'bg-amber-500' : 'bg-gray-200 dark:bg-gray-700'} 
+                      relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer 
+                      rounded-full border-2 border-transparent transition-colors 
+                      duration-200 ease-in-out focus:outline-none`}
+            onClick={() => onChange(!enabled)}
+        >
+            <span
+                className={`${enabled ? 'translate-x-5' : 'translate-x-0'} 
+                          pointer-events-none inline-block h-5 w-5 transform rounded-full 
+                          bg-white shadow-lg ring-0 transition duration-200 ease-in-out`}
+            />
+        </button>
+    </div>
+);
+
 const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigate, onSelectMedia, onPlay }) => {
     const { t, setIsAuthenticated, userProfile, user } = useAppContext();
+    const [premiumForAll, setPremiumForAll] = useState(false);
+
+    // Charger l'état de premiumForAll au montage du composant
+    useEffect(() => {
+        const loadPremiumForAll = async () => {
+            if (userProfile?.isAdmin) {
+                const isEnabled = await appSettingsService.isPremiumForAll();
+                setPremiumForAll(isEnabled);
+            }
+        };
+        loadPremiumForAll();
+    }, [userProfile?.isAdmin]);
+
     const navigateRouter = useNavigate();
     const [onlineUsers, setOnlineUsers] = useState<User[]>([]);
     const [loadingUsers, setLoadingUsers] = useState(true);
@@ -203,6 +236,23 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigate, onSelectMedia, 
                     <div className="mt-4">
                         <h3 className="text-lg font-bold mb-3 text-amber-600 dark:text-amber-400">Administration</h3>
                         <div className="border border-amber-200 dark:border-amber-800 rounded-lg overflow-visible divide-y divide-amber-200 dark:divide-amber-800">
+                            {/* Toggle pour l'accès premium pour tous */}
+                            <div className="flex items-center justify-between p-4">
+                                <div className="flex items-center">
+                                    <SettingsIcon className="w-6 h-6 text-gray-400 mr-4" />
+                                    <span className="text-gray-900 dark:text-white">Accès premium pour tous</span>
+                                </div>
+                                <ToggleSwitch 
+                                    enabled={premiumForAll} 
+                                    onChange={async (enabled) => {
+                                        const success = await appSettingsService.setPremiumForAll(enabled);
+                                        if (success) {
+                                            setPremiumForAll(enabled);
+                                        }
+                                    }} 
+                                />
+                            </div>
+                            
                             {adminItems.map((item) => (
                                 <SettingsItem key={item.label} Icon={item.icon} label={item.label} onClick={item.action} />
                             ))}

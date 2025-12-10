@@ -301,26 +301,28 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
 
 
                 {/* Stats et actions - Mieux organisés */}
-                <div className="flex flex-wrap items-center gap-4 md:gap-6 text-sm md:text-base">
-                    {isLoadingLikes ? (
-                        <span className="text-gray-500 dark:text-gray-400">Chargement...</span>
-                    ) : (
-                        <>
-                            <span className="flex items-center gap-2">
-                                <LikeIcon className={`w-5 h-5 ${hasLiked ? 'text-red-500' : 'text-gray-600 dark:text-gray-400'}`} />
-                                <span className={hasLiked ? 'text-red-500 font-semibold' : 'text-gray-700 dark:text-gray-300'}>
-                                    {likeCount} {t('likes')}
+                {type === MediaType.Movie && (
+                    <div className="flex flex-wrap items-center gap-4 md:gap-6 text-sm md:text-base">
+                        {isLoadingLikes ? (
+                            <span className="text-gray-500 dark:text-gray-400">Chargement...</span>
+                        ) : (
+                            <>
+                                <span className="flex items-center gap-2">
+                                    <LikeIcon className={`w-5 h-5 ${hasLiked ? 'text-red-500' : 'text-gray-600 dark:text-gray-400'}`} />
+                                    <span className={hasLiked ? 'text-red-500 font-semibold' : 'text-gray-700 dark:text-gray-300'}>
+                                        {likeCount} {t('likes')}
+                                    </span>
                                 </span>
-                            </span>
-                            <span className="flex items-center gap-2">
-                                <CommentIcon className="w-5 h-5 text-sky-500" />
-                                <span className="text-gray-700 dark:text-gray-300">
-                                    {comments.length} {t(comments.length !== 1 ? 'comments' : 'comment')}
+                                <span className="flex items-center gap-2">
+                                    <CommentIcon className="w-5 h-5 text-sky-500" />
+                                    <span className="text-gray-700 dark:text-gray-300">
+                                        {comments.length} {t(comments.length !== 1 ? 'comments' : 'comment')}
+                                    </span>
                                 </span>
-                            </span>
-                        </>
-                    )}
-                </div>
+                            </>
+                        )}
+                    </div>
+                )}
 
                 {/* Boutons d'action améliorés */}
                 <div className="flex flex-wrap items-center gap-3 md:gap-4">
@@ -331,6 +333,20 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
                         <PlayIcon className="w-5 h-5 md:w-6 md:h-6" />
                         <span className="text-sm md:text-base">{t('play')}</span>
                     </button>
+                    {type === MediaType.Movie && (
+                        <button
+                            onClick={handleLike}
+                            className={`flex items-center justify-center gap-2 font-bold py-3 md:py-3.5 px-5 md:px-6 rounded-lg md:rounded-xl backdrop-blur-sm transition-all duration-300 hover:scale-105 ${
+                                hasLiked
+                                    ? 'bg-red-500 text-white hover:bg-red-600'
+                                    : 'bg-gray-200/90 dark:bg-gray-800/90 text-gray-900 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-700'
+                            }`}
+                            disabled={isLoading}
+                        >
+                            <LikeIcon className={`w-5 h-5 md:w-6 md:h-6 ${hasLiked ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
+                            <span className="text-sm md:text-base">{hasLiked ? t('liked') : t('like')}</span>
+                        </button>
+                    )}
                     <button
                         onClick={() => toggleBookmark(item.id)}
                         className={`flex items-center justify-center gap-2 font-bold py-3 md:py-3.5 px-5 md:px-6 rounded-lg md:rounded-xl backdrop-blur-sm transition-all duration-300 hover:scale-105 ${

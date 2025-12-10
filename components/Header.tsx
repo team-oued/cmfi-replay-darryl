@@ -12,12 +12,12 @@ interface HeaderProps {
   isWatchRoute?: boolean;
 }
 
-const Header: React.FC<HeaderProps> = ({ 
-  title, 
-  onBack, 
-  isSidebarOpen, 
+const Header: React.FC<HeaderProps> = ({
+  title,
+  onBack,
+  isSidebarOpen,
   onToggleSidebar,
-  isWatchRoute = false 
+  isWatchRoute = false
 }) => {
   const { theme, setTheme, t, isSidebarCollapsed } = useAppContext();
 
@@ -31,15 +31,15 @@ const Header: React.FC<HeaderProps> = ({
       <div className="fixed top-0 left-0 right-0 z-20 bg-[#FBF9F3] dark:bg-black p-4 border-b border-gray-200 dark:border-gray-800 md:hidden">
         <div className="w-full flex items-center justify-between">
           {/* Menu burger à gauche */}
-          <HamburgerMenu 
-            isOpen={isSidebarOpen} 
-            onClick={onToggleSidebar} 
+          <HamburgerMenu
+            isOpen={isSidebarOpen}
+            onClick={onToggleSidebar}
             className="p-2 rounded-full text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
           />
-          
+
           {/* Titre au centre */}
           <h1 className="text-xl font-bold text-center">CMFI Replay</h1>
-          
+
           {/* Contrôles à droite */}
           <div className="flex items-center space-x-2">
             <button
@@ -57,10 +57,9 @@ const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Header pour les écrans plus larges */}
-      <header className={`bg-[#FBF9F3] dark:bg-black hidden md:block fixed top-0 right-0 left-0 z-10 transition-all duration-500 ease-in-out ${
-        isWatchRoute ? 'lg:left-0 bg-black/60 backdrop-blur-md' : 
-        isSidebarCollapsed ? 'lg:left-16' : 'lg:left-64'
-      } ${isWatchRoute ? 'bg-opacity-60' : ''}`}>
+      <header className={`bg-[#FBF9F3] dark:bg-black hidden md:block fixed top-0 right-0 left-0 z-10 transition-all duration-500 ease-in-out ${isWatchRoute ? 'lg:left-0 bg-black/60 backdrop-blur-md' :
+          isSidebarCollapsed ? 'lg:left-16' : 'lg:left-64'
+        } ${isWatchRoute ? 'bg-opacity-60' : ''}`}>
         <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200 dark:border-gray-800">
           {/* Bouton de retour et menu */}
           <div className="flex items-center space-x-4">
@@ -85,7 +84,7 @@ const Header: React.FC<HeaderProps> = ({
             )}
             <h1 className="text-lg font-semibold text-gray-900 dark:text-white">{isWatchRoute ? t('watch') : title}</h1>
           </div>
-          
+
           {/* Contrôles alignés à droite */}
           <div className="flex items-center space-x-4">
             <button

@@ -14,6 +14,7 @@ import { toast } from 'react-toastify';
 import AuthPrompt from '../components/AuthPrompt';
 import PremiumPaywall from '../components/PremiumPaywall';
 import AdPlayer from '../components/AdPlayer';
+import { appSettingsService } from '../lib/appSettingsService';
 
 // --- Reusable formatter ---
 const formatNumber = (num: number) => {
@@ -652,11 +653,25 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
     const [isPremiumContent, setIsPremiumContent] = useState(false);
     const [isCheckingPremium, setIsCheckingPremium] = useState(true);
     const [showAd, setShowAd] = useState(true);
+    const [premiumForAll, setPremiumForAll] = useState(false);
 
     const handleAuthRequired = (action: string) => {
         setAuthAction(action);
         setShowAuthPrompt(true);
     };
+
+    // Charger l'état de premiumForAll
+    useEffect(() => {
+        const loadPremiumForAll = async () => {
+            try {
+                const isEnabled = await appSettingsService.isPremiumForAll();
+                setPremiumForAll(isEnabled);
+            } catch (error) {
+                console.error('Error loading premiumForAll setting:', error);
+            }
+        };
+        loadPremiumForAll();
+    }, []);
 
     // Vérifier si le contenu est premium
     useEffect(() => {
@@ -979,7 +994,7 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
     }
 
     // Si le contenu est premium et que l'utilisateur n'est pas premium, afficher le paywall
-    if (isPremiumContent && (!userProfile?.uid || !isPremium)) {
+    if (isPremiumContent && (!userProfile?.uid || !isPremium) && !premiumForAll) {
         return (
             <div className="bg-[#FBF9F3] dark:bg-black min-h-screen">
                 <header className="absolute top-4 left-4 z-20">
@@ -1057,7 +1072,7 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
 
                             <div className="flex items-center justify-around py-4 px-2 bg-white/50 dark:bg-gray-900/50 rounded-2xl backdrop-blur-sm border border-gray-200/50 dark:border-gray-800/50 shadow-lg">
                                 <LikeButton
-                                    label={hasLiked ? (t('like') + ' ✓') : t('like')}
+                                    label={hasLiked ? (t('likeVideo') + ' ✓') : t('likeVideo')}
                                     value={likeCount}
                                     onClick={handleLike}
                                     isActive={hasLiked}
