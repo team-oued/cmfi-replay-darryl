@@ -18,15 +18,8 @@ const PremiumBadgeComponent: React.FC<PremiumBadgeProps> = ({ size = 'md', showD
         );
     }
 
-    console.log('🔍 [PremiumBadge] Rendu du composant avec:', {
-        isPremium,
-        subscriptionDetails,
-        showDetails,
-        loading
-    });
 
     if (!isPremium) {
-        console.log('🔍 [PremiumBadge] isPremium est false, pas de rendu');
         return null;
     }
 
@@ -43,7 +36,6 @@ const PremiumBadgeComponent: React.FC<PremiumBadgeProps> = ({ size = 'md', showD
     };
 
     const getPlanLabel = () => {
-        console.log('🔍 [PremiumBadge] getPlanLabel avec subscriptionDetails:', subscriptionDetails);
         if (!subscriptionDetails) return 'Premium';
 
         switch (subscriptionDetails.planType) {

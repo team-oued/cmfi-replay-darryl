@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { MediaType } from '../types';
-import { Movie, movieService, likeService, commentService, Comment, generateDefaultAvatar, viewService } from '../lib/firestore';
+import { Movie, movieService, likeService, commentService, Comment, generateDefaultAvatar, viewService, getLastWatchedPositionForMovie, statsVuesService } from '../lib/firestore';
 import { appSettingsService } from '../lib/appSettingsService';
 import {
     PlayIcon, PauseIcon, ArrowLeftIcon,
@@ -36,7 +36,16 @@ const formatTime = (seconds: number) => {
 };
 
 // --- Video Player Component ---
-const VideoPlayer: React.FC<{ src: string, poster: string, onEnded?: () => void, onPlayingStateChange?: (isPlaying: boolean) => void }> = ({ src, poster, onEnded, onPlayingStateChange }) => {
+const VideoPlayer: React.FC<{ 
+    src: string, 
+    poster: string, 
+    onEnded?: () => void, 
+    onPlayingStateChange?: (isPlaying: boolean) => void,
+    initialPosition?: number,
+    videoUid: string,
+    isEpisode?: boolean,
+    episodeRef?: any
+}> = ({ src, poster, onEnded, onPlayingStateChange, initialPosition = 0, videoUid, isEpisode = false, episodeRef }) => {
     const { t } = useAppContext();
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -71,10 +80,61 @@ const VideoPlayer: React.FC<{ src: string, poster: string, onEnded?: () => void,
 
         closePiP();
     }, []);
+
+    // Positionner la lecture à la position enregistrée
+    useEffect(() => {
+        if (videoRef.current && initialPosition > 0) {
+            videoRef.current.currentTime = initialPosition;
+            // Mettre à jour la barre de progression
+            setProgress((initialPosition / duration) * 100);
+            setCurrentTime(initialPosition);
+        }
+    }, [initialPosition]);
     const [isLoading, setIsLoading] = useState(true);
     const wasPlayingRef = useRef(false);
     const [showControls, setShowControls] = useState(false);
     const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const lastSavedPosition = useRef(0);
+    const saveIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const { userProfile } = useAppContext();
+
+    // Sauvegarder la position de lecture toutes les 10 secondes
+    useEffect(() => {
+        if (!userProfile?.uid || !videoUid) return;
+
+        const saveProgress = async () => {
+            if (!videoRef.current) return;
+            
+            const currentTime = Math.floor(videoRef.current.currentTime);
+            
+            // Ne sauvegarder que si la position a changé d'au moins 5 secondes
+            if (Math.abs(currentTime - lastSavedPosition.current) >= 5) {
+                try {
+                    await statsVuesService.updateViewingProgress(
+                        userProfile.uid,
+                        videoUid,
+                        currentTime,
+                        isEpisode,
+                    );
+                    lastSavedPosition.current = currentTime;
+                } catch (error) {
+                    console.error('Erreur lors de la sauvegarde de la position:', error);
+                }
+            }
+        };
+
+        // Démarrer l'enregistrement périodique
+        saveIntervalRef.current = setInterval(saveProgress, 10000); // Toutes les 10 secondes
+
+        // Sauvegarder aussi lors du démontage du composant
+        return () => {
+            if (saveIntervalRef.current) {
+                clearInterval(saveIntervalRef.current);
+            }
+            // Dernière sauvegarde à la fermeture
+            saveProgress().catch(console.error);
+        };
+    }, [userProfile?.uid, videoUid, isEpisode, episodeRef]);
 
     const togglePlay = () => {
         const wasPlaying = !videoRef.current?.paused;
@@ -622,7 +682,7 @@ interface MoviePlayerScreenProps {
 }
 
 const MoviePlayerScreen: React.FC<MoviePlayerScreenProps> = ({ item, onBack }) => {
-    const { t, bookmarkedIds, toggleBookmark, userProfile, isPremium } = useAppContext();
+    const { t, bookmarkedIds, toggleBookmark, userProfile, isPremium, autoplay } = useAppContext();
     const [movieData, setMovieData] = useState<Movie | null>(null);
     const [likeCount, setLikeCount] = useState(0);
     const [hasLiked, setHasLiked] = useState(false);
@@ -912,6 +972,36 @@ const MoviePlayerScreen: React.FC<MoviePlayerScreenProps> = ({ item, onBack }) =
 
     const [premiumForAll, setPremiumForAll] = useState(false);
 
+    // Mettre à jour le titre de la page avec le nom du film
+    useEffect(() => {
+        if (item?.title) {
+            document.title = `${item.title}`;
+        }
+        
+        // Restaurer le titre par défaut lors du démontage du composant
+        return () => {
+            document.title = 'CMFI Replay';
+        };
+    }, [item]);
+
+    // Charger la position de lecture précédente
+    useEffect(() => {
+        const loadPlaybackPosition = async () => {
+            if (!userProfile?.uid || !item.id) return;
+            
+            try {
+                const position = await getLastWatchedPositionForMovie(userProfile.uid, item.id);
+                if (position > 0) {
+                    setInitialPlaybackPosition(position);
+                }
+            } catch (error) {
+                console.error('Erreur lors du chargement de la position de lecture du film:', error);
+            }
+        };
+
+        loadPlaybackPosition();
+    }, [userProfile?.uid, item?.id]);
+
     // Charger l'état de premiumForAll
     useEffect(() => {
         const loadPremiumForAll = async () => {
@@ -929,6 +1019,8 @@ const MoviePlayerScreen: React.FC<MoviePlayerScreenProps> = ({ item, onBack }) =
     if (movieData?.is_premium && !isPremium && !premiumForAll) {
         return <PremiumPaywall contentTitle={movieData.title} contentType="movie" />;
     }
+
+    const [initialPlaybackPosition, setInitialPlaybackPosition] = useState(0);
 
     return (
         <div className="bg-[#FBF9F3] dark:bg-black min-h-screen animate-fadeIn">
@@ -958,10 +1050,14 @@ const MoviePlayerScreen: React.FC<MoviePlayerScreenProps> = ({ item, onBack }) =
                             )}
                             {!showAd && (
                                 <VideoPlayer
-                                    src={movieData?.video_path_hd || item.video_path_hd}
-                                    poster={movieData?.picture_path || item.imageUrl}
+                                    key={item.id}
+                                    src={item.video_path_hd?.trim() ? item.video_path_hd : ''}
+                                    poster={item.imageUrl || ''}
                                     onEnded={handleVideoEnded}
                                     onPlayingStateChange={setVideoIsPlaying}
+                                    initialPosition={initialPlaybackPosition}
+                                    videoUid={item.id}
+                                    isEpisode={false}
                                 />
                             )}
                         </div>

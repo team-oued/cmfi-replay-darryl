@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useMemo, useEffect } from 'react';
+import React, { createContext, useContext, useState, useMemo, useEffect, useCallback } from 'react';
 import { i18n, Language, TranslationKey } from '../lib/i18n';
 import { auth, db } from '../lib/firebase';
 import { userService, UserProfile, bookDocService, bookSeriesService, subscriptionService } from '../lib/firestore';
@@ -50,11 +50,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const [theme, setThemeState] = useState<'light' | 'dark'>(() => {
         if (typeof window !== 'undefined') {
             const savedTheme = window.localStorage.getItem('theme') as 'light' | 'dark';
-            if (savedTheme) return savedTheme;
-            return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            if (savedTheme) {
+                // Appliquer le thème au chargement
+                const root = window.document.documentElement;
+                root.classList.remove('light', 'dark');
+                root.classList.add(savedTheme);
+                return savedTheme;
+            }
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const defaultTheme = prefersDark ? 'dark' : 'light';
+            localStorage.setItem('theme', defaultTheme);
+            return defaultTheme;
         }
         return 'light';
     });
+
+    const setTheme = useCallback((newTheme: 'light' | 'dark') => {
+        setThemeState(prevTheme => {
+            if (prevTheme !== newTheme) {
+                if (typeof window !== 'undefined') {
+                    const root = window.document.documentElement;
+                    root.classList.remove(prevTheme);
+                    root.classList.add(newTheme);
+                    localStorage.setItem('theme', newTheme);
+                }
+                return newTheme;
+            }
+            return prevTheme;
+        });
+    }, []);
 
     const [language, setLanguage] = useState<Language>('en');
     const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -79,6 +103,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
         return false;
     });
+
+    const setAutoplay = (value: boolean) => {
+        setAutoplayState(value);
+        localStorage.setItem('autoplay', String(value));
+    };
 
     // État pour le mode d'affichage de la page d'accueil
     const [homeViewMode, setHomeViewModeState] = useState<HomeViewMode>('default');
@@ -159,59 +188,81 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         daysRemaining: number | null;
     } | null>(null);
 
-    useEffect(() => {
-        const root = window.document.documentElement;
-        root.classList.remove('light', 'dark');
-        root.classList.add(theme);
-        localStorage.setItem('theme', theme);
-    }, [theme]);
-
     // Fonction pour rafraîchir le statut d'abonnement
-    const refreshSubscription = useMemo(() => async () => {
-        console.log(' [refreshSubscription] Début de la vérification du statut premium');
-        const currentUser = auth.currentUser; // Utiliser directement auth.currentUser
-        
-        if (!currentUser) {
-            console.log(' [refreshSubscription] Aucun utilisateur connecté, statut premium désactivé');
-            setIsPremium(false);
-            setSubscriptionDetails(null);
-            return;
-        }
-
-        try {
-            console.log(' [refreshSubscription] Vérification du statut premium pour l\'utilisateur:', currentUser.uid);
-            const details = await subscriptionService.getSubscriptionDetails(currentUser.uid);
-            console.log(' [refreshSubscription] Détails de l\'abonnement:', details);
-
-            setIsPremium(details.isPremium);
-            setSubscriptionDetails({
-                planType: details.planType,
-                endDate: details.endDate,
-                daysRemaining: details.daysRemaining
-            });
-
-            // Stocker en localStorage pour une récupération immédiate au chargement
-            if (typeof window !== 'undefined') {
-                // Vérifier que endDate est une Date valide avant d'appeler toISOString()
-                const endDateISO = details.endDate && details.endDate instanceof Date && !isNaN(details.endDate.getTime())
-                    ? details.endDate.toISOString()
-                    : null;
-                
-                localStorage.setItem('premiumStatus', JSON.stringify({
-                    isPremium: details.isPremium,
-                    planType: details.planType,
-                    endDate: endDateISO,
-                    timestamp: new Date().toISOString()
-                }));
+    const refreshSubscription = useMemo(() => {
+        return async () => {
+            console.log(' [refreshSubscription] Début de la vérification du statut premium');
+            const currentUser = auth.currentUser; // Utiliser directement auth.currentUser
+            
+            if (!currentUser) {
+                console.log(' [refreshSubscription] Aucun utilisateur connecté, statut premium désactivé');
+                setIsPremium(false);
+                setSubscriptionDetails(null);
+                return;
             }
 
-            console.log(' [refreshSubscription] Statut premium mis à jour:', details.isPremium);
-        } catch (error) {
-            console.error('Error refreshing subscription:', error);
-            setIsPremium(false);
-            setSubscriptionDetails(null);
-        }
+            try {
+                console.log(' [refreshSubscription] Vérification du statut premium pour l\'utilisateur:', currentUser.uid);
+                const details = await subscriptionService.getSubscriptionDetails(currentUser.uid);
+                console.log(' [refreshSubscription] Détails de l\'abonnement:', details);
+
+                setIsPremium(details.isPremium);
+                setSubscriptionDetails({
+                    planType: details.planType,
+                    endDate: details.endDate,
+                    daysRemaining: details.daysRemaining
+                });
+
+                // Stocker en localStorage pour une récupération immédiate au chargement
+                if (typeof window !== 'undefined') {
+                    // Vérifier que endDate est une Date valide avant d'appeler toISOString()
+                    const endDateISO = details.endDate && details.endDate instanceof Date && !isNaN(details.endDate.getTime())
+                        ? details.endDate.toISOString()
+                        : null;
+                    
+                    localStorage.setItem('premiumStatus', JSON.stringify({
+                        isPremium: details.isPremium,
+                        planType: details.planType,
+                        endDate: endDateISO,
+                        timestamp: new Date().toISOString()
+                    }));
+                }
+
+                console.log(' [refreshSubscription] Statut premium mis à jour:', details.isPremium);
+            } catch (error) {
+                console.error('Error refreshing subscription:', error);
+                setIsPremium(false);
+                setSubscriptionDetails(null);
+            }
+        };
     }, []);
+
+    // Mettre à jour le statut de présence de l'utilisateur
+    const updateUserPresence = async (uid: string, status: 'online' | 'offline' | 'idle' | 'away') => {
+        try {
+            await userService.updateUserProfile(uid, { presence: status });
+        } catch (error) {
+            console.error('Erreur lors de la mise à jour du statut de présence:', error);
+        }
+    };
+
+    // Gérer la visibilité de l'onglet
+    useEffect(() => {
+        const handleVisibilityChange = async () => {
+            if (user && user.uid) {
+                if (document.visibilityState === 'visible') {
+                    await updateUserPresence(user.uid, 'online');
+                } else {
+                    await updateUserPresence(user.uid, 'away');
+                }
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [user]);
 
     // Initialiser l'état avec l'utilisateur actuel s'il est déjà connecté
     useEffect(() => {
@@ -229,6 +280,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
             if (user) {
                 try {
+                    // Mettre à jour le statut en ligne lors de la connexion
+                    await updateUserPresence(user.uid, 'online');
+                    
                     const profile = await userService.getUserProfile(user.uid);
                     if (profile) {
                         setUserProfile(profile);
@@ -267,6 +321,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                     console.error('Error loading user profile:', error);
                 }
             } else {
+                // Mettre à jour le statut hors ligne lors de la déconnexion
+                if (userProfile?.uid) {
+                    try {
+                        await updateUserPresence(userProfile.uid, 'offline');
+                    } catch (error) {
+                        console.error('Erreur lors de la mise à jour du statut hors ligne:', error);
+                    }
+                }
                 setUserProfile(null);
                 setBookmarkedIds([]);
                 setIsPremium(false);
@@ -276,28 +338,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setLoading(false);
         });
 
-        return () => unsubscribe();
+        // Nettoyage lors du démontage du composant
+        return () => {
+            // Mettre à jour le statut hors ligne lors de la déconnexion
+            if (userProfile?.uid) {
+                updateUserPresence(userProfile.uid, 'offline').catch(console.error);
+            }
+            unsubscribe();
+        };
     }, []);
 
+    // Mettre à jour le thème dans le profil utilisateur uniquement si nécessaire
     useEffect(() => {
-        if (userProfile && user) {
-            const updates: Partial<UserProfile> = {};
-            if (theme !== undefined) updates.theme = theme;
-
-            if (Object.keys(updates).length > 0) {
-                userService.updateUserProfile(user.uid, updates);
+        if (userProfile && user && theme !== undefined) {
+            // Vérifier si le thème a réellement changé avant de mettre à jour
+            if (theme !== userProfile.theme) {
+                const updates: Partial<UserProfile> = { theme };
+                // Ne pas attendre la fin de la mise à jour pour éviter les retards d'UI
+                userService.updateUserProfile(user.uid, updates).catch(error => {
+                    console.error('Failed to update user theme:', error);
+                });
             }
         }
     }, [theme, userProfile, user]);
-
-    const setTheme = (newTheme: 'light' | 'dark') => {
-        setThemeState(newTheme);
-    };
-
-    const setAutoplay = (value: boolean) => {
-        setAutoplayState(value);
-        localStorage.setItem('autoplay', String(value));
-    };
 
     const toggleBookmark = async (id: string, title: string, description: string, image: string, isseries: boolean = false) => {
         if (!user || !user.email) return;
@@ -365,7 +428,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsSidebarCollapsed(!isSidebarCollapsed);
     };
 
-    const value = {
+    const value = useMemo(() => ({
         theme,
         setTheme,
         language,
@@ -387,12 +450,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         toggleSidebarCollapse,
         activeTab,
         setActiveTab,
-        isPremium,
+        isPremium: isPremium ?? false,
         subscriptionDetails,
         refreshSubscription,
         homeViewMode,
         setHomeViewMode,
-    };
+    }), [
+        theme,
+        language,
+        t,
+        isAuthenticated,
+        bookmarkedIds,
+        user,
+        userProfile,
+        loading,
+        autoplay,
+        isSidebarCollapsed,
+        activeTab,
+        isPremium,
+        subscriptionDetails,
+        homeViewMode,
+        // Fonctions
+        setTheme,
+        setLanguage,
+        setIsAuthenticated,
+        toggleBookmark,
+        toggleSeriesBookmark,
+        setUserProfile,
+        setAutoplay,
+        setIsSidebarCollapsed,
+        toggleSidebarCollapse,
+        setActiveTab,
+        refreshSubscription,
+        setHomeViewMode,
+    ]);
 
     return (
         <AppContext.Provider value={value}>

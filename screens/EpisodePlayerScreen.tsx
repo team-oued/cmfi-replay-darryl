@@ -2,7 +2,9 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { MediaContent } from '../types';
-import { EpisodeSerie, episodeSerieService, seasonSerieService, serieService, likeService, commentService, Comment, generateDefaultAvatar, viewService } from '../lib/firestore';
+import { EpisodeSerie, episodeSerieService, seasonSerieService, serieService, likeService, commentService, Comment, generateDefaultAvatar, viewService, getLastWatchedPosition, statsVuesService } from '../lib/firestore';
+import { doc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import {
     PlayIcon, PauseIcon, ArrowLeftIcon, ChevronLeftIcon, ChevronRightIcon,
     LikeIcon, ShareIcon, PlusIcon,
@@ -36,7 +38,17 @@ const formatTime = (seconds: number) => {
 };
 
 // --- Video Player Component ---
-const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () => void, onEnded?: () => void, onPlayingStateChange?: (isPlaying: boolean) => void }> = ({ src, poster, onUnavailable, onEnded, onPlayingStateChange }) => {
+const VideoPlayer: React.FC<{ 
+    src?: string, 
+    poster: string, 
+    onUnavailable: () => void, 
+    onEnded?: () => void, 
+    onPlayingStateChange?: (isPlaying: boolean) => void,
+    initialPosition?: number,
+    videoUid: string,
+    isEpisode?: boolean,
+    episodeRef?: any
+}> = ({ src, poster, onUnavailable, onEnded, onPlayingStateChange, initialPosition = 0, videoUid, isEpisode = false, episodeRef }) => {
     const { t } = useAppContext();
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -45,8 +57,9 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
     const [duration, setDuration] = useState(0);
     const [currentTime, setCurrentTime] = useState(0);
     const [isMuted, setIsMuted] = useState(false);
-    const [volume, setVolume] = useState(1);
+    const [isPip, setIsPip] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [autoplayEnabled, setAutoplayEnabled] = useState(true);
     const [playbackRate, setPlaybackRate] = useState(1);
     const [buffered, setBuffered] = useState(0);
     const [isScrubbing, setIsScrubbing] = useState(false);
@@ -62,7 +75,6 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
                         pipElement.pause();
                     }
                     await document.exitPictureInPicture();
-                    console.log('PiP fermé et lecture mise en pause');
                 } catch (err) {
                     console.error('Erreur lors de la fermeture du PiP :', err);
                 }
@@ -71,11 +83,62 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
 
         closePiP();
     }, []);
+
+    // Positionner la lecture à la position enregistrée
+    useEffect(() => {
+        if (videoRef.current && initialPosition > 0) {
+            videoRef.current.currentTime = initialPosition;
+            // Mettre à jour la barre de progression
+            setProgress((initialPosition / duration) * 100);
+            setCurrentTime(initialPosition);
+        }
+    }, [initialPosition]);
     const [isLoading, setIsLoading] = useState(true);
     const wasPlayingRef = useRef(false);
-    const [unavailable, setUnavailable] = useState(false);
     const [showControls, setShowControls] = useState(false);
     const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const lastSavedPosition = useRef(0);
+    const saveIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const { userProfile } = useAppContext();
+    const [unavailable, setUnavailable] = useState(false);
+
+    // Sauvegarder la position de lecture toutes les 10 secondes
+    useEffect(() => {
+        if (!userProfile?.uid || !videoUid) return;
+
+        const saveProgress = async () => {
+            if (!videoRef.current) return;
+            
+            const currentTime = Math.floor(videoRef.current.currentTime);
+            
+            // Ne sauvegarder que si la position a changé d'au moins 5 secondes
+            if (Math.abs(currentTime - lastSavedPosition.current) >= 5) {
+                try {
+                    await statsVuesService.updateViewingProgress(
+                        userProfile.uid,
+                        videoUid,
+                        currentTime,
+                        isEpisode
+                    );
+                    lastSavedPosition.current = currentTime;
+                } catch (error) {
+                    console.error('Erreur lors de la sauvegarde de la position:', error);
+                }
+            }
+        };
+
+        // Démarrer l'enregistrement périodique
+        saveIntervalRef.current = setInterval(saveProgress, 10000); // Toutes les 10 secondes
+
+        // Sauvegarder aussi lors du démontage du composant
+        return () => {
+            if (saveIntervalRef.current) {
+                clearInterval(saveIntervalRef.current);
+            }
+            // Dernière sauvegarde à la fermeture
+            saveProgress().catch(console.error);
+        };
+    }, [userProfile?.uid, videoUid, isEpisode, episodeRef]);
 
     const togglePlay = () => {
         const wasPlaying = !videoRef.current?.paused;
@@ -171,7 +234,8 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
         };
         const handleLoadedMetadata = () => setDuration(video.duration);
         const handleVolumeChange = () => {
-            setVolume(video.volume);
+            // Mise à jour uniquement de l'état isMuted
+            // Le volume est géré directement par l'élément vidéo
             setIsMuted(video.muted);
         };
         const handleEnded = () => {
@@ -237,6 +301,7 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
         setDuration(0);
         setCurrentTime(0);
         setBuffered(0);
+        setUnavailable(!src || !src.trim());
         try {
             video.pause();
             video.load();
@@ -328,6 +393,30 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
         } else if (document.pictureInPictureEnabled) {
             await videoRef.current.requestPictureInPicture();
         }
+    };
+
+    const toggleAutoplay = () => {
+        const newAutoplayState = !autoplayEnabled;
+        setAutoplayEnabled(newAutoplayState);
+        
+        // Afficher une notification élégante
+        toast.success(`Lecture automatique ${newAutoplayState ? 'activée' : 'désactivée'}`, {
+            position: 'bottom-center',
+            autoClose: 2000,
+            hideProgressBar: true,
+            closeOnClick: true,
+            pauseOnHover: true,
+            draggable: true,
+            style: {
+                background: 'rgba(26, 32, 44, 0.95)',
+                color: '#fff',
+                borderRadius: '8px',
+                padding: '12px 20px',
+                fontSize: '14px',
+                fontWeight: 500,
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
+            }
+        });
     };
 
     // Fermer le PIP quand la source de la vidéo change
@@ -499,9 +588,48 @@ const VideoPlayer: React.FC<{ src?: string, poster: string, onUnavailable: () =>
                                 <span>{formatTime(currentTime)} / {formatTime(duration)}</span>
                             </div>
                             <div className="flex items-center space-x-2 sm:space-x-4">
-                                <button onClick={togglePip}><PipIcon className="w-6 h-6" /></button>
-                                <button onClick={toggleFullscreen}>
-                                    {isFullscreen ? <FullscreenExitIcon className="w-6 h-6" /> : <FullscreenEnterIcon className="w-6 h-6" />}
+                                <button 
+                                    onClick={toggleAutoplay}
+                                    className={`relative w-12 h-6 rounded-full p-0.5 transition-colors duration-200 ${autoplayEnabled ? 'bg-amber-500' : 'bg-gray-700'}`}
+                                    title={`Lecture automatique ${autoplayEnabled ? 'activée' : 'désactivée'}`}
+                                >
+                                    <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-200 ${autoplayEnabled ? 'translate-x-6' : 'translate-x-0'}`}>
+                                        {autoplayEnabled ? (
+                                            <svg 
+                                                viewBox="0 0 24 24" 
+                                                fill="currentColor"
+                                                className="w-full h-full text-amber-500"
+                                            >
+                                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
+                                                <path d="M10 16l6-4-6-4v8z" />
+                                            </svg>
+                                        ) : (
+                                            <svg 
+                                                viewBox="0 0 24 24" 
+                                                fill="currentColor"
+                                                className="w-full h-full text-gray-700"
+                                            >
+                                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
+                                                <path d="M9 16h2V8H9v8zm4 0h2V8h-2v8z" />
+                                            </svg>
+                                        )}
+                                    </div>
+                                </button>
+                                <button 
+                                    onClick={togglePip} 
+                                    className="p-1 text-white hover:bg-white/20 rounded-full transition-colors duration-200"
+                                    title="Mode image dans l'image"
+                                >
+                                    <PipIcon className="w-6 h-6" />
+                                </button>
+                                <button 
+                                    onClick={toggleFullscreen}
+                                    className="p-1 text-white hover:bg-white/20 rounded-full transition-colors duration-200"
+                                >
+                                    {isFullscreen ? 
+                                        <FullscreenExitIcon className="w-6 h-6" /> : 
+                                        <FullscreenEnterIcon className="w-6 h-6" />
+                                    }
                                 </button>
                             </div>
                         </div>
@@ -654,6 +782,7 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
     const [isCheckingPremium, setIsCheckingPremium] = useState(true);
     const [showAd, setShowAd] = useState(true);
     const [premiumForAll, setPremiumForAll] = useState(false);
+    const [initialPlaybackPosition, setInitialPlaybackPosition] = useState(0);
 
     const handleAuthRequired = (action: string) => {
         setAuthAction(action);
@@ -695,8 +824,6 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
 
                 // Vérifier si la série ou la saison est premium
                 const isContentPremium = Boolean(serie.premium_text?.trim() || season.premium_text?.trim());
-                console.log('Contenu premium:', isContentPremium);
-                console.log('Utilisateur premium:', isPremium);
                 setIsPremiumContent(isContentPremium);
 
                 // Si c'est du contenu premium et que l'utilisateur n'est pas premium, afficher le paywall
@@ -757,6 +884,36 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
         // Réinitialiser la pub quand l'épisode change
         setShowAd(true);
     }, [episode.uid_episode, userProfile]);
+
+    // Mettre à jour le titre de la page avec le nom de l'épisode
+    useEffect(() => {
+        if (episode?.title) {
+            document.title = `${episode.title}`;
+        }
+        
+        // Restaurer le titre par défaut lors du démontage du composant
+        return () => {
+            document.title = 'CMFI Replay';
+        };
+    }, [episode]);
+
+    // Charger la position de lecture précédente
+    useEffect(() => {
+        const loadPlaybackPosition = async () => {
+            if (!userProfile?.uid || !episode?.uid_episode) return;
+            
+            try {
+                const position = await getLastWatchedPosition(userProfile.uid, episode.uid_episode);
+                if (position > 0) {
+                    setInitialPlaybackPosition(position);
+                }
+            } catch (error) {
+                console.error('Erreur lors du chargement de la position de lecture:', error);
+            }
+        };
+
+        loadPlaybackPosition();
+    }, [userProfile?.uid, episode?.uid_episode]);
 
     // Track view after 30 seconds of watching (only when video is playing)
     const watchTimeRef = useRef(0);
@@ -1050,6 +1207,9 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
                                     onUnavailable={onReturnHome}
                                     onEnded={handleVideoEnded}
                                     onPlayingStateChange={setVideoIsPlaying}
+                                    initialPosition={initialPlaybackPosition}
+                                    videoUid={episode.uid_episode}
+                                    isEpisode={true}
                                 />
                             )}
                         </div>

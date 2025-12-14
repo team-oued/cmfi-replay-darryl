@@ -43,10 +43,7 @@ import Header from './components/Header';
 import { ActiveTab, MediaContent, MediaType } from './types';
 import { serieService, seasonSerieService, episodeSerieService, EpisodeSerie } from './lib/firestore';
 import { usePageTitle } from './lib/pageTitle';
-import { initializeMovieViews, userService } from './lib/firestore';
-import { generateDefaultAvatar } from './lib/firestore';
-import UserAvatar from './components/UserAvatar';
-import { User } from './types';
+import { initializeMovieViews } from './lib/firestore';
 
 const getTitleFromPath = (path: string, t: (key: string) => string): string => {
     if (path === '/home') return t('home');
@@ -92,29 +89,7 @@ const AppContent: React.FC = () => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [playingItem, setPlayingItem] = useState<{ media: MediaContent; episode?: EpisodeSerie } | null>(null);
     const [episodesCache, setEpisodesCache] = useState<{ serieId: string; episodes: EpisodeSerie[] } | null>(null);
-    const [onlineUsers, setOnlineUsers] = useState<User[]>([]);
 
-    // Fetch active users when component mounts
-    useEffect(() => {
-        const fetchActiveUsers = async () => {
-            try {
-                const activeUserProfiles = await userService.getActiveUsers(50);
-                const formattedUsers: User[] = activeUserProfiles.map(profile => ({
-                    id: profile.uid,
-                    name: profile.display_name || 'Unknown User',
-                    avatarUrl: profile.photo_url || generateDefaultAvatar(profile.display_name),
-                    isOnline: profile.presence === 'online' || profile.presence === 'idle'
-                }));
-                setOnlineUsers(formattedUsers);
-            } catch (error) {
-                console.error('Error fetching active users:', error);
-            }
-        };
-
-        if (isAuthenticated) {
-            fetchActiveUsers();
-        }
-    }, [isAuthenticated]);
 
     const toggleSidebarCollapse = () => {
         contextToggleSidebarCollapse();
@@ -353,16 +328,6 @@ const AppContent: React.FC = () => {
                                         onSelectMedia={handleSelectMedia}
                                         onPlay={handlePlay}
                                     />
-                                    {user?.isAdmin && onlineUsers.length > 0 && (
-                                        <div className="mt-auto border-t border-gray-200 dark:border-gray-800 pt-4 px-4 pb-6">
-                                            <h3 className="text-lg font-semibold mb-3">Active Now</h3>
-                                            <div className="flex space-x-4 overflow-x-auto scrollbar-hide pb-2">
-                                                {onlineUsers.map((user) => (
-                                                    <UserAvatar key={user.id} user={user} />
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
                                 </div>
                             } />
 

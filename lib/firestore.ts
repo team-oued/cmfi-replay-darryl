@@ -1,18 +1,19 @@
-import { db } from './firebase.ts';
-import {
-    collection,
-    doc,
-    getDoc,
-    getDocs,
-    setDoc,
-    updateDoc,
-    deleteDoc,
-    query,
-    where,
-    orderBy,
-    limit,
-    arrayUnion,
-    arrayRemove,
+import { db } from './firebase';
+import { 
+    collection, 
+    doc, 
+    getDoc, 
+    setDoc, 
+    updateDoc, 
+    deleteDoc, 
+    arrayUnion, 
+    arrayRemove, 
+    query, 
+    where, 
+    limit, 
+    getDocs, 
+    orderBy, 
+    onSnapshot,
     Timestamp,
     writeBatch,
     DocumentReference,
@@ -159,7 +160,7 @@ export interface BookSeries {
 // Interface pour la collection stats_vues
 export interface StatsVues {
     id?: string;
-    dateDernierUpdate: string;
+    dateDernierUpdate: Date | Timestamp;
     idEpisodeSerie?: DocumentReference; // Référence à un épisode de série (absent si c'est un film)
     uid: string; // uid de l'épisode ou du film
     nombreLectures: number;
@@ -336,6 +337,31 @@ export const userService = {
             console.error('Error getting all users:', error);
             return [];
         }
+    },
+
+    /**
+     * S'abonne aux mises à jour en temps réel des utilisateurs en ligne
+     * @param callback Fonction de rappel appelée à chaque mise à jour
+     * @returns Fonction pour se désabonner
+     */
+    subscribeToOnlineUsers(callback: (users: UserProfile[]) => void): () => void {
+        const q = query(
+            collection(db, USERS_COLLECTION),
+            where('presence', '==', 'online'),
+            orderBy('display_name')
+        );
+
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+            const users = querySnapshot.docs.map(doc => ({
+                ...doc.data(),
+                uid: doc.id
+            } as UserProfile));
+            callback(users);
+        }, (error) => {
+            console.error('Error subscribing to online users:', error);
+        });
+
+        return unsubscribe;
     }
 };
 
@@ -853,6 +879,77 @@ export const seasonSerieService = {
 };
 
 // Fonction utilitaire pour calculer et mettre à jour les vues des épisodes
+/**
+ * Récupère la dernière position de lecture d'un épisode pour un utilisateur donné
+ * @param userId ID de l'utilisateur
+ * @param episodeUid UID de l'épisode
+ * @returns La dernière position de lecture en secondes, ou 0 si non trouvée
+ */
+export const getLastWatchedPosition = async (userId: string, episodeUid: string): Promise<number> => {
+    try {
+        // Trouver la référence de l'épisode à partir de son UID
+        const episodeQuery = query(
+            collection(db, EPISODES_SERIES_COLLECTION),
+            where('uid_episode', '==', episodeUid),
+            limit(1)
+        );
+        const episodeSnapshot = await getDocs(episodeQuery);
+        
+        if (episodeSnapshot.empty) return 0;
+        
+        const episodeRef = doc(db, EPISODES_SERIES_COLLECTION, episodeSnapshot.docs[0].id);
+        
+        // Rechercher la position de lecture avec la référence de l'épisode
+        const q = query(
+            collection(db, STATS_VUES_COLLECTION),
+            where('idEpisodeSerie', '==', episodeRef),
+            where('user', '==', doc(db, USERS_COLLECTION, userId)),
+            limit(1)
+        );
+
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+            const stats = querySnapshot.docs[0].data() as StatsVues;
+            return stats.tempsRegarde || 0;
+        }
+        
+        return 0;
+    } catch (error) {
+        console.error('Erreur lors de la récupération de la position de lecture:', error);
+        return 0;
+    }
+};
+
+/**
+ * Récupère la dernière position de lecture d'un film pour un utilisateur donné
+ * @param userId ID de l'utilisateur
+ * @param movieId ID du film
+ * @returns La dernière position de lecture en secondes, ou 0 si non trouvée
+ */
+export const getLastWatchedPositionForMovie = async (userId: string, movieId: string): Promise<number> => {
+    try {
+        const q = query(
+            collection(db, STATS_VUES_COLLECTION),
+            where('uid', '==', movieId),
+            where('user', '==', doc(db, USERS_COLLECTION, userId)),
+            limit(1)
+        );
+
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+            const stats = querySnapshot.docs[0].data() as StatsVues;
+            return stats.tempsRegarde || 0;
+        }
+        
+        return 0;
+    } catch (error) {
+        console.error('Erreur lors de la récupération de la position de lecture du film:', error);
+        return 0;
+    }
+};
+
 export const updateEpisodeViews = async (): Promise<void> => {
     try {
         console.log('Début du calcul des vues des épisodes...');
@@ -1497,7 +1594,7 @@ export interface ContinueWatchingItem {
     episodeTitle?: string;
     uid_episode?: string; // uid_episode pour récupérer l'épisode directement
     episodeId?: string; // ID du document Firestore (fallback si uid_episode manquant)
-    dateDernierUpdate: string;
+    dateDernierUpdate: Date | Timestamp;
 }
 
 // Service pour stats_vues
@@ -1593,14 +1690,48 @@ export const statsVuesService = {
         userUid: string,
         videoUid: string,
         currentTime: number, // en secondes
-        isEpisode: boolean = false,
-        episodeRef?: DocumentReference // Optionnel, requis si c'est un épisode
+        isEpisode: boolean = false
     ): Promise<void> {
         try {
             const userRef = doc(db, USERS_COLLECTION, userUid);
             const now = new Date().toISOString();
 
-            // Vérifier s'il existe déjà une entrée pour cet utilisateur et cette vidéo
+            // Si c'est un épisode, on récupère d'abord la référence de l'épisode
+            let episodeRef: DocumentReference | null = null;
+            if (isEpisode) {
+                const episodeQuery = query(
+                    collection(db, EPISODES_SERIES_COLLECTION),
+                    where('uid_episode', '==', videoUid),
+                    limit(1)
+                );
+                const episodeSnapshot = await getDocs(episodeQuery);
+                if (!episodeSnapshot.empty) {
+                    episodeRef = doc(db, EPISODES_SERIES_COLLECTION, episodeSnapshot.docs[0].id);
+
+                    // Vérifier s'il existe déjà une entrée avec le même idEpisodeSerie et le même utilisateur
+                    const existingByEpisodeRef = query(
+                        collection(db, STATS_VUES_COLLECTION),
+                        where('user', '==', userRef),
+                        where('idEpisodeSerie', '==', episodeRef)
+                    );
+
+                    const existingByEpisodeSnapshot = await getDocs(existingByEpisodeRef);
+
+                    if (!existingByEpisodeSnapshot.empty) {
+                        // Mise à jour de l'entrée existante avec le même idEpisodeSerie
+                        const docRef = existingByEpisodeSnapshot.docs[0].ref;
+                        await updateDoc(docRef, {
+                            tempsRegarde: currentTime,
+                            dateDernierUpdate: Timestamp.now(),
+                            uid: videoUid, // Mettre à jour l'UID avec la nouvelle valeur
+                            isEpisode: true
+                        });
+                        return;
+                    }
+                }
+            }
+
+            // Vérifier s'il existe déjà une entrée pour cet utilisateur et cette vidéo (par UID)
             const q = query(
                 collection(db, STATS_VUES_COLLECTION),
                 where('user', '==', userRef),
@@ -1612,20 +1743,28 @@ export const statsVuesService = {
             if (!querySnapshot.empty) {
                 // Mise à jour de l'entrée existante
                 const docRef = querySnapshot.docs[0].ref;
-                await updateDoc(docRef, {
+                const updateData: any = {
                     tempsRegarde: currentTime,
-                    dateDernierUpdate: now,
-                    ...(isEpisode && { idEpisodeSerie: episodeRef })
-                });
+                    dateDernierUpdate: Timestamp.now(),
+                    isEpisode: isEpisode
+                };
+
+                // Si on a une référence d'épisode, on l'ajoute
+                if (episodeRef) {
+                    updateData.idEpisodeSerie = episodeRef;
+                }
+
+                await updateDoc(docRef, updateData);
             } else {
                 // Création d'une nouvelle entrée
                 const newViewData: Omit<StatsVues, 'id'> = {
                     uid: videoUid,
                     user: userRef,
                     tempsRegarde: currentTime,
-                    dateDernierUpdate: now,
+                    dateDernierUpdate: Timestamp.now(),
                     nombreLectures: 1, // Première lecture
-                    ...(isEpisode && { idEpisodeSerie: episodeRef })
+                    isEpisode: isEpisode,
+                    ...(episodeRef && { idEpisodeSerie: episodeRef })
                 };
 
                 await addDoc(collection(db, STATS_VUES_COLLECTION), newViewData);

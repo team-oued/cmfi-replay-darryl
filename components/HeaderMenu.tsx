@@ -3,6 +3,7 @@ import { EllipsisVerticalIcon, LogoutIcon, GlobeIcon } from './icons';
 import { useAppContext } from '../context/AppContext';
 import { Language } from '../lib/i18n';
 import { auth } from '../lib/firebase';
+import { userService } from '../lib/firestore';
 import { toast } from 'react-toastify';
 
 interface HeaderMenuProps {
@@ -12,7 +13,7 @@ interface HeaderMenuProps {
 const HeaderMenu: React.FC<HeaderMenuProps> = ({ variant = 'dark' }) => {
     const [isOpen, setIsOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
-    const { t, setIsAuthenticated, language, setLanguage } = useAppContext();
+    const { t, setIsAuthenticated, language, setLanguage, user } = useAppContext();
 
     const iconColor = variant === 'light' ? 'text-white' : 'text-gray-600 dark:text-gray-400';
     const hoverBg = variant === 'light' ? 'hover:bg-white/20' : 'hover:bg-gray-200 dark:hover:bg-gray-700';
@@ -31,8 +32,19 @@ const HeaderMenu: React.FC<HeaderMenuProps> = ({ variant = 'dark' }) => {
 
     const handleLogout = async () => {
         try {
+            // Mettre à jour le statut hors ligne avant la déconnexion
+            if (user?.uid) {
+                try {
+                    await userService.updateUserProfile(user.uid, { presence: 'offline' });
+                } catch (updateError) {
+                    console.error('Erreur lors de la mise à jour du statut hors ligne:', updateError);
+                }
+            }
+            
+            // Déconnexion de Firebase Auth
             await auth.signOut();
             setIsAuthenticated(false);
+            
             // Rediriger vers l'écran d'accueil après la déconnexion
             window.location.href = '/';
         } catch (error) {

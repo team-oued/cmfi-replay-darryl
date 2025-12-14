@@ -56,6 +56,7 @@ export interface User {
     name: string;
     avatarUrl: string;
     isOnline: boolean;
+    presence?: 'online' | 'offline' | 'idle' | 'away';
 }
 
 export enum ActiveTab {

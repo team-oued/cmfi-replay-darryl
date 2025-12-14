@@ -14,6 +14,7 @@ import { PlayIcon } from '../components/icons';
 import { MediaContent, User, MediaType } from '../types';
 import { useAppContext, HomeViewMode } from '../context/AppContext';
 import { userService, generateDefaultAvatar, likeService, movieService, episodeSerieService, statsVuesService, ContinueWatchingItem, viewService, Movie, Serie, serieService } from '../lib/firestore';
+import { UsersOnline } from '../components/UsersOnline';
 import ContinueWatchingSection from '../components/ContinueWatchingSection';
 import InfoBar from '../components/InfoBar';
 
@@ -134,9 +135,7 @@ interface HomeScreenProps {
 }
 
 const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigateToCategory }) => {
-    const { t, user, homeViewMode: viewMode } = useAppContext();
-    const [activeUsers, setActiveUsers] = useState<User[]>([]);
-    const [loadingUsers, setLoadingUsers] = useState(true);
+    const { t, user, userProfile, homeViewMode: viewMode } = useAppContext();
     const [mostLikedItems, setMostLikedItems] = useState<Array<{ content: MediaContent; likeCount: number; viewCount?: number }>>([]);
     const [loadingMostLiked, setLoadingMostLiked] = useState(true);
     const [mostWatchedItems, setMostWatchedItems] = useState<Array<{ content: MediaContent; likeCount: number; viewCount: number }>>([]);
@@ -166,27 +165,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
             setLoadingCategories(false);
         }, 1000);
         return () => clearTimeout(timer);
-    }, []);
-
-    useEffect(() => {
-        const fetchActiveUsers = async () => {
-            try {
-                const activeUserProfiles = await userService.getActiveUsers(50);
-                const formattedUsers: User[] = activeUserProfiles.map(profile => ({
-                    id: profile.uid,
-                    name: profile.display_name || 'Unknown User',
-                    avatarUrl: profile.photo_url || generateDefaultAvatar(profile.display_name),
-                    isOnline: profile.presence === 'online' || profile.presence === 'idle'
-                }));
-                setActiveUsers(formattedUsers);
-            } catch (error) {
-                console.error('Error fetching active users:', error);
-            } finally {
-                setLoadingUsers(false);
-            }
-        };
-
-        fetchActiveUsers();
     }, []);
 
     useEffect(() => {
@@ -747,6 +725,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                     )}
                 </div>
 
+                {/* Section Utilisateurs en ligne */}
+                {userProfile?.isAdmin && (
+                <div className="animate-fadeIn" style={{ animationDelay: '75ms' }}>
+                    <div className="px-4 md:px-6 lg:px-8 mt-6">
+                        <UsersOnline />
+                    </div>
+                </div>
+                )}
+
                 {/* Barre d'information déroulante */}
                 <InfoBar />
 
@@ -1033,6 +1020,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                 )}
             </div>
 
+            {/* Section Utilisateurs en ligne */}
+            <div className="animate-fadeIn" style={{ animationDelay: '75ms' }}>
+                <div className="px-4 md:px-6 lg:px-8 mt-6">
+                    <UsersOnline />
+                </div>
+            </div>
+
             {/* Barre d'information déroulante */}
             <InfoBar />
 
@@ -1269,23 +1263,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                 )}
             </div>
 
-            {/* Section Active Now - Visible uniquement pour les administrateurs */}
-            {/*             {user?.isAdmin && (
-                <div className="space-y-4">
-                    {loadingUsers ? (
-                        <section className="py-4">
-                            <h3 className="text-xl font-bold px-4 mb-3">{t('activeNow')}</h3>
-                            <div className="flex space-x-4 overflow-x-auto px-4 scrollbar-hide pb-2">
-                                {[...Array(8)].map((_, i) => (
-                                    <UserAvatarSkeleton key={i} />
-                                ))}
-                            </div>
-                        </section>
-                    ) : (
-                        <UserRow title={`${t('activeNow')} (Admin)`} users={activeUsers} />
-                    )}
-                </div>
-            )} */}
+            {/* Section Active Now supprimée */}
         </div>
     );
 };

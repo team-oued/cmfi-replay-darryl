@@ -17,7 +17,7 @@ import {
     TrashIcon
 } from '../components/icons';
 import { useAppContext } from '../context/AppContext';
-import { userService, UserProfile, generateDefaultAvatar } from '../lib/firestore';
+import { UserProfile } from '../lib/firestore';
 import { appSettingsService } from '../lib/appSettingsService';
 import PremiumBadge from '../components/PremiumBadge';
 
@@ -82,34 +82,10 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigate, onSelectMedia, 
     }, [userProfile?.isAdmin]);
 
     const navigateRouter = useNavigate();
-    const [onlineUsers, setOnlineUsers] = useState<User[]>([]);
-    const [loadingUsers, setLoadingUsers] = useState(true);
     const [historyItems, setHistoryItems] = useState<ContinueWatchingItem[]>([]);
     const [loadingHistory, setLoadingHistory] = useState(true);
 
-    // Récupérer les utilisateurs actifs depuis Firestore
-    useEffect(() => {
-        const fetchActiveUsers = async () => {
-            try {
-                const activeUserProfiles = await userService.getActiveUsers(50);
-                const formattedUsers: User[] = activeUserProfiles.map(profile => ({
-                    id: profile.uid,
-                    name: profile.display_name || 'Unknown User',
-                    avatarUrl: profile.photo_url || generateDefaultAvatar(profile.display_name),
-                    isOnline: profile.presence === 'online' || profile.presence === 'idle'
-                }));
-                setOnlineUsers(formattedUsers);
-            } catch (error) {
-                console.error('Error fetching active users:', error);
-            } finally {
-                setLoadingUsers(false);
-            }
-        };
-
-        fetchActiveUsers();
-    }, []);
-
-    // Récupérer l'historique depuis Firebase
+// Récupérer l'historique depuis Firebase
     useEffect(() => {
         const fetchHistory = async () => {
             if (!user) {
