@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { MediaContent, MediaType, Episode } from '../types';
 import HeaderMenu from '../components/HeaderMenu';
-import { PlayIcon, PlusIcon, ArrowLeftIcon, ChevronDownIcon, VolumeHighIcon, LikeIcon, CommentIcon, CheckIcon } from '../components/icons';
+import { PlayIcon, PlusIcon, ArrowLeftIcon, ChevronDownIcon, VolumeHighIcon, LikeIcon, CommentIcon, CheckIcon, ShareIcon } from '../components/icons';
 import { useAppContext } from '../context/AppContext';
 import { serieService, Serie, seasonSerieService, SeasonSerie, episodeSerieService, EpisodeSerie } from '../lib/firestore';
 import { Movie, movieService, likeService, commentService, Comment as FirestoreComment } from '../lib/firestore';
@@ -70,6 +70,7 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
     const [comments, setComments] = useState<FirestoreComment[]>([]);
     const [isLoadingLikes, setIsLoadingLikes] = useState(false);
     const [isLoadingComments, setIsLoadingComments] = useState(false);
+    const [isSharing, setIsSharing] = useState(false);
     const descriptionThreshold = 150;
     const isLongDescription = description && description.length > descriptionThreshold;
     const isBookmarked = bookmarkedIds.includes(item.id);
@@ -246,6 +247,56 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
         }
     };
 
+    const handleShare = async () => {
+        if (isSharing) return;
+        
+        setIsSharing(true);
+        
+        try {
+            // Déterminer le chemin en fonction du type de média
+            let mediaPath = '';
+            if (type === MediaType.Movie) {
+                mediaPath = `/movie/${item.id}`;
+            } else if (type === MediaType.Series) {
+                mediaPath = `/serie/${item.id}`;
+            } else if (type === MediaType.Podcast) {
+                mediaPath = `/podcast/${item.id}`;
+            } else {
+                // Fallback générique si le type n'est pas reconnu
+                mediaPath = `/media/${item.id}`;
+            }
+
+            const shareUrl = `${window.location.origin}${mediaPath}`;
+            const shareData = {
+                title: item.title,
+                text: `Retrouvez "${item.title}" sur le CMFI Replay${item.description ? ` - ${item.description.substring(0, 80)}...` : ''}`,
+                url: shareUrl,
+            };
+
+            // Vérifier si l'API Web Share est disponible (principalement sur mobile)
+            if (navigator.share) {
+                await navigator.share(shareData);
+            } else {
+                // Fallback pour les navigateurs qui ne supportent pas l'API Web Share
+                await navigator.clipboard.writeText(shareUrl);
+                toast.success('Lien copié dans le presse-papier', {
+                    position: 'bottom-center',
+                    autoClose: 2000,
+                });
+            }
+        } catch (error) {
+            if (error instanceof Error && error.name !== 'AbortError') {
+                console.error('Erreur lors du partage:', error);
+                toast.error('Erreur lors du partage', {
+                    position: 'bottom-center',
+                    autoClose: 2000,
+                });
+            }
+        } finally {
+            setIsSharing(false);
+        }
+    };
+
     return (
         <div className="animate-fadeIn pb-8 md:pb-12 bg-[#FBF9F3] dark:bg-black min-h-screen">
             <div className="relative h-[50vh] md:h-[60vh] lg:h-[65vh]">
@@ -287,7 +338,7 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
                             </span>
                         )}
                         {languages && languages.length > 0 && (
-                            <span className="px-2.5 py-1 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium text-xs md:text-sm">
+                            <span className="px-2.5 py-1 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs md:text-sm">
                                 {languages[0].toUpperCase()}
                             </span>
                         )}
@@ -324,44 +375,61 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
                     </div>
                 )}
 
-                {/* Boutons d'action améliorés */}
-                <div className="flex flex-wrap items-center gap-3 md:gap-4">
-                    <button 
-                        onClick={handlePlay} 
-                        className="flex items-center justify-center gap-2 bg-amber-500 text-gray-900 font-bold py-3 md:py-3.5 px-6 md:px-8 rounded-lg md:rounded-xl hover:bg-amber-400 transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl"
-                    >
-                        <PlayIcon className="w-5 h-5 md:w-6 md:h-6" />
-                        <span className="text-sm md:text-base">{t('play')}</span>
-                    </button>
-                    {type === MediaType.Movie && (
+                {/* Boutons d'action optimisés pour mobile */}
+                <div className="w-full">
+                    {/* Bouton Play - Toujours en pleine largeur */}
+                    <div className="mb-3 sm:mb-4">
+                        <button 
+                            onClick={handlePlay} 
+                            className="w-full flex items-center justify-center gap-2 bg-amber-500 text-gray-900 font-bold py-2.5 sm:py-3 md:py-3.5 px-4 sm:px-6 md:px-8 rounded-lg md:rounded-xl hover:bg-amber-400 transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl text-sm sm:text-base"
+                        >
+                            <PlayIcon className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
+                            <span>{t('play')}</span>
+                        </button>
+                    </div>
+                    
+                    {/* Boutons secondaires - Même ligne pour les films */}
+                    <div className={`grid ${type === MediaType.Movie ? 'grid-cols-3' : 'grid-cols-2'} gap-2 sm:gap-3 md:gap-4`}>
+                        {type === MediaType.Movie && (
+                            <button
+                                onClick={handleLike}
+                                className={`flex flex-col items-center justify-center gap-1 font-bold py-2.5 px-2 sm:px-3 md:px-4 rounded-lg md:rounded-xl backdrop-blur-sm transition-all duration-300 hover:scale-105 text-xs sm:text-sm ${
+                                    hasLiked
+                                        ? 'bg-red-500 text-white hover:bg-red-600'
+                                        : 'bg-gray-200/90 dark:bg-gray-800/90 text-gray-900 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-700'
+                                }`}
+                                disabled={isLoading}
+                            >
+                                <LikeIcon className={`w-4 h-4 sm:w-5 sm:h-5 ${hasLiked ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
+                                <span className="text-[10px] xs:text-xs">{hasLiked ? t('liked') : t('like')}</span>
+                            </button>
+                        )}
+                        
                         <button
-                            onClick={handleLike}
-                            className={`flex items-center justify-center gap-2 font-bold py-3 md:py-3.5 px-5 md:px-6 rounded-lg md:rounded-xl backdrop-blur-sm transition-all duration-300 hover:scale-105 ${
-                                hasLiked
-                                    ? 'bg-red-500 text-white hover:bg-red-600'
+                            onClick={() => toggleBookmark(item.id)}
+                            className={`flex flex-col items-center justify-center gap-1 font-bold py-2.5 px-2 sm:px-3 md:px-4 rounded-lg md:rounded-xl backdrop-blur-sm transition-all duration-300 hover:scale-105 text-xs sm:text-sm ${
+                                isBookmarked
+                                    ? 'bg-amber-500 text-gray-900 hover:bg-amber-400'
                                     : 'bg-gray-200/90 dark:bg-gray-800/90 text-gray-900 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-700'
                             }`}
-                            disabled={isLoading}
                         >
-                            <LikeIcon className={`w-5 h-5 md:w-6 md:h-6 ${hasLiked ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
-                            <span className="text-sm md:text-base">{hasLiked ? t('liked') : t('like')}</span>
+                            {isBookmarked ? (
+                                <CheckIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                            ) : (
+                                <PlusIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                            )}
+                            <span className="text-[10px] xs:text-xs whitespace-nowrap">{isBookmarked ? t('addedToList') : t('myList')}</span>
                         </button>
-                    )}
-                    <button
-                        onClick={() => toggleBookmark(item.id)}
-                        className={`flex items-center justify-center gap-2 font-bold py-3 md:py-3.5 px-5 md:px-6 rounded-lg md:rounded-xl backdrop-blur-sm transition-all duration-300 hover:scale-105 ${
-                            isBookmarked
-                                ? 'bg-amber-500 text-gray-900 hover:bg-amber-400'
-                                : 'bg-gray-200/90 dark:bg-gray-800/90 text-gray-900 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-700'
-                        }`}
-                    >
-                        {isBookmarked ? (
-                            <CheckIcon className="w-5 h-5 md:w-6 md:h-6" />
-                        ) : (
-                            <PlusIcon className="w-5 h-5 md:w-6 md:h-6" />
-                        )}
-                        <span className="text-sm md:text-base">{isBookmarked ? t('addedToList') : t('myList')}</span>
-                    </button>
+                        
+                        <button
+                            onClick={handleShare}
+                            disabled={isSharing}
+                            className="flex flex-col items-center justify-center gap-1 font-bold py-2.5 px-2 sm:px-3 md:px-4 rounded-lg md:rounded-xl bg-gray-200/90 dark:bg-gray-800/90 text-gray-900 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-700 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-sm"
+                        >
+                            <ShareIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                            <span className="text-[10px] xs:text-xs">{t('share') || 'Partager'}</span>
+                        </button>
+                    </div>
                 </div>
 
                 {/* Description avec meilleure lisibilité */}

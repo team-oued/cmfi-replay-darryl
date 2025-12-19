@@ -20,6 +20,7 @@ import { useAppContext } from '../context/AppContext';
 import { UserProfile } from '../lib/firestore';
 import { appSettingsService } from '../lib/appSettingsService';
 import PremiumBadge from '../components/PremiumBadge';
+import { authService } from '../lib/authService';
 
 const SettingsItem: React.FC<{
     Icon: React.FC<{ className?: string }>;
@@ -85,7 +86,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigate, onSelectMedia, 
     const [historyItems, setHistoryItems] = useState<ContinueWatchingItem[]>([]);
     const [loadingHistory, setLoadingHistory] = useState(true);
 
-// Récupérer l'historique depuis Firebase
+    // Récupérer l'historique depuis Firebase
     useEffect(() => {
         const fetchHistory = async () => {
             if (!user) {
@@ -176,6 +177,16 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigate, onSelectMedia, 
         },
     ] : [];
 
+    const handleLogout = async () => {
+        try {
+            await authService.signOut();
+            setIsAuthenticated(false);
+            navigateRouter('/login');
+        } catch (error) {
+            console.error('Erreur lors de la déconnexion:', error);
+        }
+    };
+
     return (
         <div className="pt-4">
             <div className="flex flex-col items-center p-6 space-y-3 border-b border-gray-200 dark:border-gray-800">
@@ -240,7 +251,12 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigate, onSelectMedia, 
                     </div>
                 )}
                 <div className="mt-4 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden divide-y divide-gray-200 dark:divide-gray-800">
-                    <SettingsItem Icon={LogoutIcon} label={t('logout')} isDestructive onClick={() => setIsAuthenticated(false)} />
+                    <SettingsItem 
+                        Icon={LogoutIcon} 
+                        label={t('logout')} 
+                        isDestructive 
+                        onClick={handleLogout} 
+                    />
                 </div>
             </section>
 
