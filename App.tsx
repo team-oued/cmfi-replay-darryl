@@ -191,24 +191,10 @@ const AppContent: React.FC = () => {
         return <GetStartedScreen onGetStarted={() => setHasStarted(true)} />;
     }
 
-    // Route publique pour /watch/:uid (accessible sans authentification)
-    const isWatchRoute = location.pathname.startsWith('/watch/');
-
     // Afficher un indicateur de chargement pendant la vérification de l'authentification
-    // mais garder la sidebar fonctionnelle
     if (loading) {
         return (
             <div className="min-h-screen bg-[#FBF9F3] dark:bg-black">
-                {/* Sidebar toujours accessible */}
-                <Sidebar
-                    isOpen={isSidebarOpen}
-                    onClose={() => setIsSidebarOpen(false)}
-                    activeTab={contextActiveTab}
-                    setActiveTab={setContextActiveTab}
-                    isCollapsed={contextIsSidebarCollapsed}
-                    toggleCollapse={contextToggleSidebarCollapse}
-                />
-
                 {/* Header avec bouton de menu fonctionnel */}
                 <Header
                     title=""
@@ -227,7 +213,7 @@ const AppContent: React.FC = () => {
         );
     }
 
-    if (!isAuthenticated && !isWatchRoute) {
+    if (!isAuthenticated) {
         return (
             <Routes>
                 <Route path="/login" element={<LoginScreen />} />
@@ -239,7 +225,7 @@ const AppContent: React.FC = () => {
     }
 
     // Déterminer si on doit afficher la bottom nav
-    const showBottomNav = isAuthenticated && !location.pathname.startsWith('/watch/') && !['/login', '/register', '/forgot-password'].includes(location.pathname);
+    const showBottomNav = !location.pathname.startsWith('/watch/') && !['/login', '/register', '/forgot-password'].includes(location.pathname);
 
     // Toujours permettre l'ouverture/fermeture de la sidebar, même pendant le chargement
     const handleToggleSidebar = () => {
@@ -276,7 +262,7 @@ const AppContent: React.FC = () => {
             />
 
             {/* Ne pas afficher le header sur les pages de lecture vidéo */}
-            {!isWatchRoute && (
+            {!location.pathname.startsWith('/watch/') && (
                 <Header
                     title={location.pathname === '/home' ? t('home') :
                         getTitleFromPath(location.pathname, t)}
@@ -286,9 +272,9 @@ const AppContent: React.FC = () => {
                 />
             )}
 
-            <div className={`page-transition fadeIn min-h-screen ${showBottomNav ? 'pb-20' : ''} ${!isWatchRoute ? 'pt-16 md:pt-16' : 'pt-0'} transition-all duration-300 ease-in-out ${contextIsSidebarCollapsed ? 'lg:pl-16' : 'lg:pl-64'}`}>
+            <div className={`page-transition fadeIn min-h-screen ${showBottomNav ? 'pb-20' : ''} ${!location.pathname.startsWith('/watch/') ? 'pt-16 md:pt-16' : 'pt-0'} transition-all duration-300 ease-in-out ${contextIsSidebarCollapsed ? 'lg:pl-16' : 'lg:pl-64'}`}>
                 <Routes>
-                    {/* Watch Route - Accessible sans authentification */}
+                    {/* Watch Route - Maintenant protégée par authentification */}
                     <Route path="/watch/:uid" element={
                         <WatchScreen onReturnHome={handleReturnHome} />
                     } />
