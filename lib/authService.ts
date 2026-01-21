@@ -107,7 +107,11 @@ export const authService = {
             const user = auth.currentUser;
             if (user) {
                 try {
-                    await userService.updateUserProfile(user.uid, { presence: 'offline' });
+                    // Mettre à jour le statut à offline ET lastSeen pour éviter qu'il soit remis à online
+                    await userService.updateUserProfile(user.uid, { 
+                        presence: 'offline',
+                        lastSeen: new Date() // Mettre à jour lastSeen pour éviter qu'il soit remis à online
+                    });
                 } catch (error) {
                     console.error('Erreur lors de la mise à jour du statut hors ligne:', error);
                 }

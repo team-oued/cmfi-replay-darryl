@@ -175,6 +175,11 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigate, onSelectMedia, 
             label: 'Gérer les publicités',
             action: () => navigateRouter('/manage-ads')
         },
+        {
+            icon: SettingsIcon,
+            label: 'Gérer les utilisateurs',
+            action: () => navigateRouter('/manage-users')
+        },
     ] : [];
 
     const handleLogout = async () => {

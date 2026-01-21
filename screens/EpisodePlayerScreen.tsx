@@ -1,8 +1,9 @@
 // screens/EpisodePlayerScreen.tsx
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { MediaContent } from '../types';
-import { EpisodeSerie, episodeSerieService, seasonSerieService, serieService, likeService, commentService, Comment, generateDefaultAvatar, viewService, getLastWatchedPosition, statsVuesService } from '../lib/firestore';
+import { EpisodeSerie, episodeSerieService, seasonSerieService, serieService, likeService, commentService, Comment, generateDefaultAvatar, viewService, getLastWatchedPosition, statsVuesService, SeasonSerie } from '../lib/firestore';
 import { doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import {
@@ -771,8 +772,12 @@ interface EpisodePlayerScreenProps {
 }
 
 const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode, onBack, onNavigateEpisode, onReturnHome }) => {
+    const navigate = useNavigate();
     const { t, bookmarkedIds, toggleSeriesBookmark, userProfile, autoplay, isPremium } = useAppContext();
     const [episodesInSerie, setEpisodesInSerie] = useState<EpisodeSerie[]>([]);
+    const [episodesInSeason, setEpisodesInSeason] = useState<EpisodeSerie[]>([]);
+    const [currentSeason, setCurrentSeason] = useState<SeasonSerie | null>(null);
+    const [serieUid, setSerieUid] = useState<string | null>(null);
     const [likeCount, setLikeCount] = useState(0);
     const [hasLiked, setHasLiked] = useState(false);
     const [showAuthPrompt, setShowAuthPrompt] = useState(false);
@@ -802,7 +807,7 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
         loadPremiumForAll();
     }, []);
 
-    // Vérifier si le contenu est premium
+    // Récupérer les informations de la saison et vérifier si le contenu est premium
     useEffect(() => {
         const checkPremiumStatus = async () => {
             try {
@@ -813,6 +818,10 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
                     setIsPremiumContent(false);
                     return;
                 }
+
+                // Stocker les informations de la saison
+                setCurrentSeason(season);
+                setSerieUid(season.uid_serie);
 
                 // Récupérer la série
                 const serie = await serieService.getSerieByUid(season.uid_serie);
@@ -847,20 +856,34 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
         const fetchEpisodes = async () => {
             try {
                 const serie = await serieService.getSerieByUid(item.id);
-                if (!serie) { setEpisodesInSerie([]); return; }
+                if (!serie) { 
+                    setEpisodesInSerie([]); 
+                    setEpisodesInSeason([]);
+                    return; 
+                }
                 const seasons = await seasonSerieService.getSeasonsBySerie(serie.uid_serie);
-                if (seasons.length === 0) { setEpisodesInSerie([]); return; }
+                if (seasons.length === 0) { 
+                    setEpisodesInSerie([]); 
+                    setEpisodesInSeason([]);
+                    return; 
+                }
                 const episodesBySeason = await Promise.all(
                     seasons.map(async (s) => await episodeSerieService.getEpisodesBySeason(s.uid_season))
                 );
-                setEpisodesInSerie(episodesBySeason.flat());
+                const allEpisodes = episodesBySeason.flat();
+                setEpisodesInSerie(allEpisodes);
+                
+                // Filtrer les épisodes de la même saison que l'épisode actuel
+                const currentSeasonEpisodes = await episodeSerieService.getEpisodesBySeason(episode.uid_season);
+                setEpisodesInSeason(currentSeasonEpisodes);
             } catch (error) {
                 console.error('Error fetching episodes list:', error);
                 setEpisodesInSerie([]);
+                setEpisodesInSeason([]);
             }
         };
         fetchEpisodes();
-    }, [item.id]);
+    }, [item.id, episode.uid_season]);
 
     // Fetch like data
     useEffect(() => {
@@ -1192,6 +1215,27 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Colonne de gauche - Lecteur vidéo et métadonnées */}
                     <div className="lg:col-span-2 space-y-6">
+                        {/* Titre de la saison avec lien vers la série */}
+                        {currentSeason && serieUid && (
+                            <div className="flex items-center gap-2 text-sm md:text-base">
+                                <button
+                                    onClick={() => navigate(`/serie/${serieUid}`)}
+                                    className="text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 font-semibold transition-colors duration-200 hover:underline"
+                                >
+                                    {item.title}
+                                </button>
+                                <span className="text-gray-500 dark:text-gray-400">•</span>
+                                <span className="text-gray-700 dark:text-gray-300 font-medium">
+                                    {t('season')} {currentSeason.season_number}
+                                    {currentSeason.title_season && (
+                                        <span className="ml-2 text-gray-600 dark:text-gray-400">
+                                            - {currentSeason.title_season}
+                                        </span>
+                                    )}
+                                </span>
+                            </div>
+                        )}
+                        
                         <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl ring-2 ring-black/20 dark:ring-white/5">
                             {showAd && (
                                 <AdPlayer
@@ -1285,6 +1329,54 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
                         </div>
                     </div>
                 </div>
+
+                {/* Section des autres épisodes de la saison */}
+                {episodesInSeason.length > 0 && (
+                    <div className="mt-8 space-y-4">
+                        <h3 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">
+                            {t('otherEpisodes') || 'Autres épisodes de la saison'}
+                        </h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                            {episodesInSeason
+                                .filter(e => e.uid_episode !== episode.uid_episode) // Exclure l'épisode actuel
+                                .sort((a, b) => (a.episode_numero || 0) - (b.episode_numero || 0)) // Trier par numéro d'épisode
+                                .map(otherEpisode => (
+                                    <div
+                                        key={otherEpisode.uid_episode}
+                                        onClick={() => onNavigateEpisode(otherEpisode)}
+                                        className="group relative bg-gray-100/50 dark:bg-gray-800/40 rounded-lg overflow-hidden cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-xl"
+                                    >
+                                        <div className="relative aspect-video bg-gray-300 dark:bg-gray-700">
+                                            {otherEpisode.picture_path ? (
+                                                <img 
+                                                    src={otherEpisode.picture_path} 
+                                                    alt={otherEpisode.title}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center">
+                                                    <PlayIcon className="w-12 h-12 text-gray-400 dark:text-gray-600" />
+                                                </div>
+                                            )}
+                                            <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                                                <PlayIcon className="w-12 h-12 text-white/80 group-hover:text-white group-hover:scale-110 transition-transform" />
+                                            </div>
+                                            {otherEpisode.runtime_h_m && (
+                                                <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                                                    {otherEpisode.runtime_h_m}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="p-3">
+                                            <h4 className="font-semibold text-gray-900 dark:text-white text-sm md:text-base truncate">
+                                                {otherEpisode.episode_numero}. {otherEpisode.title}
+                                            </h4>
+                                        </div>
+                                    </div>
+                                ))}
+                        </div>
+                    </div>
+                )}
 
                 {showAuthPrompt && (
                     <AuthPrompt

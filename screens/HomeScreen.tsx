@@ -14,7 +14,6 @@ import { PlayIcon } from '../components/icons';
 import { MediaContent, User, MediaType } from '../types';
 import { useAppContext, HomeViewMode } from '../context/AppContext';
 import { userService, generateDefaultAvatar, likeService, movieService, episodeSerieService, statsVuesService, ContinueWatchingItem, viewService, Movie, Serie, serieService } from '../lib/firestore';
-import { UsersOnline } from '../components/UsersOnline';
 import ContinueWatchingSection from '../components/ContinueWatchingSection';
 import InfoBar from '../components/InfoBar';
 
@@ -725,14 +724,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                     )}
                 </div>
 
-                {/* Section Utilisateurs en ligne */}
-                {userProfile?.isAdmin && (
-                <div className="animate-fadeIn" style={{ animationDelay: '75ms' }}>
-                    <div className="px-4 md:px-6 lg:px-8 mt-6">
-                        <UsersOnline />
-                    </div>
-                </div>
-                )}
 
                 {/* Barre d'information déroulante */}
                 <InfoBar />
@@ -1020,12 +1011,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                 )}
             </div>
 
-            {/* Section Utilisateurs en ligne */}
-            <div className="animate-fadeIn" style={{ animationDelay: '75ms' }}>
-                <div className="px-4 md:px-6 lg:px-8 mt-6">
-                    <UsersOnline />
-                </div>
-            </div>
 
             {/* Barre d'information déroulante */}
             <InfoBar />

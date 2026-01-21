@@ -35,6 +35,7 @@ export interface UserProfile {
     createdAt?: Date | Timestamp;
     updatedAt?: Date | Timestamp;
     isAdmin?: boolean;
+    lastSeen?: Date | Timestamp; // Timestamp de la dernière activité
 }
 
 // Interface pour la collection series
@@ -240,9 +241,15 @@ export const userService = {
     async updateUserProfile(uid: string, updates: Partial<UserProfile>): Promise<UserProfile> {
         try {
             const userRef = doc(db, USERS_COLLECTION, uid);
+            // Convertir lastSeen en Timestamp si c'est une Date
+            const firestoreUpdates: any = { ...updates };
+            if (updates.lastSeen instanceof Date) {
+                firestoreUpdates.lastSeen = Timestamp.fromDate(updates.lastSeen);
+            }
+            
             await updateDoc(userRef, {
-                ...updates,
-                updatedAt: new Date()
+                ...firestoreUpdates,
+                updatedAt: Timestamp.now() // Utiliser Timestamp.now() pour la cohérence
             });
 
             // Récupérer le document mis à jour pour le retourner
@@ -341,21 +348,257 @@ export const userService = {
 
     /**
      * S'abonne aux mises à jour en temps réel des utilisateurs en ligne
+     * Filtre les utilisateurs avec lastSeen récent (< 3 minutes) pour éviter les "fantômes"
      * @param callback Fonction de rappel appelée à chaque mise à jour
+     * @param includeInactive Si true, inclut aussi les utilisateurs offline avec lastSeen récent
      * @returns Fonction pour se désabonner
      */
-    subscribeToOnlineUsers(callback: (users: UserProfile[]) => void): () => void {
+    subscribeToOnlineUsers(callback: (users: (UserProfile & { lastSeen?: Date | Timestamp | number; updatedAt?: Date | Timestamp })[]) => void, includeInactive: boolean = false): () => void {
+        // Note: On ne peut pas utiliser orderBy avec where('in') sans index composite
+        // On fait donc le tri côté client
+        const presenceFilter = includeInactive 
+            ? where('presence', 'in', ['online', 'away', 'idle', 'offline'])
+            : where('presence', 'in', ['online', 'away', 'idle']);
+        
         const q = query(
             collection(db, USERS_COLLECTION),
-            where('presence', '==', 'online'),
-            orderBy('display_name')
+            presenceFilter
         );
 
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
-            const users = querySnapshot.docs.map(doc => ({
-                ...doc.data(),
-                uid: doc.id
-            } as UserProfile));
+            const now = Date.now();
+            const oneMinuteAgo = now - (1 * 60 * 1000); // 1 minute en millisecondes
+            const threeMinutesAgo = now - (3 * 60 * 1000); // 3 minutes en millisecondes (gardé pour compatibilité)
+            
+            const users = querySnapshot.docs
+                .map(doc => {
+                    const data = doc.data();
+                    // Préserver le Timestamp original si c'est un Timestamp Firestore
+                    const originalLastSeen = data.lastSeen;
+                    let lastSeenTimestamp = 0;
+                    let lastSeenOriginal: Date | Timestamp | undefined = undefined;
+                    
+                    // Essayer de récupérer lastSeen
+                    if (originalLastSeen) {
+                        if (originalLastSeen instanceof Timestamp) {
+                            lastSeenTimestamp = originalLastSeen.toMillis();
+                            lastSeenOriginal = originalLastSeen;
+                        } else if (originalLastSeen instanceof Date) {
+                            lastSeenTimestamp = originalLastSeen.getTime();
+                            lastSeenOriginal = originalLastSeen;
+                        } else if (typeof originalLastSeen === 'object' && 'toMillis' in originalLastSeen) {
+                            // Cas où c'est un Timestamp Firestore mais pas reconnu comme Timestamp
+                            lastSeenTimestamp = (originalLastSeen as any).toMillis();
+                            lastSeenOriginal = originalLastSeen as Timestamp;
+                        } else if (typeof originalLastSeen === 'number') {
+                            // Cas où c'est déjà un timestamp en millisecondes
+                            lastSeenTimestamp = originalLastSeen;
+                            lastSeenOriginal = new Date(originalLastSeen);
+                        } else {
+                            // Essayer de convertir en Date
+                            try {
+                                const date = new Date(originalLastSeen as any);
+                                if (!isNaN(date.getTime())) {
+                                    lastSeenTimestamp = date.getTime();
+                                    lastSeenOriginal = date;
+                                }
+                            } catch (e) {
+                                // Ignorer les erreurs de conversion
+                            }
+                        }
+                    }
+                    
+                    // Si pas de lastSeen, utiliser updatedAt comme fallback pour tous les statuts
+                    if (lastSeenTimestamp === 0) {
+                        const updatedAt = data.updatedAt;
+                        if (updatedAt) {
+                            if (updatedAt instanceof Timestamp) {
+                                lastSeenTimestamp = updatedAt.toMillis();
+                                lastSeenOriginal = updatedAt;
+                            } else if (updatedAt instanceof Date) {
+                                lastSeenTimestamp = updatedAt.getTime();
+                                lastSeenOriginal = updatedAt;
+                            } else if (typeof updatedAt === 'object' && 'toMillis' in updatedAt) {
+                                lastSeenTimestamp = (updatedAt as any).toMillis();
+                                lastSeenOriginal = updatedAt as Timestamp;
+                            }
+                        }
+                    }
+                    
+                    // Préserver updatedAt pour l'affichage
+                    let updatedAtOriginal: Date | Timestamp | undefined = undefined;
+                    if (data.updatedAt) {
+                        if (data.updatedAt instanceof Timestamp) {
+                            updatedAtOriginal = data.updatedAt;
+                        } else if (data.updatedAt instanceof Date) {
+                            updatedAtOriginal = data.updatedAt;
+                        } else if (typeof data.updatedAt === 'object' && 'toMillis' in data.updatedAt) {
+                            updatedAtOriginal = data.updatedAt as Timestamp;
+                        }
+                    }
+                    
+                    return {
+                        ...data,
+                        uid: doc.id,
+                        lastSeen: lastSeenTimestamp,
+                        lastSeenOriginal: lastSeenOriginal,
+                        updatedAt: updatedAtOriginal
+                    } as UserProfile & { lastSeen: number; lastSeenOriginal?: Date | Timestamp; updatedAt?: Date | Timestamp };
+                })
+                .filter(user => {
+                    // Si includeInactive est true, on inclut tous les utilisateurs (même offline)
+                    // Sinon, on filtre seulement les actifs (< 1 minute)
+                    const oneMinuteAgoFilter = Date.now() - (1 * 60 * 1000);
+                    if (includeInactive) {
+                        return true; // Inclure tous les utilisateurs si on veut voir les inactifs
+                    }
+                    // Pour les utilisateurs actifs uniquement, vérifier le statut ET lastSeen
+                    // Si presence est 'online', inclure même si lastSeen n'est pas encore défini (connexion récente)
+                    if (user.presence === 'online') {
+                        // Si online, inclure même sans lastSeen (connexion très récente)
+                        // ou si lastSeen est récent (< 1 minute)
+                        if (!user.lastSeen || user.lastSeen === 0) {
+                            return true; // Utilisateur vient de se connecter, inclure
+                        }
+                        return user.lastSeen > oneMinuteAgoFilter;
+                    }
+                    // Pour les autres statuts (away, idle), filtrer par lastSeen récent
+                    if (!user.lastSeen || user.lastSeen === 0) {
+                        return false; // Pas de lastSeen = considérer comme offline, ne pas inclure dans les actifs
+                    }
+                    return user.lastSeen > oneMinuteAgoFilter;
+                })
+                .map(user => {
+                    // Mettre à jour automatiquement le statut basé sur lastSeen (ou updatedAt comme fallback)
+                    const now = Date.now();
+                    const tenMinutesAgo = now - (10 * 60 * 1000); // 10 minutes
+                    const oneMinuteAgo = now - (1 * 60 * 1000); // 1 minute pour détecter les déconnexions plus rapidement
+                    
+                    // Utiliser lastSeen ou updatedAt comme fallback pour déterminer l'activité
+                    // user.lastSeen peut être un Date, Timestamp, ou number (millisecondes)
+                    let activityTimestamp = 0;
+                    
+                    // Convertir lastSeen en millisecondes
+                    if (user.lastSeen) {
+                        if (user.lastSeen instanceof Date) {
+                            activityTimestamp = user.lastSeen.getTime();
+                        } else if (user.lastSeen instanceof Timestamp) {
+                            activityTimestamp = user.lastSeen.toMillis();
+                        } else if (typeof user.lastSeen === 'number') {
+                            activityTimestamp = user.lastSeen;
+                        } else if (typeof user.lastSeen === 'object' && 'toMillis' in user.lastSeen) {
+                            activityTimestamp = (user.lastSeen as any).toMillis();
+                        }
+                    }
+                    
+                    // Si pas de lastSeen, utiliser updatedAt comme fallback
+                    if (activityTimestamp === 0 && user.updatedAt) {
+                        if (user.updatedAt instanceof Date) {
+                            activityTimestamp = user.updatedAt.getTime();
+                        } else if (user.updatedAt instanceof Timestamp) {
+                            activityTimestamp = user.updatedAt.toMillis();
+                        } else if (typeof user.updatedAt === 'object' && 'toMillis' in user.updatedAt) {
+                            activityTimestamp = (user.updatedAt as any).toMillis();
+                        }
+                    }
+                    
+                    // Debug: afficher les valeurs pour comprendre le problème
+                    if (user.display_name === 'Jeunesse' || user.display_name?.toLowerCase().includes('jeunesse') || 
+                        user.display_name === 'Walter' || user.display_name?.toLowerCase().includes('walter')) {
+                        const diffMinutes = activityTimestamp > 0 ? Math.floor((now - activityTimestamp) / 60000) : 'N/A';
+                        console.log('🔍 Debug User:', {
+                            display_name: user.display_name,
+                            currentPresence: user.presence,
+                            lastSeen: user.lastSeen,
+                            lastSeenType: typeof user.lastSeen,
+                            updatedAt: user.updatedAt,
+                            activityTimestamp,
+                            now,
+                            oneMinuteAgo,
+                            tenMinutesAgo,
+                            diffMinutes,
+                            'activityTimestamp >= oneMinuteAgo': activityTimestamp >= oneMinuteAgo,
+                            'activityTimestamp >= tenMinutesAgo': activityTimestamp >= tenMinutesAgo,
+                            'activityTimestamp < oneMinuteAgo': activityTimestamp < oneMinuteAgo,
+                            'activityTimestamp < tenMinutesAgo': activityTimestamp < tenMinutesAgo
+                        });
+                    }
+                    
+                    let newPresence = user.presence;
+                    
+                    // Si l'utilisateur est déjà marqué comme 'online', le garder online même sans lastSeen (connexion très récente)
+                    if (user.presence === 'online' && activityTimestamp === 0) {
+                        // Utilisateur vient de se connecter, garder online
+                        newPresence = 'online';
+                    } else if (user.presence === 'away' && activityTimestamp === 0) {
+                        // Utilisateur vient de changer d'onglet (away), garder away même si lastSeen n'est pas encore propagé
+                        // Le heartbeat mettra à jour lastSeen dans les prochaines secondes
+                        newPresence = 'away';
+                    } else if (activityTimestamp === 0) {
+                        // Pas de lastSeen ni updatedAt = offline (jamais connecté ou profil ancien)
+                        // Si l'utilisateur était online, le passer à offline immédiatement
+                        if (user.presence === 'online') {
+                            newPresence = 'offline';
+                        } else if (user.presence !== 'away' && user.presence !== 'idle') {
+                            newPresence = 'offline';
+                        } else {
+                            // Garder away/idle même sans lastSeen (mise à jour en cours)
+                            newPresence = user.presence;
+                        }
+                    } else if (activityTimestamp >= oneMinuteAgo) {
+                        // Actif dans la dernière minute = online
+                        // activityTimestamp >= oneMinuteAgo signifie que l'activité est plus récente qu'il y a 1 minute
+                        // SAUF si l'utilisateur est explicitement offline (déconnexion récente)
+                        if (user.presence === 'offline' && activityTimestamp >= oneMinuteAgo) {
+                            // Si offline ET activité récente (< 1 min), c'est une déconnexion explicite, garder offline
+                            newPresence = 'offline';
+                        } else {
+                            newPresence = 'online';
+                        }
+                    } else if (activityTimestamp >= tenMinutesAgo) {
+                        // Actif entre 1 et 10 minutes = away/idle (inactif)
+                        // activityTimestamp >= tenMinutesAgo ET < oneMinuteAgo signifie que l'activité est entre 1 et 10 minutes
+                        // TOUJOURS passer à away si l'activité est entre 1 et 10 minutes, peu importe le statut actuel
+                        newPresence = 'away';
+                    } else {
+                        // Inactif depuis plus de 10 minutes = offline
+                        // activityTimestamp < tenMinutesAgo signifie que l'activité est plus ancienne qu'il y a 10 minutes
+                        newPresence = 'offline';
+                    }
+                    
+                    // Mettre à jour le statut si nécessaire (de manière asynchrone pour ne pas bloquer)
+                    // Ne pas mettre à jour si le statut reste le même (éviter les boucles)
+                    // IMPORTANT: Ne pas mettre à jour updatedAt lors de la mise à jour automatique du statut
+                    // car cela fausserait le calcul de lastSeen (updatedAt serait utilisé comme fallback)
+                    if (newPresence !== user.presence && user.uid) {
+                        // Mettre à jour dans Firestore de manière asynchrone
+                        // Utiliser updateDoc directement pour éviter de mettre à jour updatedAt
+                        const userRef = doc(db, USERS_COLLECTION, user.uid);
+                        updateDoc(userRef, { presence: newPresence }).catch(console.error);
+                    }
+                    
+                    return {
+                        ...user,
+                        presence: newPresence
+                    };
+                })
+                .map(user => {
+                    // Garder lastSeenOriginal pour l'affichage et préserver updatedAt
+                    const { lastSeen, lastSeenOriginal, ...profile } = user;
+                    return {
+                        ...profile,
+                        lastSeen: lastSeenOriginal,
+                        // Préserver updatedAt si disponible
+                        updatedAt: profile.updatedAt instanceof Timestamp ? profile.updatedAt :
+                                   profile.updatedAt instanceof Date ? profile.updatedAt :
+                                   profile.updatedAt ? new Date(profile.updatedAt as any) : undefined
+                    } as UserProfile & { lastSeen?: Date | Timestamp; updatedAt?: Date | Timestamp };
+                })
+                .sort((a, b) => {
+                    // Tri côté client par nom d'affichage
+                    return (a.display_name || '').localeCompare(b.display_name || '');
+                });
+            
             callback(users);
         }, (error) => {
             console.error('Error subscribing to online users:', error);

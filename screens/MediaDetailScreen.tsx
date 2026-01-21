@@ -63,6 +63,7 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
     const [firestoreSeasons, setFirestoreSeasons] = useState<SeasonSerie[]>([]);
     const [seasonEpisodes, setSeasonEpisodes] = useState<{ [key: string]: EpisodeSerie[] }>({});
+    const [selectedSeasonUid, setSelectedSeasonUid] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [movieData, setMovieData] = useState<Movie | null>(null);
     const [likeCount, setLikeCount] = useState(item.likes || 0);
@@ -149,6 +150,18 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
                     episodesData[season.uid_season] = episodes;
                 }
                 setSeasonEpisodes(episodesData);
+                
+                // Initialiser la saison sélectionnée avec la première saison ou la saison de l'épisode en cours
+                if (seasons.length > 0) {
+                    const playingSeason = playingItem?.episode && 'uid_episode' in playingItem.episode
+                        ? seasons.find(s => {
+                            const episodes = episodesData[s.uid_season] || [];
+                            return episodes.some(e => e.uid_episode === playingItem.episode?.uid_episode);
+                        })
+                        : null;
+                    
+                    setSelectedSeasonUid(playingSeason?.uid_season || seasons[0].uid_season);
+                }
             }
         } catch (error) {
             console.error('Error loading seasons and episodes:', error);
@@ -460,69 +473,80 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
 
                 {(type === MediaType.Series || type === MediaType.Podcast) && (
                     <div className="space-y-4 md:space-y-6">
-                        <h2 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white">{t('episodes')}</h2>
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white">{t('episodes')}</h2>
+                            {/* Menu déroulant pour sélectionner la saison */}
+                            {firestoreSeasons.length > 0 && (
+                                <select
+                                    value={selectedSeasonUid || ''}
+                                    onChange={(e) => setSelectedSeasonUid(e.target.value)}
+                                    className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                                >
+                                    {firestoreSeasons.map(season => (
+                                        <option key={season.uid_season} value={season.uid_season}>
+                                            {t('season')} {season.season_number}
+                                            {season.title_season ? ` - ${season.title_season}` : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                            )}
+                        </div>
                         {isLoading ? (
                             <div className="text-center py-8 md:py-12">
                                 <div className="text-gray-500 dark:text-gray-400 text-sm md:text-base">{t('loading') || 'Chargement...'}</div>
                             </div>
                         ) : (
                             <div className="space-y-2 md:space-y-3">
-                                {/* Afficher les saisons depuis Firestore si disponibles, sinon fallback vers les données mockées */}
-                                {firestoreSeasons.length > 0 ? (
-                                    firestoreSeasons.map(season => {
-                                        const isExpanded = expandedSeasons.includes(season.season_number);
-                                        const episodes = seasonEpisodes[season.uid_season] || [];
+                                {/* Afficher les épisodes de la saison sélectionnée depuis Firestore */}
+                                {firestoreSeasons.length > 0 && selectedSeasonUid ? (
+                                    (() => {
+                                        const selectedSeason = firestoreSeasons.find(s => s.uid_season === selectedSeasonUid);
+                                        const episodes = seasonEpisodes[selectedSeasonUid] || [];
+                                        if (!selectedSeason) return null;
+                                        
                                         return (
-                                            <div key={season.uid_season} className="bg-gray-100/50 dark:bg-gray-800/40 rounded-lg overflow-hidden transition-all duration-300">
-                                                <button
-                                                    onClick={() => toggleSeason(season.season_number)}
-                                                    className="w-full flex items-center justify-between p-4 text-left font-semibold hover:bg-gray-200/50 dark:hover:bg-gray-700/50"
-                                                >
-                                                    <span className="text-lg">
-                                                        {t('season')} {season.season_number}
-                                                        {season.title_season && (
-                                                            <span className="ml-2 text-base font-normal text-gray-600 dark:text-gray-400">
-                                                                - {season.title_season}
-                                                            </span>
-                                                        )}
-                                                    </span>
-                                                    <ChevronDownIcon className={`w-6 h-6 text-gray-500 dark:text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                                                </button>
-                                                {isExpanded && (
-                                                    <div className="px-2 pb-2 space-y-1 animate-fadeIn">
-                                                        {episodes.map(episode => {
-                                                            const isPlaying = season.season_number === playingEpisodeSeasonNumber && episode.uid_episode === playingItem?.episode?.uid_episode;
-                                                            return <EpisodeListItem key={episode.uid_episode} episode={episode} onClick={() => onPlay(item, episode)} isPlaying={isPlaying} />;
-                                                        })}
+                                            <div className="space-y-1">
+                                                {episodes.length > 0 ? (
+                                                    episodes.map(episode => {
+                                                        const isPlaying = selectedSeason.season_number === playingEpisodeSeasonNumber && episode.uid_episode === playingItem?.episode?.uid_episode;
+                                                        return <EpisodeListItem key={episode.uid_episode} episode={episode} onClick={() => onPlay(item, episode)} isPlaying={isPlaying} />;
+                                                    })
+                                                ) : (
+                                                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                                                        {t('noEpisodes') || 'Aucun épisode disponible pour cette saison'}
                                                     </div>
                                                 )}
                                             </div>
                                         );
-                                    })
+                                    })()
                                 ) : (
                                     /* Fallback vers les données mockées seulement si aucune donnée Firestore */
-                                    seasons && seasons.length > 0 && seasons.map(season => {
-                                        const isExpanded = expandedSeasons.includes(season.seasonNumber);
-                                        return (
-                                            <div key={season.seasonNumber} className="bg-gray-100/50 dark:bg-gray-800/40 rounded-lg overflow-hidden transition-all duration-300">
-                                                <button
-                                                    onClick={() => toggleSeason(season.seasonNumber)}
-                                                    className="w-full flex items-center justify-between p-4 text-left font-semibold hover:bg-gray-200/50 dark:hover:bg-gray-700/50"
-                                                >
-                                                    <span className="text-lg">{t('season')} {season.seasonNumber}</span>
-                                                    <ChevronDownIcon className={`w-6 h-6 text-gray-500 dark:text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                                                </button>
-                                                {isExpanded && (
-                                                    <div className="px-2 pb-2 space-y-1 animate-fadeIn">
-                                                        {season.episodes.map(episode => {
-                                                            const isPlaying = season.seasonNumber === playingEpisodeSeasonNumber && episode.episodeNumber === playingItem?.episode?.episodeNumber;
-                                                            return <EpisodeListItem key={episode.episodeNumber} episode={episode} onClick={() => onPlay(item, episode)} isPlaying={isPlaying} />;
-                                                        })}
+                                    seasons && seasons.length > 0 && (
+                                        <div className="space-y-2 md:space-y-3">
+                                            {seasons.map(season => {
+                                                const isExpanded = expandedSeasons.includes(season.seasonNumber);
+                                                return (
+                                                    <div key={season.seasonNumber} className="bg-gray-100/50 dark:bg-gray-800/40 rounded-lg overflow-hidden transition-all duration-300">
+                                                        <button
+                                                            onClick={() => toggleSeason(season.seasonNumber)}
+                                                            className="w-full flex items-center justify-between p-4 text-left font-semibold hover:bg-gray-200/50 dark:hover:bg-gray-700/50"
+                                                        >
+                                                            <span className="text-lg">{t('season')} {season.seasonNumber}</span>
+                                                            <ChevronDownIcon className={`w-6 h-6 text-gray-500 dark:text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                                        </button>
+                                                        {isExpanded && (
+                                                            <div className="px-2 pb-2 space-y-1 animate-fadeIn">
+                                                                {season.episodes.map(episode => {
+                                                                    const isPlaying = season.seasonNumber === playingEpisodeSeasonNumber && episode.episodeNumber === playingItem?.episode?.episodeNumber;
+                                                                    return <EpisodeListItem key={episode.episodeNumber} episode={episode} onClick={() => onPlay(item, episode)} isPlaying={isPlaying} />;
+                                                                })}
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })
+                                                );
+                                            })}
+                                        </div>
+                                    )
                                 )}
                             </div>
                         )}

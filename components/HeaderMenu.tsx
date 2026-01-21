@@ -35,7 +35,11 @@ const HeaderMenu: React.FC<HeaderMenuProps> = ({ variant = 'dark' }) => {
             // Mettre à jour le statut hors ligne avant la déconnexion
             if (user?.uid) {
                 try {
-                    await userService.updateUserProfile(user.uid, { presence: 'offline' });
+                    // Mettre à jour le statut à offline ET lastSeen pour éviter qu'il soit remis à online
+                    await userService.updateUserProfile(user.uid, { 
+                        presence: 'offline',
+                        lastSeen: new Date() // Mettre à jour lastSeen pour éviter qu'il soit remis à online
+                    });
                 } catch (updateError) {
                     console.error('Erreur lors de la mise à jour du statut hors ligne:', updateError);
                 }

@@ -25,6 +25,7 @@ import RedeemVoucherScreen from './screens/RedeemVoucherScreen';
 import ManageSubscriptionScreen from './screens/ManageSubscriptionScreen';
 import ManageInfoBarScreen from './screens/ManageInfoBarScreen';
 import ManageAdsScreen from './screens/ManageAdsScreen';
+import ManageUsersScreen from './screens/ManageUsersScreen';
 import PaymentSuccessScreen from './screens/PaymentSuccessScreen';
 
 // Category Screens
@@ -412,6 +413,10 @@ const AppContent: React.FC = () => {
 
                             <Route path="/manage-ads" element={
                                 <ManageAdsScreen />
+                            } />
+
+                            <Route path="/manage-users" element={
+                                <ManageUsersScreen />
                             } />
 
                             <Route path="/payment-success" element={

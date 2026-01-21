@@ -237,17 +237,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
     }, []);
 
-    // Mettre à jour le statut de présence de l'utilisateur
+    // Mettre à jour le statut de présence de l'utilisateur avec lastSeen
     const updateUserPresence = async (uid: string, status: 'online' | 'offline' | 'idle' | 'away') => {
         try {
-            await userService.updateUserProfile(uid, { presence: status });
+            await userService.updateUserProfile(uid, { 
+                presence: status,
+                lastSeen: new Date() // Mettre à jour lastSeen à chaque changement de statut
+            });
         } catch (error) {
             console.error('Erreur lors de la mise à jour du statut de présence:', error);
         }
     };
 
-    // Gérer la visibilité de l'onglet
+    // Système de heartbeat : mettre à jour lastSeen toutes les 30 secondes
     useEffect(() => {
+        if (!user?.uid) return;
+
+        // Mettre à jour immédiatement
+        updateUserPresence(user.uid, userProfile?.presence || 'online');
+
+        // Heartbeat : mettre à jour lastSeen toutes les 30 secondes
+        // Mettre à jour uniquement si l'onglet est visible (pour permettre le passage à "inactif" quand l'onglet est en arrière-plan)
+        const heartbeatInterval = setInterval(async () => {
+            if (user?.uid && document.visibilityState === 'visible') {
+                try {
+                    // Mettre à jour uniquement lastSeen sans changer le statut
+                    // Cela permet de garder le statut "online" tant que l'onglet est actif
+                    await userService.updateUserProfile(user.uid, { 
+                        lastSeen: new Date() 
+                    });
+                } catch (error) {
+                    console.error('Erreur lors du heartbeat:', error);
+                }
+            }
+        }, 30000); // Toutes les 30 secondes
+
+        // Gérer la visibilité de l'onglet
         const handleVisibilityChange = async () => {
             if (user && user.uid) {
                 if (document.visibilityState === 'visible') {
@@ -258,11 +283,63 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }
         };
 
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        return () => {
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        // Gérer la fermeture de l'onglet/application
+        const handleBeforeUnload = () => {
+            if (user?.uid) {
+                // Utiliser sendBeacon pour une mise à jour plus fiable lors de la fermeture
+                // sendBeacon est plus fiable que les requêtes async dans beforeunload
+                try {
+                    const data = JSON.stringify({
+                        uid: user.uid,
+                        presence: 'offline',
+                        lastSeen: new Date().toISOString()
+                    });
+                    
+                    // Envoyer via sendBeacon si disponible (plus fiable)
+                    if (navigator.sendBeacon) {
+                        // Note: sendBeacon nécessite une URL, on ne peut pas l'utiliser directement avec Firestore
+                        // On garde donc la méthode actuelle mais on améliore la logique de détection
+                    }
+                    
+                    // Tentative de mise à jour synchrone (peut ne pas aboutir si la page se ferme trop vite)
+                    // Le filtrage par lastSeen gérera les déconnexions si cette mise à jour échoue
+                    userService.updateUserProfile(user.uid, { 
+                        presence: 'offline',
+                        lastSeen: new Date()
+                    }).catch(() => {
+                        // Ignorer les erreurs lors de la fermeture
+                    });
+                } catch (error) {
+                    // Ignorer les erreurs
+                }
+            }
         };
-    }, [user]);
+
+        const handlePageHide = async () => {
+            if (user?.uid) {
+                try {
+                    // Mettre à jour immédiatement lors du masquage de la page
+                    await userService.updateUserProfile(user.uid, { 
+                        presence: 'offline',
+                        lastSeen: new Date()
+                    });
+                } catch (error) {
+                    // Ignorer les erreurs lors de la fermeture
+                }
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        window.addEventListener('pagehide', handlePageHide);
+
+        return () => {
+            clearInterval(heartbeatInterval);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+            window.removeEventListener('pagehide', handlePageHide);
+        };
+    }, [user, userProfile?.presence]);
 
     // Initialiser l'état avec l'utilisateur actuel s'il est déjà connecté
     useEffect(() => {
@@ -324,7 +401,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 // Mettre à jour le statut hors ligne lors de la déconnexion
                 if (userProfile?.uid) {
                     try {
-                        await updateUserPresence(userProfile.uid, 'offline');
+                        // Mettre à jour le statut à offline ET lastSeen pour éviter qu'il soit remis à online
+                        await userService.updateUserProfile(userProfile.uid, { 
+                            presence: 'offline',
+                            lastSeen: new Date() // Mettre à jour lastSeen pour éviter qu'il soit remis à online
+                        });
                     } catch (error) {
                         console.error('Erreur lors de la mise à jour du statut hors ligne:', error);
                     }
