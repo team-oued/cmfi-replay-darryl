@@ -215,7 +215,14 @@ export const userService = {
         try {
             const userDoc = await getDoc(doc(db, USERS_COLLECTION, uid));
             if (userDoc.exists()) {
-                return userDoc.data() as UserProfile;
+                const data = userDoc.data();
+                console.log('🔍 [getUserProfile] Raw data from Firestore:', {
+                    uid: data.uid,
+                    isAdmin: data.isAdmin,
+                    isAdminType: typeof data.isAdmin,
+                    allFields: Object.keys(data)
+                });
+                return data as UserProfile;
             }
             return null;
         } catch (error) {

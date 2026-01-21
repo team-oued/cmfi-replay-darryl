@@ -249,14 +249,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
     };
 
-    // Système de heartbeat : mettre à jour lastSeen toutes les 30 secondes
+    // Système de heartbeat : mettre à jour lastSeen toutes les 5 minutes
     useEffect(() => {
         if (!user?.uid) return;
 
         // Mettre à jour immédiatement
         updateUserPresence(user.uid, userProfile?.presence || 'online');
 
-        // Heartbeat : mettre à jour lastSeen toutes les 30 secondes
+        // Heartbeat : mettre à jour lastSeen toutes les 5 minutes
         // Mettre à jour uniquement si l'onglet est visible (pour permettre le passage à "inactif" quand l'onglet est en arrière-plan)
         const heartbeatInterval = setInterval(async () => {
             if (user?.uid && document.visibilityState === 'visible') {
@@ -270,7 +270,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                     console.error('Erreur lors du heartbeat:', error);
                 }
             }
-        }, 30000); // Toutes les 30 secondes
+        }, 300000); // Toutes les 5 minutes (300000 ms = 5 * 60 * 1000)
 
         // Gérer la visibilité de l'onglet
         const handleVisibilityChange = async () => {
@@ -349,6 +349,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setIsAuthenticated(true);
         }
         
+        let unsubscribeProfile: (() => void) | null = null;
+        
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             console.log(' État d\'authentification changé:', user ? `Utilisateur connecté: ${user.uid}` : 'Déconnecté');
             setUser(user);
@@ -360,6 +362,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                     // Mettre à jour le statut en ligne lors de la connexion
                     await updateUserPresence(user.uid, 'online');
                     
+                    // Charger le profil initial
                     const profile = await userService.getUserProfile(user.uid);
                     if (profile) {
                         setUserProfile(profile);
@@ -394,10 +397,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                         await subscriptionService.createFreeSubscription(user.uid);
                         await refreshSubscription();
                     }
+
+                    // S'abonner aux changements du profil en temps réel (pour détecter isAdmin, etc.)
+                    const userProfileRef = doc(db, 'users', user.uid);
+                    unsubscribeProfile = onSnapshot(userProfileRef, (snapshot) => {
+                        if (snapshot.exists()) {
+                            const rawData = snapshot.data();
+                            console.log('🔄 [onSnapshot] Raw data from Firestore:', {
+                                uid: rawData.uid,
+                                isAdmin: rawData.isAdmin,
+                                isAdminType: typeof rawData.isAdmin,
+                                isAdminValue: rawData.isAdmin,
+                                allFields: Object.keys(rawData)
+                            });
+                            const updatedProfile = rawData as UserProfile;
+                            console.log('🔄 Profil mis à jour en temps réel - isAdmin:', updatedProfile.isAdmin, 'Type:', typeof updatedProfile.isAdmin);
+                            setUserProfile(updatedProfile);
+                            // Mettre à jour le thème si changé
+                            if (updatedProfile.theme && updatedProfile.theme !== theme) {
+                                setThemeState(updatedProfile.theme);
+                            }
+                        }
+                    }, (error) => {
+                        console.error('Erreur lors de l\'écoute du profil:', error);
+                    });
                 } catch (error) {
                     console.error('Error loading user profile:', error);
                 }
             } else {
+                // Nettoyer l'abonnement au profil lors de la déconnexion
+                if (unsubscribeProfile) {
+                    unsubscribeProfile();
+                    unsubscribeProfile = null;
+                }
+                
                 // Mettre à jour le statut hors ligne lors de la déconnexion
                 if (userProfile?.uid) {
                     try {
@@ -424,6 +457,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             // Mettre à jour le statut hors ligne lors de la déconnexion
             if (userProfile?.uid) {
                 updateUserPresence(userProfile.uid, 'offline').catch(console.error);
+            }
+            // Nettoyer l'abonnement au profil
+            if (unsubscribeProfile) {
+                unsubscribeProfile();
             }
             unsubscribe();
         };

@@ -17,7 +17,7 @@ import {
     TrashIcon
 } from '../components/icons';
 import { useAppContext } from '../context/AppContext';
-import { UserProfile } from '../lib/firestore';
+import { UserProfile, userService } from '../lib/firestore';
 import { appSettingsService } from '../lib/appSettingsService';
 import PremiumBadge from '../components/PremiumBadge';
 import { authService } from '../lib/authService';
@@ -71,16 +71,25 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigate, onSelectMedia, 
     const { t, setIsAuthenticated, userProfile, user } = useAppContext();
     const [premiumForAll, setPremiumForAll] = useState(false);
 
+    // Debug: afficher la valeur de isAdmin
+    useEffect(() => {
+        // Gérer le cas où le champ s'appelle "isAdmin " (avec espace) dans Firestore
+        const isAdminValue = userProfile?.isAdmin ?? (userProfile as any)?.['isAdmin '];
+        console.log('ProfileScreen - isAdmin:', isAdminValue, 'userProfile:', userProfile);
+        console.log('ProfileScreen - Raw isAdmin field:', (userProfile as any)?.['isAdmin '], 'isAdmin (no space):', userProfile?.isAdmin);
+    }, [userProfile]);
+
     // Charger l'état de premiumForAll au montage du composant
     useEffect(() => {
         const loadPremiumForAll = async () => {
-            if (userProfile?.isAdmin) {
+            const isAdminValue = userProfile?.isAdmin ?? (userProfile as any)?.['isAdmin '];
+            if (isAdminValue) {
                 const isEnabled = await appSettingsService.isPremiumForAll();
                 setPremiumForAll(isEnabled);
             }
         };
         loadPremiumForAll();
-    }, [userProfile?.isAdmin]);
+    }, [userProfile]);
 
     const navigateRouter = useNavigate();
     const [historyItems, setHistoryItems] = useState<ContinueWatchingItem[]>([]);
@@ -163,8 +172,9 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigate, onSelectMedia, 
         },
     ];
 
-    // Items admin
-    const adminItems = userProfile?.isAdmin ? [
+    // Items admin - Gérer le cas où le champ s'appelle "isAdmin " (avec espace) dans Firestore
+    const isAdminValue = userProfile?.isAdmin ?? (userProfile as any)?.['isAdmin '];
+    const adminItems = isAdminValue ? [
         {
             icon: SettingsIcon,
             label: 'Gérer les messages d\'information',
@@ -224,7 +234,34 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigate, onSelectMedia, 
                         <SettingsItem key={item.label} Icon={item.icon} label={item.label} onClick={item.action} />
                     ))}
                 </div>
-                {userProfile?.isAdmin && (
+                {/* Bouton temporaire pour activer l'admin (si isAdmin est undefined) */}
+                {userProfile && !userProfile.isAdmin && !(userProfile as any)?.['isAdmin '] && user && (
+                    <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                        <p className="text-sm text-yellow-800 dark:text-yellow-200 mb-2">
+                            Le statut admin n'est pas défini. Cliquez pour activer l'administration.
+                        </p>
+                        <button
+                            onClick={async () => {
+                                if (user?.uid) {
+                                    try {
+                                        await userService.setAdminStatus(user.uid, true);
+                                        // Recharger le profil
+                                        const updatedProfile = await userService.getUserProfile(user.uid);
+                                        if (updatedProfile) {
+                                            window.location.reload(); // Recharger pour voir les changements
+                                        }
+                                    } catch (error) {
+                                        console.error('Erreur lors de l\'activation admin:', error);
+                                    }
+                                }
+                            }}
+                            className="bg-amber-500 hover:bg-amber-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+                        >
+                            Activer l'administration
+                        </button>
+                    </div>
+                )}
+                {isAdminValue && (
                     <div className="mt-4">
                         <h3 className="text-lg font-bold mb-3 text-amber-600 dark:text-amber-400">Administration</h3>
                         <div className="border border-amber-200 dark:border-amber-800 rounded-lg overflow-visible divide-y divide-amber-200 dark:divide-amber-800">
