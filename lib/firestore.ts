@@ -3171,6 +3171,55 @@ export const notificationService = {
     },
 
     /**
+     * Récupérer les utilisateurs par catégorie
+     */
+    async getUsersByCategory(category: 'all' | 'premium' | 'non-premium' | 'admin' | 'non-admin'): Promise<string[]> {
+        try {
+            const allUsersSnapshot = await getDocs(collection(db, USERS_COLLECTION));
+            const allUsers = allUsersSnapshot.docs.map(doc => ({
+                uid: doc.id,
+                ...doc.data()
+            })) as UserProfile[];
+
+            if (category === 'all') {
+                return allUsers.map(u => u.uid);
+            }
+
+            if (category === 'admin' || category === 'non-admin') {
+                const isAdminValue = category === 'admin';
+                return allUsers
+                    .filter(u => {
+                        const userIsAdmin = u.isAdmin ?? (u as any)?.['isAdmin '];
+                        return isAdminValue ? userIsAdmin : !userIsAdmin;
+                    })
+                    .map(u => u.uid);
+            }
+
+            // Pour premium/non-premium, vérifier les abonnements
+            if (category === 'premium' || category === 'non-premium') {
+                const { subscriptionService } = await import('./subscriptionService');
+                const userIds: string[] = [];
+                
+                for (const user of allUsers) {
+                    const isPremium = await subscriptionService.isUserPremium(user.uid);
+                    if (category === 'premium' && isPremium) {
+                        userIds.push(user.uid);
+                    } else if (category === 'non-premium' && !isPremium) {
+                        userIds.push(user.uid);
+                    }
+                }
+                
+                return userIds;
+            }
+
+            return [];
+        } catch (error) {
+            console.error('Error getting users by category:', error);
+            return [];
+        }
+    },
+
+    /**
      * Créer une notification pour TOUS les utilisateurs
      * Utile pour les annonces globales, nouvelles vidéos, etc.
      */
@@ -3223,6 +3272,273 @@ export const notificationService = {
             return { success: successCount, errors: errorCount };
         } catch (error) {
             console.error('Error creating notification for all users:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Créer une notification pour une catégorie spécifique d'utilisateurs
+     */
+    async createNotificationForCategory(
+        category: 'all' | 'premium' | 'non-premium' | 'admin' | 'non-admin',
+        title: string,
+        message: string,
+        type: 'info' | 'success' | 'warning' | 'error' = 'info',
+        link?: string
+    ): Promise<{ success: number; errors: number; category: string }> {
+        try {
+            // Récupérer les utilisateurs de la catégorie
+            const userIds = await this.getUsersByCategory(category);
+            
+            console.log(`📢 Création de notification pour ${userIds.length} utilisateurs (catégorie: ${category})...`);
+            
+            if (userIds.length === 0) {
+                console.warn(`⚠️ Aucun utilisateur trouvé pour la catégorie: ${category}`);
+                return { success: 0, errors: 0, category };
+            }
+            
+            // Créer les notifications par batch
+            const batchSize = 500;
+            let successCount = 0;
+            let errorCount = 0;
+            
+            for (let i = 0; i < userIds.length; i += batchSize) {
+                const batch = writeBatch(db);
+                const batchUserIds = userIds.slice(i, i + batchSize);
+                
+                batchUserIds.forEach(userId => {
+                    const notificationRef = doc(collection(db, NOTIFICATIONS_COLLECTION));
+                    batch.set(notificationRef, {
+                        userId,
+                        title,
+                        message,
+                        type,
+                        read: false,
+                        createdAt: Timestamp.now(),
+                        link: link || null
+                    });
+                });
+                
+                try {
+                    await batch.commit();
+                    successCount += batchUserIds.length;
+                    console.log(`✅ Batch ${Math.floor(i / batchSize) + 1} créé: ${batchUserIds.length} notifications`);
+                } catch (error) {
+                    console.error(`❌ Erreur batch ${Math.floor(i / batchSize) + 1}:`, error);
+                    errorCount += batchUserIds.length;
+                }
+            }
+            
+            console.log(`📢 Notification envoyée à la catégorie "${category}": ${successCount} succès, ${errorCount} erreurs`);
+            return { success: successCount, errors: errorCount, category };
+        } catch (error) {
+            console.error('Error creating notification for category:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Récupérer toutes les notifications avec statistiques (pour admin)
+     * Regroupe les notifications par titre/message pour voir les notifications globales
+     */
+    async getAllNotificationsGrouped(): Promise<Array<{
+        title: string;
+        message: string;
+        type: string;
+        link?: string;
+        totalCount: number;
+        readCount: number;
+        unreadCount: number;
+        createdAt: Date | Timestamp;
+        notificationIds: string[]; // IDs de toutes les notifications avec ce contenu
+    }>> {
+        try {
+            // Récupérer toutes les notifications
+            const notificationsSnapshot = await getDocs(collection(db, NOTIFICATIONS_COLLECTION));
+            const allNotifications = notificationsSnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            })) as (Notification & { id: string })[];
+
+            // Grouper par titre + message + type (notifications identiques envoyées à plusieurs users)
+            const grouped = new Map<string, {
+                title: string;
+                message: string;
+                type: string;
+                link?: string;
+                notificationIds: string[];
+                readCount: number;
+                createdAt: Date | Timestamp;
+            }>();
+
+            allNotifications.forEach(notif => {
+                const key = `${notif.title}|${notif.message}|${notif.type}|${notif.link || ''}`;
+                if (!grouped.has(key)) {
+                    grouped.set(key, {
+                        title: notif.title,
+                        message: notif.message,
+                        type: notif.type,
+                        link: notif.link,
+                        notificationIds: [],
+                        readCount: 0,
+                        createdAt: notif.createdAt
+                    });
+                }
+                const group = grouped.get(key)!;
+                group.notificationIds.push(notif.id);
+                if (notif.read) {
+                    group.readCount++;
+                }
+            });
+
+            // Convertir en array et calculer les stats
+            return Array.from(grouped.values()).map(group => ({
+                ...group,
+                totalCount: group.notificationIds.length,
+                unreadCount: group.notificationIds.length - group.readCount
+            })).sort((a, b) => {
+                // Trier par date (plus récent en premier)
+                const aTime = a.createdAt instanceof Date ? a.createdAt.getTime() : 
+                             a.createdAt instanceof Timestamp ? a.createdAt.toMillis() : 0;
+                const bTime = b.createdAt instanceof Date ? b.createdAt.getTime() : 
+                             b.createdAt instanceof Timestamp ? b.createdAt.toMillis() : 0;
+                return bTime - aTime;
+            });
+        } catch (error) {
+            console.error('Error getting all notifications grouped:', error);
+            return [];
+        }
+    },
+
+    /**
+     * Supprimer une notification pour tous les utilisateurs qui ne l'ont pas encore lue
+     * Utile pour annuler une notification avant qu'elle soit vue
+     */
+    async deleteUnreadNotifications(
+        title: string,
+        message: string,
+        type: string,
+        link?: string
+    ): Promise<{ deleted: number; errors: number }> {
+        try {
+            // Trouver toutes les notifications correspondantes qui ne sont pas lues
+            let q = query(
+                collection(db, NOTIFICATIONS_COLLECTION),
+                where('title', '==', title),
+                where('message', '==', message),
+                where('type', '==', type),
+                where('read', '==', false)
+            );
+
+            // Si link est défini, filtrer aussi par link
+            if (link) {
+                q = query(
+                    collection(db, NOTIFICATIONS_COLLECTION),
+                    where('title', '==', title),
+                    where('message', '==', message),
+                    where('type', '==', type),
+                    where('link', '==', link),
+                    where('read', '==', false)
+                );
+            }
+
+            const querySnapshot = await getDocs(q);
+            const notificationsToDelete = querySnapshot.docs;
+
+            console.log(`🗑️ Suppression de ${notificationsToDelete.length} notifications non lues...`);
+
+            // Supprimer par batch
+            const batchSize = 500;
+            let deletedCount = 0;
+            let errorCount = 0;
+
+            for (let i = 0; i < notificationsToDelete.length; i += batchSize) {
+                const batch = writeBatch(db);
+                const batchDocs = notificationsToDelete.slice(i, i + batchSize);
+
+                batchDocs.forEach(doc => {
+                    batch.delete(doc.ref);
+                });
+
+                try {
+                    await batch.commit();
+                    deletedCount += batchDocs.length;
+                    console.log(`✅ Batch ${Math.floor(i / batchSize) + 1} supprimé: ${batchDocs.length} notifications`);
+                } catch (error) {
+                    console.error(`❌ Erreur batch ${Math.floor(i / batchSize) + 1}:`, error);
+                    errorCount += batchDocs.length;
+                }
+            }
+
+            console.log(`🗑️ Suppression terminée: ${deletedCount} supprimées, ${errorCount} erreurs`);
+            return { deleted: deletedCount, errors: errorCount };
+        } catch (error) {
+            console.error('Error deleting unread notifications:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Supprimer complètement une notification pour TOUS les utilisateurs (lues et non lues)
+     */
+    async deleteAllNotifications(
+        title: string,
+        message: string,
+        type: string,
+        link?: string
+    ): Promise<{ deleted: number; errors: number }> {
+        try {
+            // Trouver toutes les notifications correspondantes (lues et non lues)
+            let q = query(
+                collection(db, NOTIFICATIONS_COLLECTION),
+                where('title', '==', title),
+                where('message', '==', message),
+                where('type', '==', type)
+            );
+
+            // Si link est défini, filtrer aussi par link
+            if (link) {
+                q = query(
+                    collection(db, NOTIFICATIONS_COLLECTION),
+                    where('title', '==', title),
+                    where('message', '==', message),
+                    where('type', '==', type),
+                    where('link', '==', link)
+                );
+            }
+
+            const querySnapshot = await getDocs(q);
+            const notificationsToDelete = querySnapshot.docs;
+
+            console.log(`🗑️ Suppression de ${notificationsToDelete.length} notifications (toutes)...`);
+
+            // Supprimer par batch
+            const batchSize = 500;
+            let deletedCount = 0;
+            let errorCount = 0;
+
+            for (let i = 0; i < notificationsToDelete.length; i += batchSize) {
+                const batch = writeBatch(db);
+                const batchDocs = notificationsToDelete.slice(i, i + batchSize);
+
+                batchDocs.forEach(doc => {
+                    batch.delete(doc.ref);
+                });
+
+                try {
+                    await batch.commit();
+                    deletedCount += batchDocs.length;
+                    console.log(`✅ Batch ${Math.floor(i / batchSize) + 1} supprimé: ${batchDocs.length} notifications`);
+                } catch (error) {
+                    console.error(`❌ Erreur batch ${Math.floor(i / batchSize) + 1}:`, error);
+                    errorCount += batchDocs.length;
+                }
+            }
+
+            console.log(`🗑️ Suppression terminée: ${deletedCount} supprimées, ${errorCount} erreurs`);
+            return { deleted: deletedCount, errors: errorCount };
+        } catch (error) {
+            console.error('Error deleting all notifications:', error);
             throw error;
         }
     }

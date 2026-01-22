@@ -58,33 +58,6 @@ const NotificationsScreen: React.FC = () => {
         }
     };
 
-    const handleCreateTestNotification = async () => {
-        if (!user?.uid) {
-            toast.error('Vous devez être connecté');
-            return;
-        }
-        try {
-            const types: ('info' | 'success' | 'warning' | 'error')[] = ['info', 'success', 'warning', 'error'];
-            const randomType = types[Math.floor(Math.random() * types.length)];
-            const messages = {
-                info: 'Ceci est une notification d\'information de test',
-                success: 'Opération réussie ! Ceci est un test.',
-                warning: 'Attention ! Ceci est une notification d\'avertissement.',
-                error: 'Erreur ! Ceci est une notification d\'erreur de test.'
-            };
-            await notificationService.createNotification(
-                user.uid,
-                `Notification de test (${randomType})`,
-                messages[randomType],
-                randomType
-            );
-            toast.success('Notification de test créée !');
-        } catch (error) {
-            console.error('Error creating test notification:', error);
-            toast.error('Erreur lors de la création');
-        }
-    };
-
     const formatDate = (date: Date | Timestamp): string => {
         let dateObj: Date;
         if (date instanceof Timestamp) {
@@ -144,23 +117,14 @@ const NotificationsScreen: React.FC = () => {
                             </span>
                         )}
                     </div>
-                    <div className="flex items-center gap-2">
+                    {unreadCount > 0 && (
                         <button
-                            onClick={handleCreateTestNotification}
-                            className="px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors border border-blue-300 dark:border-blue-700"
-                            title="Créer une notification de test"
+                            onClick={handleMarkAllAsRead}
+                            className="px-4 py-2 text-sm font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors"
                         >
-                            Test
+                            Tout marquer comme lu
                         </button>
-                        {unreadCount > 0 && (
-                            <button
-                                onClick={handleMarkAllAsRead}
-                                className="px-4 py-2 text-sm font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors"
-                            >
-                                Tout marquer comme lu
-                            </button>
-                        )}
-                    </div>
+                    )}
                 </div>
             </div>
 
