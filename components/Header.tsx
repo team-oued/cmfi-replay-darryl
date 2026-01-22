@@ -3,6 +3,7 @@ import { ArrowLeftIcon, SunIcon, MoonIcon } from './icons';
 import HeaderMenu from './HeaderMenu';
 import { useAppContext } from '../context/AppContext';
 import HamburgerMenu from './HamburgerMenu';
+import NotificationBell from './NotificationBell';
 
 interface HeaderProps {
   title: string;
@@ -42,6 +43,7 @@ const Header: React.FC<HeaderProps> = ({
 
           {/* Contrôles à droite */}
           <div className="flex items-center space-x-2">
+            <NotificationBell />
             <button
               onClick={toggleTheme}
               className="p-2 rounded-full text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
@@ -87,6 +89,7 @@ const Header: React.FC<HeaderProps> = ({
 
           {/* Contrôles alignés à droite */}
           <div className="flex items-center space-x-4">
+            {!isWatchRoute && <NotificationBell />}
             <button
               onClick={toggleTheme}
               className="p-2 rounded-full text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"

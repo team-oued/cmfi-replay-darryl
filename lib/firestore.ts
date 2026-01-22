@@ -177,6 +177,18 @@ export interface UserView {
     user_uid: string; // uid de l'utilisateur
 }
 
+// Interface pour les notifications
+export interface Notification {
+    id: string;
+    userId: string; // uid de l'utilisateur destinataire
+    title: string;
+    message: string;
+    type: 'info' | 'success' | 'warning' | 'error';
+    read: boolean;
+    createdAt: Date | Timestamp;
+    link?: string; // Lien optionnel vers une page
+}
+
 // Constantes pour les collections
 const USERS_COLLECTION = 'users';
 const MOVIES_COLLECTION = 'movies';
@@ -192,6 +204,7 @@ const STATS_VUES_COLLECTION = 'stats_vues';
 const USER_VIEW_COLLECTION = 'user_view';
 const APP_SETTINGS_COLLECTION = 'appSettings';
 const ADS_COLLECTION = 'ads';
+const NOTIFICATIONS_COLLECTION = 'notifications';
 
 // Fonction utilitaire pour générer un avatar par défaut
 export const generateDefaultAvatar = (name?: string): string => {
@@ -2996,6 +3009,220 @@ export const adService = {
             }
         } catch (error) {
             console.error('Error updating ad settings:', error);
+            throw error;
+        }
+    }
+};
+
+// Service pour les notifications
+export const notificationService = {
+    /**
+     * Créer une notification pour un utilisateur
+     */
+    async createNotification(
+        userId: string,
+        title: string,
+        message: string,
+        type: 'info' | 'success' | 'warning' | 'error' = 'info',
+        link?: string
+    ): Promise<string> {
+        try {
+            const notificationRef = doc(collection(db, NOTIFICATIONS_COLLECTION));
+            const notificationData = {
+                userId,
+                title,
+                message,
+                type,
+                read: false,
+                createdAt: Timestamp.now(),
+                link: link || null
+            };
+            await setDoc(notificationRef, notificationData);
+            return notificationRef.id;
+        } catch (error) {
+            console.error('Error creating notification:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Récupérer les notifications d'un utilisateur (non lues en premier)
+     */
+    async getUserNotifications(userId: string, limitCount: number = 50): Promise<Notification[]> {
+        try {
+            const q = query(
+                collection(db, NOTIFICATIONS_COLLECTION),
+                where('userId', '==', userId),
+                orderBy('createdAt', 'desc'),
+                limit(limitCount)
+            );
+            const querySnapshot = await getDocs(q);
+            return querySnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data(),
+                createdAt: doc.data().createdAt
+            })) as Notification[];
+        } catch (error) {
+            console.error('Error getting user notifications:', error);
+            return [];
+        }
+    },
+
+    /**
+     * Marquer une notification comme lue
+     */
+    async markAsRead(notificationId: string): Promise<void> {
+        try {
+            const notificationRef = doc(db, NOTIFICATIONS_COLLECTION, notificationId);
+            await updateDoc(notificationRef, { read: true });
+        } catch (error) {
+            console.error('Error marking notification as read:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Marquer toutes les notifications comme lues
+     */
+    async markAllAsRead(userId: string): Promise<void> {
+        try {
+            const q = query(
+                collection(db, NOTIFICATIONS_COLLECTION),
+                where('userId', '==', userId),
+                where('read', '==', false)
+            );
+            const querySnapshot = await getDocs(q);
+            const batch = writeBatch(db);
+            querySnapshot.docs.forEach(doc => {
+                batch.update(doc.ref, { read: true });
+            });
+            await batch.commit();
+        } catch (error) {
+            console.error('Error marking all notifications as read:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Supprimer une notification
+     */
+    async deleteNotification(notificationId: string): Promise<void> {
+        try {
+            const notificationRef = doc(db, NOTIFICATIONS_COLLECTION, notificationId);
+            await deleteDoc(notificationRef);
+        } catch (error) {
+            console.error('Error deleting notification:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Compter les notifications non lues
+     */
+    async getUnreadCount(userId: string): Promise<number> {
+        try {
+            const q = query(
+                collection(db, NOTIFICATIONS_COLLECTION),
+                where('userId', '==', userId),
+                where('read', '==', false)
+            );
+            const querySnapshot = await getDocs(q);
+            return querySnapshot.size;
+        } catch (error) {
+            console.error('Error getting unread count:', error);
+            return 0;
+        }
+    },
+
+    /**
+     * S'abonner aux notifications d'un utilisateur en temps réel
+     */
+    subscribeToUserNotifications(
+        userId: string,
+        callback: (notifications: Notification[]) => void
+    ): () => void {
+        // Note: Si l'index composite n'est pas créé, cette requête échouera
+        // Créez l'index via le lien fourni dans l'erreur ou dans Firebase Console
+        // Collection: notifications, Fields: userId (Ascending), createdAt (Descending)
+        const q = query(
+            collection(db, NOTIFICATIONS_COLLECTION),
+            where('userId', '==', userId),
+            orderBy('createdAt', 'desc'),
+            limit(50)
+        );
+
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+            const notifications = querySnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data(),
+                createdAt: doc.data().createdAt
+            })) as Notification[];
+            callback(notifications);
+        }, (error) => {
+            console.error('Error subscribing to notifications:', error);
+            // Si l'index n'existe pas, afficher un message plus clair
+            if (error.code === 'failed-precondition') {
+                console.error('❌ Index composite manquant ! Créez l\'index via le lien dans l\'erreur ou Firebase Console.');
+                console.error('Collection: notifications, Fields: userId (Ascending), createdAt (Descending)');
+            }
+        });
+
+        return unsubscribe;
+    },
+
+    /**
+     * Créer une notification pour TOUS les utilisateurs
+     * Utile pour les annonces globales, nouvelles vidéos, etc.
+     */
+    async createNotificationForAllUsers(
+        title: string,
+        message: string,
+        type: 'info' | 'success' | 'warning' | 'error' = 'info',
+        link?: string
+    ): Promise<{ success: number; errors: number }> {
+        try {
+            // Récupérer tous les utilisateurs
+            const usersSnapshot = await getDocs(collection(db, USERS_COLLECTION));
+            const userIds = usersSnapshot.docs.map(doc => doc.id);
+            
+            console.log(`📢 Création de notification pour ${userIds.length} utilisateurs...`);
+            
+            // Créer les notifications par batch (Firestore limite à 500 opérations par batch)
+            const batchSize = 500;
+            let successCount = 0;
+            let errorCount = 0;
+            
+            for (let i = 0; i < userIds.length; i += batchSize) {
+                const batch = writeBatch(db);
+                const batchUserIds = userIds.slice(i, i + batchSize);
+                
+                batchUserIds.forEach(userId => {
+                    const notificationRef = doc(collection(db, NOTIFICATIONS_COLLECTION));
+                    batch.set(notificationRef, {
+                        userId,
+                        title,
+                        message,
+                        type,
+                        read: false,
+                        createdAt: Timestamp.now(),
+                        link: link || null
+                    });
+                });
+                
+                try {
+                    await batch.commit();
+                    successCount += batchUserIds.length;
+                    console.log(`✅ Batch ${Math.floor(i / batchSize) + 1} créé: ${batchUserIds.length} notifications`);
+                } catch (error) {
+                    console.error(`❌ Erreur batch ${Math.floor(i / batchSize) + 1}:`, error);
+                    errorCount += batchUserIds.length;
+                }
+            }
+            
+            console.log(`📢 Notification envoyée: ${successCount} succès, ${errorCount} erreurs`);
+            return { success: successCount, errors: errorCount };
+        } catch (error) {
+            console.error('Error creating notification for all users:', error);
             throw error;
         }
     }

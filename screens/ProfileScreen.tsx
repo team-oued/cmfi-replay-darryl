@@ -190,6 +190,11 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigate, onSelectMedia, 
             label: 'Gérer les utilisateurs',
             action: () => navigateRouter('/manage-users')
         },
+        {
+            icon: SettingsIcon,
+            label: 'Envoyer une notification à tous',
+            action: () => navigateRouter('/manage-notifications')
+        },
     ] : [];
 
     const handleLogout = async () => {

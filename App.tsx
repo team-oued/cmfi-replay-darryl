@@ -27,6 +27,8 @@ import ManageInfoBarScreen from './screens/ManageInfoBarScreen';
 import ManageAdsScreen from './screens/ManageAdsScreen';
 import ManageUsersScreen from './screens/ManageUsersScreen';
 import PaymentSuccessScreen from './screens/PaymentSuccessScreen';
+import NotificationsScreen from './screens/NotificationsScreen';
+import ManageNotificationsScreen from './screens/ManageNotificationsScreen';
 
 // Category Screens
 import MoviesScreen from './screens/MoviesScreen';
@@ -418,7 +420,12 @@ const AppContent: React.FC = () => {
                             <Route path="/manage-users" element={
                                 <ManageUsersScreen />
                             } />
-
+                            <Route path="/notifications" element={
+                                <NotificationsScreen />
+                            } />
+                            <Route path="/manage-notifications" element={
+                                <ManageNotificationsScreen />
+                            } />
                             <Route path="/payment-success" element={
                                 <PaymentSuccessScreen />
                             } />
