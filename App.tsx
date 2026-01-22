@@ -29,6 +29,7 @@ import ManageUsersScreen from './screens/ManageUsersScreen';
 import PaymentSuccessScreen from './screens/PaymentSuccessScreen';
 import NotificationsScreen from './screens/NotificationsScreen';
 import ManageNotificationsScreen from './screens/ManageNotificationsScreen';
+import AdminBackupVideosScreen from './screens/AdminBackupVideosScreen';
 
 // Category Screens
 import MoviesScreen from './screens/MoviesScreen';
@@ -425,6 +426,9 @@ const AppContent: React.FC = () => {
                             } />
                             <Route path="/manage-notifications" element={
                                 <ManageNotificationsScreen />
+                            } />
+                            <Route path="/admin" element={
+                                <AdminBackupVideosScreen />
                             } />
                             <Route path="/payment-success" element={
                                 <PaymentSuccessScreen />

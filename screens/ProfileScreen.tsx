@@ -195,6 +195,11 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigate, onSelectMedia, 
             label: 'Envoyer une notification à tous',
             action: () => navigateRouter('/manage-notifications')
         },
+        {
+            icon: SettingsIcon,
+            label: 'Admin - Gestion des vidéos',
+            action: () => navigateRouter('/admin')
+        },
     ] : [];
 
     const handleLogout = async () => {
@@ -239,33 +244,6 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigate, onSelectMedia, 
                         <SettingsItem key={item.label} Icon={item.icon} label={item.label} onClick={item.action} />
                     ))}
                 </div>
-                {/* Bouton temporaire pour activer l'admin (si isAdmin est undefined) */}
-                {userProfile && !userProfile.isAdmin && !(userProfile as any)?.['isAdmin '] && user && (
-                    <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                        <p className="text-sm text-yellow-800 dark:text-yellow-200 mb-2">
-                            Le statut admin n'est pas défini. Cliquez pour activer l'administration.
-                        </p>
-                        <button
-                            onClick={async () => {
-                                if (user?.uid) {
-                                    try {
-                                        await userService.setAdminStatus(user.uid, true);
-                                        // Recharger le profil
-                                        const updatedProfile = await userService.getUserProfile(user.uid);
-                                        if (updatedProfile) {
-                                            window.location.reload(); // Recharger pour voir les changements
-                                        }
-                                    } catch (error) {
-                                        console.error('Erreur lors de l\'activation admin:', error);
-                                    }
-                                }
-                            }}
-                            className="bg-amber-500 hover:bg-amber-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
-                        >
-                            Activer l'administration
-                        </button>
-                    </div>
-                )}
                 {isAdminValue && (
                     <div className="mt-4">
                         <h3 className="text-lg font-bold mb-3 text-amber-600 dark:text-amber-400">Administration</h3>

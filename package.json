@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "dev:backend": "cd server && node index.js",
+    "dev:all": "concurrently \"npm run dev\" \"npm run dev:backend\""
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
