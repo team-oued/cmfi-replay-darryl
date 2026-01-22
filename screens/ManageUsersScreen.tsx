@@ -124,10 +124,46 @@ const ManageUsersScreen: React.FC = () => {
         return displayName.includes(query);
     });
 
-    // Séparer les utilisateurs filtrés par statut
-    const onlineUsers = filteredUsers.filter(u => u.presence === 'online');
-    const awayUsers = filteredUsers.filter(u => u.presence === 'away' || u.presence === 'idle');
-    const offlineUsers = filteredUsers.filter(u => u.presence === 'offline');
+    // Fonction helper pour obtenir le timestamp de lastSeen en millisecondes
+    const getLastSeenTimestamp = (user: UserProfile & { lastSeen?: Date | Timestamp; updatedAt?: Date | Timestamp }): number => {
+        const dateToUse = user.lastSeen || user.updatedAt;
+        if (!dateToUse) return 0;
+        
+        if (dateToUse instanceof Date) {
+            return dateToUse.getTime();
+        } else if (dateToUse instanceof Timestamp) {
+            return dateToUse.toMillis();
+        }
+        return 0;
+    };
+
+    // Séparer les utilisateurs filtrés par statut et trier par lastSeen (plus récent en premier)
+    const onlineUsers = filteredUsers
+        .filter(u => u.presence === 'online')
+        .sort((a, b) => {
+            const aTime = getLastSeenTimestamp(a);
+            const bTime = getLastSeenTimestamp(b);
+            // Plus récent en premier (ordre décroissant)
+            return bTime - aTime;
+        });
+    
+    const awayUsers = filteredUsers
+        .filter(u => u.presence === 'away' || u.presence === 'idle')
+        .sort((a, b) => {
+            const aTime = getLastSeenTimestamp(a);
+            const bTime = getLastSeenTimestamp(b);
+            // Plus récent en premier (ordre décroissant)
+            return bTime - aTime;
+        });
+    
+    const offlineUsers = filteredUsers
+        .filter(u => u.presence === 'offline')
+        .sort((a, b) => {
+            const aTime = getLastSeenTimestamp(a);
+            const bTime = getLastSeenTimestamp(b);
+            // Plus récent en premier (ordre décroissant) - ceux qui étaient récemment inactifs apparaissent en premier
+            return bTime - aTime;
+        });
 
     return (
         <div className="min-h-screen bg-[#FBF9F3] dark:bg-black">
