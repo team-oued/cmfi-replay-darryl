@@ -59,6 +59,7 @@ const VideoPlayer: React.FC<{
     const [playbackRate, setPlaybackRate] = useState(1);
     const [buffered, setBuffered] = useState(0);
     const [isScrubbing, setIsScrubbing] = useState(false);
+    const wasPausedBeforeTabSwitch = useRef(false);
 
     // Fermer automatiquement le PiP et mettre en pause la lecture au chargement du composant
     useEffect(() => {
@@ -80,6 +81,31 @@ const VideoPlayer: React.FC<{
 
         closePiP();
     }, []);
+
+    // Gérer la visibilité de l'onglet pour préserver l'état de pause/play
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            const video = videoRef.current;
+            if (!video) return;
+
+            if (document.hidden) {
+                // L'onglet devient caché - sauvegarder l'état actuel
+                wasPausedBeforeTabSwitch.current = video.paused;
+            } else {
+                // L'onglet redevient visible - ne pas relancer si l'utilisateur avait mis en pause
+                if (wasPausedBeforeTabSwitch.current && !video.paused) {
+                    video.pause();
+                    setIsPlaying(false);
+                    if (onPlayingStateChange) onPlayingStateChange(false);
+                }
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [onPlayingStateChange]);
 
     // Positionner la lecture à la position enregistrée
     useEffect(() => {
@@ -142,6 +168,11 @@ const VideoPlayer: React.FC<{
         setShowControls(wasPlaying); // Afficher les contrôles si on met en pause, sinon laisser le timeout gérer
         if (!wasPlaying) {
             resetControlsTimeout();
+            // Sauvegarder l'état de pause dans sessionStorage pour préserver après rafraîchissement
+            sessionStorage.setItem(`video_paused_${videoUid}`, 'true');
+        } else {
+            // Nettoyer le flag si on reprend la lecture
+            sessionStorage.removeItem(`video_paused_${videoUid}`);
         }
     };
 
@@ -194,8 +225,17 @@ const VideoPlayer: React.FC<{
 
         const handleCanPlay = () => {
             setIsLoading(false);
-            setIsPlaying(true);
-            videoRef.current?.play().catch(() => setIsPlaying(false));
+            // Ne pas relancer automatiquement si :
+            // 1. L'utilisateur avait mis en pause avant de changer d'onglet
+            // 2. La vidéo était en pause dans sessionStorage (rafraîchissement de page)
+            const wasPausedInStorage = sessionStorage.getItem(`video_paused_${videoUid}`) === 'true';
+            if (!wasPausedBeforeTabSwitch.current && !wasPausedInStorage) {
+                setIsPlaying(true);
+                videoRef.current?.play().catch(() => setIsPlaying(false));
+            } else if (wasPausedInStorage) {
+                // Nettoyer le flag de sessionStorage après utilisation
+                sessionStorage.removeItem(`video_paused_${videoUid}`);
+            }
         };
 
         const handleWaiting = () => {
@@ -689,7 +729,10 @@ const MoviePlayerScreen: React.FC<MoviePlayerScreenProps> = ({ item, onBack }) =
     const [showAuthPrompt, setShowAuthPrompt] = useState(false);
     const [authAction, setAuthAction] = useState('');
     const [videoIsPlaying, setVideoIsPlaying] = useState(false);
-    const [showAd, setShowAd] = useState(true);
+    // Sauvegarder l'état de la pub dans sessionStorage pour éviter de la relancer
+    const getAdStateKey = () => `ad_shown_movie_${item.id}`;
+    const wasAdShown = sessionStorage.getItem(getAdStateKey()) === 'true';
+    const [showAd, setShowAd] = useState(!wasAdShown);
 
     const handleAuthRequired = (action: string) => {
         setAuthAction(action);
@@ -717,8 +760,12 @@ const MoviePlayerScreen: React.FC<MoviePlayerScreenProps> = ({ item, onBack }) =
             fetchMovieData();
         }
 
-        // Réinitialiser la pub quand le film change
-        setShowAd(true);
+        // Ne pas relancer la pub si elle a déjà été vue pour ce film dans cette session
+        const adKey = `ad_shown_movie_${item.id}`;
+        const wasAdShown = sessionStorage.getItem(adKey) === 'true';
+        if (!wasAdShown) {
+            setShowAd(true);
+        }
     }, [item.id, item.type]);
 
     // Fetch like data
@@ -1044,8 +1091,16 @@ const MoviePlayerScreen: React.FC<MoviePlayerScreenProps> = ({ item, onBack }) =
                         <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl ring-2 ring-black/20 dark:ring-white/5">
                             {showAd && (
                                 <AdPlayer
-                                    onAdEnd={() => setShowAd(false)}
-                                    onSkip={() => setShowAd(false)}
+                                    onAdEnd={() => {
+                                        setShowAd(false);
+                                        // Sauvegarder que la pub a été vue pour cette session
+                                        sessionStorage.setItem(getAdStateKey(), 'true');
+                                    }}
+                                    onSkip={() => {
+                                        setShowAd(false);
+                                        // Sauvegarder que la pub a été vue pour cette session
+                                        sessionStorage.setItem(getAdStateKey(), 'true');
+                                    }}
                                 />
                             )}
                             {!showAd && (

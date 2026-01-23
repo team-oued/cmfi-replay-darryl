@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { adminApiService } from '../lib/adminApiService';
 import { adminAllowlistService } from '../lib/adminAllowlistService';
+import { serieService, seasonSerieService, episodeSerieService, Serie, SeasonSerie, EpisodeSerie } from '../lib/firestore';
+import { db } from '../lib/firebase';
+import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import { useAppContext } from '../context/AppContext';
 import { ArrowLeftIcon, SearchIcon, ChevronRightIcon, ChevronDownIcon } from '../components/icons';
 
@@ -184,60 +187,35 @@ const AppVideosTab: React.FC = () => {
     const loadData = async () => {
         setLoading(true);
         try {
-            // Charger toutes les séries
-            let seriesRes;
-            try {
-                seriesRes = await adminApiService.getSeries();
-                setSeries(seriesRes.series);
-            } catch (seriesError: any) {
-                console.error('Erreur lors du chargement des séries:', seriesError);
-                // Si l'endpoint /admin/series n'existe pas ou retourne 403, charger directement les saisons
-                if (seriesError.message.includes('403') || seriesError.message.includes('refusé')) {
-                    toast.warn('L\'endpoint /admin/series n\'est pas accessible. Chargement des saisons directement...');
-                    // Fallback: charger toutes les saisons
-                    const seasonsRes = await adminApiService.getSeasons();
-                    setSeries([]);
-                    const data: Record<string, { seasons: any[]; episodes: Record<string, any[]> }> = {};
-                    
-                    // Grouper les saisons par série
-                    const seriesMap: Record<string, any[]> = {};
-                    for (const season of seasonsRes.seasons) {
-                        const serieUid = season.uid_serie || 'unknown';
-                        if (!seriesMap[serieUid]) {
-                            seriesMap[serieUid] = [];
-                        }
-                        seriesMap[serieUid].push(season);
-                    }
-                    
-                    // Créer des séries fictives basées sur les saisons
-                    const fakeSeries = Object.keys(seriesMap).map(serieUid => ({
-                        uid_serie: serieUid,
-                        title_serie: seriesMap[serieUid][0]?.title_serie || `Série ${serieUid}`,
-                        id: `fake_${serieUid}`
-                    }));
-                    setSeries(fakeSeries);
-                    
-                    // Ne pas charger les épisodes immédiatement - chargement lazy
-                    for (const serieUid of Object.keys(seriesMap)) {
-                        const seasons = seriesMap[serieUid];
-                        data[serieUid] = { seasons, episodes: {} };
-                    }
-                    
-                    setSeriesData(data);
-                    return;
-                }
-                throw seriesError;
-            }
+            // Charger toutes les séries directement depuis Firestore avec leurs IDs Firestore
+            const seriesSnapshot = await getDocs(collection(db, 'series'));
+            const allSeries = seriesSnapshot.docs.map(doc => ({
+                id: doc.id, // ID Firestore
+                ...doc.data()
+            }));
+            setSeries(allSeries);
 
             // Charger seulement les séries et saisons, pas les épisodes (chargement lazy)
             const data: Record<string, { seasons: any[]; episodes: Record<string, any[]> }> = {};
             
-            for (const serie of seriesRes.series) {
+            for (const serie of allSeries) {
                 try {
-                    // Charger les saisons de cette série
-                    const seasonsRes = await adminApiService.getSeasons(serie.uid_serie);
-                    const seasons = seasonsRes.seasons;
-                    data[serie.uid_serie] = { seasons, episodes: {} };
+                    // Charger les saisons de cette série directement depuis Firestore
+                    // On doit récupérer les IDs Firestore pour pouvoir les mettre à jour
+                    const seasonsQuery = query(
+                        collection(db, 'seasonsSeries'),
+                        where('uid_serie', '==', serie.uid_serie)
+                    );
+                    const seasonsSnapshot = await getDocs(seasonsQuery);
+                    const seasons = seasonsSnapshot.docs.map(doc => ({
+                        id: doc.id, // ID Firestore
+                        ...doc.data()
+                    }));
+                    
+                    data[serie.uid_serie] = { 
+                        seasons, 
+                        episodes: {} 
+                    };
                     // Les épisodes seront chargés quand l'utilisateur expand la saison
                 } catch (seasonError) {
                     console.error(`Erreur lors du chargement des saisons pour la série ${serie.uid_serie}:`, seasonError);
@@ -266,9 +244,19 @@ const AppVideosTab: React.FC = () => {
         }
 
         try {
-            const videosRes = await adminApiService.getAppVideos({
-                seasonId: seasonUid
-            });
+            // Charger les épisodes directement depuis Firestore
+            // On doit récupérer les IDs Firestore pour pouvoir les mettre à jour
+            const q = query(
+                collection(db, 'episodesSeries'),
+                where('uid_season', '==', seasonUid),
+                where('hidden', '==', false),
+                orderBy('episode_numero', 'asc')
+            );
+            const snapshot = await getDocs(q);
+            const episodes = snapshot.docs.map(doc => ({
+                id: doc.id, // ID Firestore
+                ...doc.data()
+            }));
             
             // Mettre à jour les données
             setSeriesData(prev => ({
@@ -277,7 +265,7 @@ const AppVideosTab: React.FC = () => {
                     ...prev[serieUid],
                     episodes: {
                         ...prev[serieUid]?.episodes,
-                        [seasonUid]: videosRes.videos
+                        [seasonUid]: episodes
                     }
                 }
             }));
@@ -352,11 +340,14 @@ const AppVideosTab: React.FC = () => {
         if (!editingVideo) return;
 
         try {
-            await adminApiService.updateVideo(editingVideo.id, editForm);
+            // Mettre à jour directement dans Firestore
+            // editingVideo.id est l'ID Firestore
+            await episodeSerieService.updateEpisodeById(editingVideo.id, editForm);
             toast.success('Vidéo mise à jour avec succès');
             setEditingVideo(null);
             loadData();
         } catch (error: any) {
+            console.error('Erreur lors de la mise à jour de l\'épisode:', error);
             toast.error(error.message || 'Erreur lors de la mise à jour');
         }
     };
@@ -380,11 +371,14 @@ const AppVideosTab: React.FC = () => {
         if (!editingSeason) return;
 
         try {
-            await adminApiService.updateSeason(editingSeason.id, editSeasonForm);
+            // Mettre à jour directement dans Firestore
+            // editingSeason.id est l'ID Firestore
+            await seasonSerieService.updateSeasonById(editingSeason.id, editSeasonForm);
             toast.success('Saison mise à jour avec succès');
             setEditingSeason(null);
             loadData();
         } catch (error: any) {
+            console.error('Erreur lors de la mise à jour de la saison:', error);
             toast.error(error.message || 'Erreur lors de la mise à jour');
         }
     };

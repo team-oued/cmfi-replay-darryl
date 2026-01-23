@@ -1139,6 +1139,49 @@ export const seasonSerieService = {
             return null;
         }
     },
+
+    /**
+     * Met à jour une saison par son ID Firestore
+     */
+    async updateSeasonById(id: string, updates: Partial<SeasonSerie>): Promise<void> {
+        try {
+            const seasonRef = doc(db, SEASONS_SERIES_COLLECTION, id);
+            await updateDoc(seasonRef, {
+                ...updates,
+                updatedAt: new Date().toISOString()
+            } as any);
+        } catch (error) {
+            console.error('Error updating season:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Met à jour une saison par son UID
+     */
+    async updateSeasonByUid(uid_season: string, updates: Partial<SeasonSerie>): Promise<void> {
+        try {
+            const q = query(
+                collection(db, SEASONS_SERIES_COLLECTION),
+                where('uid_season', '==', uid_season),
+                limit(1)
+            );
+            const snapshot = await getDocs(q);
+            
+            if (snapshot.empty) {
+                throw new Error(`Saison avec UID ${uid_season} non trouvée`);
+            }
+
+            const seasonRef = doc(db, SEASONS_SERIES_COLLECTION, snapshot.docs[0].id);
+            await updateDoc(seasonRef, {
+                ...updates,
+                updatedAt: new Date().toISOString()
+            } as any);
+        } catch (error) {
+            console.error('Error updating season by UID:', error);
+            throw error;
+        }
+    },
 };
 
 // Fonction utilitaire pour calculer et mettre à jour les vues des épisodes
@@ -1446,6 +1489,49 @@ export const episodeSerieService = {
         } catch (error) {
             console.error('Error searching episodes:', error);
             return [];
+        }
+    },
+
+    /**
+     * Met à jour un épisode par son ID Firestore
+     */
+    async updateEpisodeById(id: string, updates: Partial<EpisodeSerie>): Promise<void> {
+        try {
+            const episodeRef = doc(db, EPISODES_SERIES_COLLECTION, id);
+            await updateDoc(episodeRef, {
+                ...updates,
+                updatedAt: new Date().toISOString()
+            } as any);
+        } catch (error) {
+            console.error('Error updating episode:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Met à jour un épisode par son UID
+     */
+    async updateEpisodeByUid(uid_episode: string, updates: Partial<EpisodeSerie>): Promise<void> {
+        try {
+            const q = query(
+                collection(db, EPISODES_SERIES_COLLECTION),
+                where('uid_episode', '==', uid_episode),
+                limit(1)
+            );
+            const snapshot = await getDocs(q);
+            
+            if (snapshot.empty) {
+                throw new Error(`Épisode avec UID ${uid_episode} non trouvé`);
+            }
+
+            const episodeRef = doc(db, EPISODES_SERIES_COLLECTION, snapshot.docs[0].id);
+            await updateDoc(episodeRef, {
+                ...updates,
+                updatedAt: new Date().toISOString()
+            } as any);
+        } catch (error) {
+            console.error('Error updating episode by UID:', error);
+            throw error;
         }
     },
 };
