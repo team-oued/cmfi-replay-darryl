@@ -54,12 +54,12 @@ const ContinueWatchingCard: React.FC<ContinueWatchingCardProps> = ({ item, onCli
 
                 {/* Info container amélioré */}
                 <div className="px-2 py-2">
-                    <h3 className="text-sm md:text-base font-bold text-gray-900 dark:text-white line-clamp-2 min-h-[2.5rem] flex items-center group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors duration-300">
+                    <h3 className="text-sm md:text-base font-bold text-gray-900 dark:text-white break-words min-h-[2.5rem] group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors duration-300">
                         {item.title}
                     </h3>
-                    {item.type === 'episode' && item.episodeTitle && (
+                    {item.type === 'episode' && item.serieTitle && item.serieTitle !== item.title && (
                         <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400 line-clamp-1 mt-1.5">
-                            Ép. {item.episodeNumber} - {item.episodeTitle}
+                            {item.serieTitle}
                         </p>
                     )}
                     <div className="flex justify-between items-center mt-2">

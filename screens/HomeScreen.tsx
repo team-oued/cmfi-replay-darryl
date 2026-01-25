@@ -4,7 +4,6 @@ import HeroPrimeVideo from '../components/HeroPrimeVideo';
 import HeroNetflix from '../components/HeroNetflix';
 import MediaCard from '../components/MediaCard';
 import RankedMediaCard from '../components/RankedMediaCard';
-import PrimeMediaCard from '../components/PrimeMediaCard';
 import UserAvatar from '../components/UserAvatar';
 import CategoryTiles from '../components/CategoryTiles';
 import { MediaCardSkeleton, UserAvatarSkeleton, HeroSkeleton, ContinueWatchingSkeleton, CategoryTilesSkeleton, MostLikedSkeleton } from '../components/Skeleton';
@@ -854,12 +853,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                                         video_path_hd: movie.video_path_hd
                                     };
                                     return (
-                                        <PrimeMediaCard
-                                            key={movie.uid}
-                                            item={mediaContent}
-                                            onSelect={onSelectMedia}
-                                            onPlay={onPlay}
-                                        />
+                                        <div key={movie.uid} className="flex-shrink-0">
+                                            <MediaCard
+                                                item={mediaContent}
+                                                variant="thumbnail"
+                                                onSelect={onSelectMedia}
+                                                onPlay={onPlay}
+                                            />
+                                        </div>
                                     );
                                 })}
                             </div>
@@ -897,12 +898,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                                         video_path_hd: ''
                                     };
                                     return (
-                                        <PrimeMediaCard
-                                            key={serie.uid_serie}
-                                            item={mediaContent}
-                                            onSelect={onSelectMedia}
-                                            onPlay={onPlay}
-                                        />
+                                        <div key={serie.uid_serie} className="flex-shrink-0">
+                                            <MediaCard
+                                                item={mediaContent}
+                                                variant="thumbnail"
+                                                onSelect={onSelectMedia}
+                                                onPlay={onPlay}
+                                            />
+                                        </div>
                                     );
                                 })}
                             </div>
@@ -977,12 +980,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                                                         video_path_hd: ''
                                                     };
                                                     return (
-                                                        <PrimeMediaCard
-                                                            key={serie.uid_serie}
-                                                            item={mediaContent}
-                                                            onSelect={onSelectMedia}
-                                                            onPlay={onPlay}
-                                                        />
+                                                        <div key={serie.uid_serie} className="flex-shrink-0">
+                                                            <MediaCard
+                                                                item={mediaContent}
+                                                                variant="thumbnail"
+                                                                onSelect={onSelectMedia}
+                                                                onPlay={onPlay}
+                                                            />
+                                                        </div>
                                                     );
                                                 })}
                                             </div>
@@ -1024,12 +1029,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                                         video_path_hd: ''
                                     };
                                     return (
-                                        <PrimeMediaCard
-                                            key={podcast.uid_serie}
-                                            item={mediaContent}
-                                            onSelect={onSelectMedia}
-                                            onPlay={onPlay}
-                                        />
+                                        <div key={podcast.uid_serie} className="flex-shrink-0">
+                                            <MediaCard
+                                                item={mediaContent}
+                                                variant="thumbnail"
+                                                onSelect={onSelectMedia}
+                                                onPlay={onPlay}
+                                            />
+                                        </div>
                                     );
                                 })}
                             </div>
@@ -1063,13 +1070,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                             </div>
                             <div className="flex space-x-3 md:space-x-4 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-4">
                                 {mostWatchedItems.slice(0, 10).map((item, index) => (
-                                    <PrimeMediaCard
-                                        key={item.content.id}
-                                        item={item.content}
-                                        rank={index + 1}
-                                        onSelect={onSelectMedia}
-                                        onPlay={onPlay}
-                                    />
+                                    <div key={item.content.id} className="flex-shrink-0">
+                                        <MediaCard
+                                            item={item.content}
+                                            variant="thumbnail"
+                                            onSelect={onSelectMedia}
+                                            onPlay={onPlay}
+                                        />
+                                    </div>
                                 ))}
                             </div>
                         </div>
@@ -1102,13 +1110,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                             </div>
                             <div className="flex space-x-3 md:space-x-4 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-4">
                                 {mostLikedItems.slice(0, 10).map((item, index) => (
-                                    <PrimeMediaCard
-                                        key={item.content.id}
-                                        item={item.content}
-                                        rank={index + 1}
-                                        onSelect={onSelectMedia}
-                                        onPlay={onPlay}
-                                    />
+                                    <div key={item.content.id} className="flex-shrink-0">
+                                        <MediaCard
+                                            item={item.content}
+                                            variant="thumbnail"
+                                            onSelect={onSelectMedia}
+                                            onPlay={onPlay}
+                                        />
+                                    </div>
                                 ))}
                             </div>
                         </div>

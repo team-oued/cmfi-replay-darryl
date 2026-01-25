@@ -2136,10 +2136,13 @@ export const statsVuesService = {
 
                         // Ne pas afficher si déjà terminé (>95%)
                         if (progress < 95) {
+                            // Utiliser le titre de l'épisode, ou combiner série + épisode si disponible
+                            const displayTitle = episode.title || `${episode.title_serie} - Épisode ${episode.episode_numero}`;
+                            
                             continueWatchingItems.push({
                                 id: docSnapshot.id,
                                 uid: data.uid || episode.uid_episode || episodeDoc.id, // Fallback sur l'ID du document
-                                title: episode.title_serie,
+                                title: displayTitle,
                                 imageUrl: episode.backdrop_path || episode.picture_path,
                                 progress,
                                 tempsRegarde: data.tempsRegarde,
@@ -2309,10 +2312,13 @@ export const statsVuesService = {
                         const runtime = episode.runtime || 0;
                         const progress = runtime > 0 ? Math.min((data.tempsRegarde / runtime) * 100, 100) : 0;
 
+                        // Utiliser le titre de l'épisode comme titre principal
+                        const displayTitle = episode.title || `${episode.title_serie} - Épisode ${episode.episode_numero}`;
+
                         historyItems.push({
                             id: docSnapshot.id,
                             uid: data.uid || episode.uid_episode || episodeDoc.id,
-                            title: episode.title_serie,
+                            title: displayTitle,
                             imageUrl: episode.backdrop_path || episode.picture_path,
                             progress,
                             tempsRegarde: data.tempsRegarde,
