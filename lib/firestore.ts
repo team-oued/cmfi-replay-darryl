@@ -38,6 +38,17 @@ export interface UserProfile {
     lastSeen?: Date | Timestamp; // Timestamp de la dernière activité
 }
 
+// Interface pour les catégories de séries
+export interface SerieCategory {
+    id: string;
+    name: string;
+    description?: string;
+    color?: string; // Couleur pour l'affichage (optionnel)
+    order?: number; // Ordre d'affichage
+    createdAt: string;
+    updatedAt: string;
+}
+
 // Interface pour la collection series
 export interface Serie {
     id: string;
@@ -52,6 +63,7 @@ export interface Serie {
     homedisplayed: boolean;
     is_hidden: boolean;
     serie_type?: 'serie' | 'podcast';
+    categoryId?: string; // ID de la catégorie
 }
 
 // Interface pour la collection seasonsSeries
@@ -195,6 +207,7 @@ const MOVIES_COLLECTION = 'movies';
 const SERIES_COLLECTION = 'series';
 const SEASONS_SERIES_COLLECTION = 'seasonsSeries';
 const EPISODES_SERIES_COLLECTION = 'episodesSeries';
+const SERIE_CATEGORIES_COLLECTION = 'serieCategories';
 const BOOKMARKS_COLLECTION = 'bookmarks';
 const BOOK_DOC_COLLECTION = 'bookDoc';
 const BOOK_SERIES_COLLECTION = 'bookSeries';
@@ -1061,7 +1074,44 @@ export const serieService = {
             console.error('Error getting ten home podcasts:', error);
             return [];
         }
-    }
+    },
+
+    /**
+     * Met à jour une série par son ID Firestore
+     */
+    async updateSerieById(id: string, updates: Partial<Serie>): Promise<void> {
+        try {
+            const serieRef = doc(db, SERIES_COLLECTION, id);
+            await updateDoc(serieRef, updates as any);
+        } catch (error) {
+            console.error('Error updating serie:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Met à jour une série par son UID
+     */
+    async updateSerieByUid(uid_serie: string, updates: Partial<Serie>): Promise<void> {
+        try {
+            const q = query(
+                collection(db, SERIES_COLLECTION),
+                where('uid_serie', '==', uid_serie),
+                limit(1)
+            );
+            const snapshot = await getDocs(q);
+            
+            if (snapshot.empty) {
+                throw new Error(`Série avec UID ${uid_serie} non trouvée`);
+            }
+
+            const serieRef = doc(db, SERIES_COLLECTION, snapshot.docs[0].id);
+            await updateDoc(serieRef, updates as any);
+        } catch (error) {
+            console.error('Error updating serie by UID:', error);
+            throw error;
+        }
+    },
 };
 
 // Services pour les saisons de séries
@@ -1532,6 +1582,115 @@ export const episodeSerieService = {
         } catch (error) {
             console.error('Error updating episode by UID:', error);
             throw error;
+        }
+    },
+};
+
+// Services pour les catégories de séries
+export const serieCategoryService = {
+    /**
+     * Récupère toutes les catégories
+     */
+    async getAllCategories(): Promise<SerieCategory[]> {
+        try {
+            const q = query(
+                collection(db, SERIE_CATEGORIES_COLLECTION),
+                orderBy('order', 'asc')
+            );
+            const snapshot = await getDocs(q);
+            return snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            } as SerieCategory));
+        } catch (error) {
+            console.error('Error getting all categories:', error);
+            return [];
+        }
+    },
+
+    /**
+     * Récupère une catégorie par son ID
+     */
+    async getCategoryById(id: string): Promise<SerieCategory | null> {
+        try {
+            const categoryDoc = await getDoc(doc(db, SERIE_CATEGORIES_COLLECTION, id));
+            if (categoryDoc.exists()) {
+                return {
+                    id: categoryDoc.id,
+                    ...categoryDoc.data()
+                } as SerieCategory;
+            }
+            return null;
+        } catch (error) {
+            console.error('Error getting category by ID:', error);
+            return null;
+        }
+    },
+
+    /**
+     * Crée une nouvelle catégorie
+     */
+    async createCategory(category: Omit<SerieCategory, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+        try {
+            const now = new Date().toISOString();
+            const categoryData = {
+                ...category,
+                createdAt: now,
+                updatedAt: now,
+                order: category.order || 0
+            };
+            const docRef = await addDoc(collection(db, SERIE_CATEGORIES_COLLECTION), categoryData);
+            return docRef.id;
+        } catch (error) {
+            console.error('Error creating category:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Met à jour une catégorie
+     */
+    async updateCategory(id: string, updates: Partial<Omit<SerieCategory, 'id' | 'createdAt'>>): Promise<void> {
+        try {
+            const categoryRef = doc(db, SERIE_CATEGORIES_COLLECTION, id);
+            await updateDoc(categoryRef, {
+                ...updates,
+                updatedAt: new Date().toISOString()
+            } as any);
+        } catch (error) {
+            console.error('Error updating category:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Supprime une catégorie
+     */
+    async deleteCategory(id: string): Promise<void> {
+        try {
+            const categoryRef = doc(db, SERIE_CATEGORIES_COLLECTION, id);
+            await deleteDoc(categoryRef);
+        } catch (error) {
+            console.error('Error deleting category:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Récupère les séries d'une catégorie
+     */
+    async getSeriesByCategory(categoryId: string): Promise<Serie[]> {
+        try {
+            const q = query(
+                collection(db, SERIES_COLLECTION),
+                where('categoryId', '==', categoryId),
+                where('is_hidden', '==', false)
+            );
+            const snapshot = await getDocs(q);
+            return snapshot.docs.map(doc => doc.data() as Serie);
+        } catch (error) {
+            console.error('Error getting series by category:', error);
+            return [];
         }
     },
 };

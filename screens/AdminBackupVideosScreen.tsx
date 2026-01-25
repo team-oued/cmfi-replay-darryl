@@ -3,13 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { adminApiService } from '../lib/adminApiService';
 import { adminAllowlistService } from '../lib/adminAllowlistService';
-import { serieService, seasonSerieService, episodeSerieService, Serie, SeasonSerie, EpisodeSerie } from '../lib/firestore';
+import { serieService, seasonSerieService, episodeSerieService, serieCategoryService, Serie, SeasonSerie, EpisodeSerie, SerieCategory } from '../lib/firestore';
+import CategoriesTab from './CategoriesTab';
 import { db } from '../lib/firebase';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import { useAppContext } from '../context/AppContext';
 import { ArrowLeftIcon, SearchIcon, ChevronRightIcon, ChevronDownIcon } from '../components/icons';
 
-type Tab = 'app-videos' | 'vimeo' | 'upload';
+type Tab = 'app-videos' | 'vimeo' | 'upload' | 'categories';
 
 const AdminBackupVideosScreen: React.FC = () => {
     const navigate = useNavigate();
@@ -155,6 +156,16 @@ const AdminBackupVideosScreen: React.FC = () => {
                     >
                         Upload Vimeo
                     </button>
+                    <button
+                        onClick={() => setActiveTab('categories')}
+                        className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+                            activeTab === 'categories'
+                                ? 'text-amber-600 dark:text-amber-400 border-b-2 border-amber-600 dark:border-amber-400'
+                                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                        }`}
+                    >
+                        Catégories
+                    </button>
                 </div>
             </div>
 
@@ -162,6 +173,7 @@ const AdminBackupVideosScreen: React.FC = () => {
                 {activeTab === 'app-videos' && <AppVideosTab />}
                 {activeTab === 'vimeo' && <VimeoTab />}
                 {activeTab === 'upload' && <UploadTab />}
+                {activeTab === 'categories' && <CategoriesTab />}
             </div>
         </div>
     );
@@ -179,10 +191,23 @@ const AppVideosTab: React.FC = () => {
     const [editForm, setEditForm] = useState<any>({});
     const [editingSeason, setEditingSeason] = useState<any | null>(null);
     const [editSeasonForm, setEditSeasonForm] = useState<any>({});
+    const [editingSerie, setEditingSerie] = useState<any | null>(null);
+    const [editSerieForm, setEditSerieForm] = useState<any>({});
+    const [categories, setCategories] = useState<SerieCategory[]>([]);
 
     useEffect(() => {
         loadData();
+        loadCategories();
     }, []);
+
+    const loadCategories = async () => {
+        try {
+            const cats = await serieCategoryService.getAllCategories();
+            setCategories(cats);
+        } catch (error) {
+            console.error('Erreur lors du chargement des catégories:', error);
+        }
+    };
 
     const loadData = async () => {
         setLoading(true);
@@ -352,6 +377,29 @@ const AppVideosTab: React.FC = () => {
         }
     };
 
+    const handleEditSerie = (serie: any) => {
+        setEditingSerie(serie);
+        setEditSerieForm({
+            title_serie: serie.title_serie || '',
+            overview_serie: serie.overview_serie || '',
+            categoryId: serie.categoryId || ''
+        });
+    };
+
+    const handleSaveSerie = async () => {
+        if (!editingSerie) return;
+
+        try {
+            await serieService.updateSerieById(editingSerie.id, editSerieForm);
+            toast.success('Série mise à jour avec succès');
+            setEditingSerie(null);
+            loadData();
+        } catch (error: any) {
+            console.error('Erreur lors de la mise à jour de la série:', error);
+            toast.error(error.message || 'Erreur lors de la mise à jour');
+        }
+    };
+
     const handleEditSeason = (season: any) => {
         setEditingSeason(season);
         setEditSeasonForm({
@@ -437,11 +485,11 @@ const AppVideosTab: React.FC = () => {
                                 className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden"
                             >
                                 {/* En-tête Série */}
-                                <button
-                                    onClick={() => toggleSeries(serie.uid_serie)}
-                                    className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                                >
-                                    <div className="flex items-center gap-3">
+                                <div className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                    <button
+                                        onClick={() => toggleSeries(serie.uid_serie)}
+                                        className="flex-1 flex items-center gap-3"
+                                    >
                                         {isSerieExpanded ? (
                                             <ChevronDownIcon className="w-5 h-5 text-gray-400" />
                                         ) : (
@@ -451,12 +499,28 @@ const AppVideosTab: React.FC = () => {
                                             <h3 className="font-semibold text-gray-900 dark:text-white">
                                                 {serie.title_serie || 'Série sans titre'}
                                             </h3>
-                                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                                                {seasons.length} saison{seasons.length > 1 ? 's' : ''}
-                                            </p>
+                                            <div className="flex items-center gap-2">
+                                                <p className="text-sm text-gray-600 dark:text-gray-400">
+                                                    {seasons.length} saison{seasons.length > 1 ? 's' : ''}
+                                                </p>
+                                                {serie.categoryId && (
+                                                    <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200">
+                                                        {categories.find(c => c.id === serie.categoryId)?.name || 'Catégorie'}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                </button>
+                                    </button>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleEditSerie(serie);
+                                        }}
+                                        className="ml-4 px-3 py-1.5 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors text-sm"
+                                    >
+                                        Modifier
+                                    </button>
+                                </div>
 
                                 {/* Saisons (si la série est expandée) */}
                                 {isSerieExpanded && seasons.length > 0 && (
@@ -877,6 +941,70 @@ const AppVideosTab: React.FC = () => {
                                 </button>
                                 <button
                                     onClick={() => setEditingSeason(null)}
+                                    className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600"
+                                >
+                                    Annuler
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal d'édition série */}
+            {editingSerie && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                        <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Modifier la série</h2>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Titre de la série
+                                </label>
+                                <input
+                                    type="text"
+                                    value={editSerieForm.title_serie}
+                                    onChange={(e) => setEditSerieForm({ ...editSerieForm, title_serie: e.target.value })}
+                                    className="w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Description
+                                </label>
+                                <textarea
+                                    value={editSerieForm.overview_serie}
+                                    onChange={(e) => setEditSerieForm({ ...editSerieForm, overview_serie: e.target.value })}
+                                    rows={4}
+                                    className="w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Catégorie
+                                </label>
+                                <select
+                                    value={editSerieForm.categoryId || ''}
+                                    onChange={(e) => setEditSerieForm({ ...editSerieForm, categoryId: e.target.value || undefined })}
+                                    className="w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white"
+                                >
+                                    <option value="">Aucune catégorie</option>
+                                    {categories.map(category => (
+                                        <option key={category.id} value={category.id}>
+                                            {category.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={handleSaveSerie}
+                                    className="flex-1 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600"
+                                >
+                                    Enregistrer
+                                </button>
+                                <button
+                                    onClick={() => setEditingSerie(null)}
                                     className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600"
                                 >
                                     Annuler

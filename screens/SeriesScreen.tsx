@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MediaContent, MediaType } from '../types';
 import MediaCard from '../components/MediaCard';
-import { serieService, Serie, seasonSerieService, SeasonSerie, episodeSerieService, EpisodeSerie } from '../lib/firestore';
+import { serieService, Serie, seasonSerieService, SeasonSerie, episodeSerieService, EpisodeSerie, serieCategoryService, SerieCategory } from '../lib/firestore';
 import { useAppContext } from '../context/AppContext';
 import { ArrowLeftIcon } from '../components/icons';
 
@@ -214,6 +214,8 @@ const SeriesScreen: React.FC<SeriesScreenProps> = ({ onSelectMedia, onPlay }) =>
     const [sortOption, setSortOption] = useState<SortOption>('title');
     const [filterOption, setFilterOption] = useState<FilterOption>('all');
     const [showFilters, setShowFilters] = useState(false);
+    const [categories, setCategories] = useState<SerieCategory[]>([]);
+    const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
 
     // Convertir une Serie en MediaContent avec stats
     const convertSerieToMediaContent = async (serie: Serie): Promise<SerieWithStats> => {
@@ -257,7 +259,14 @@ const SeriesScreen: React.FC<SeriesScreenProps> = ({ onSelectMedia, onPlay }) =>
         const loadSeries = async () => {
             setLoading(true);
             try {
-                const seriesData = await serieService.getAllSeriesOnly();
+                let seriesData: Serie[];
+                if (selectedCategoryId) {
+                    // Charger les séries de la catégorie sélectionnée
+                    seriesData = await serieCategoryService.getSeriesByCategory(selectedCategoryId);
+                } else {
+                    // Charger toutes les séries
+                    seriesData = await serieService.getAllSeriesOnly();
+                }
                 // Charger les stats pour chaque série (en parallèle mais avec limite pour éviter la surcharge)
                 const seriesWithStats = await Promise.all(
                     seriesData.map(convertSerieToMediaContent)
@@ -271,6 +280,19 @@ const SeriesScreen: React.FC<SeriesScreenProps> = ({ onSelectMedia, onPlay }) =>
         };
 
         loadSeries();
+    }, [selectedCategoryId]);
+
+    // Charger les catégories
+    useEffect(() => {
+        const loadCategories = async () => {
+            try {
+                const cats = await serieCategoryService.getAllCategories();
+                setCategories(cats);
+            } catch (error) {
+                console.error('Error loading categories:', error);
+            }
+        };
+        loadCategories();
     }, []);
 
     // Filtrer et trier les séries
@@ -464,6 +486,42 @@ const SeriesScreen: React.FC<SeriesScreenProps> = ({ onSelectMedia, onPlay }) =>
                                 >
                                     {t('free') || 'Gratuites'}
                                 </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Filtre par catégorie */}
+                    {categories.length > 0 && (
+                        <div className="pt-2 pb-2 border-t border-gray-200 dark:border-gray-700">
+                            <div className="flex flex-wrap gap-2 items-center">
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Catégories:</span>
+                                <button
+                                    onClick={() => setSelectedCategoryId(null)}
+                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                                        selectedCategoryId === null
+                                            ? 'bg-amber-500 text-gray-900'
+                                            : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                                    }`}
+                                >
+                                    Toutes
+                                </button>
+                                {categories.map((category) => (
+                                    <button
+                                        key={category.id}
+                                        onClick={() => setSelectedCategoryId(category.id)}
+                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
+                                            selectedCategoryId === category.id
+                                                ? 'bg-amber-500 text-gray-900'
+                                                : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                                        }`}
+                                    >
+                                        <div
+                                            className="w-3 h-3 rounded-full"
+                                            style={{ backgroundColor: category.color || '#3B82F6' }}
+                                        />
+                                        {category.name}
+                                    </button>
+                                ))}
                             </div>
                         </div>
                     )}

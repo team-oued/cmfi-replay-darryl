@@ -62,8 +62,8 @@ const MediaCard: React.FC<MediaCardProps> = ({ item, variant = 'thumbnail', onSe
             </div>
           </div>
         </div>
-        <h3 className="text-gray-900 dark:text-white text-sm font-bold truncate group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors duration-300">{title}</h3>
-        {author && <p className="text-gray-500 dark:text-gray-400 text-xs truncate">{author}</p>}
+        <h3 className="text-gray-900 dark:text-white text-sm font-bold break-words group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors duration-300">{title}</h3>
+        {author && <p className="text-gray-500 dark:text-gray-400 text-xs break-words">{author}</p>}
       </div>
     );
   }
@@ -107,7 +107,7 @@ const MediaCard: React.FC<MediaCardProps> = ({ item, variant = 'thumbnail', onSe
         {/* Informations */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1.5">
-            <h3 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white truncate group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors duration-300">
+            <h3 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white break-words group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors duration-300">
               {title}
             </h3>
             {is_premium && (
@@ -186,8 +186,8 @@ const MediaCard: React.FC<MediaCardProps> = ({ item, variant = 'thumbnail', onSe
           </div>
         )}
       </div>
-      <h3 className="text-gray-900 dark:text-white font-bold truncate group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors duration-300">{title}</h3>
-      {author && <p className="text-gray-500 dark:text-gray-400 text-sm truncate">{author}</p>}
+      <h3 className="text-gray-900 dark:text-white font-bold break-words group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors duration-300">{title}</h3>
+      {author && <p className="text-gray-500 dark:text-gray-400 text-sm break-words">{author}</p>}
     </div>
   );
 };

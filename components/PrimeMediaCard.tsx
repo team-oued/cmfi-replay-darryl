@@ -102,8 +102,8 @@ const PrimeMediaCard: React.FC<PrimeMediaCardProps> = ({
 
                 {/* Contenu en bas avec logo Prime */}
                 <div className="absolute bottom-0 left-0 right-0 p-4 md:p-5">
-                    {/* Titre - Style Prime Video */}
-                    <h3 className="text-white text-lg md:text-xl lg:text-2xl font-bold mb-3 line-clamp-2 drop-shadow-2xl leading-tight">
+                    {/* Titre - Style Prime Video - Titre complet sans troncature */}
+                    <h3 className="text-white text-lg md:text-xl lg:text-2xl font-bold mb-3 drop-shadow-2xl leading-tight break-words">
                         {title}
                     </h3>
                 </div>

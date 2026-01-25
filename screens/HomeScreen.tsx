@@ -13,7 +13,7 @@ import { PlayIcon } from '../components/icons';
 
 import { MediaContent, User, MediaType } from '../types';
 import { useAppContext, HomeViewMode } from '../context/AppContext';
-import { userService, generateDefaultAvatar, likeService, movieService, episodeSerieService, statsVuesService, ContinueWatchingItem, viewService, Movie, Serie, serieService } from '../lib/firestore';
+import { userService, generateDefaultAvatar, likeService, movieService, episodeSerieService, statsVuesService, ContinueWatchingItem, viewService, Movie, Serie, serieService, serieCategoryService, SerieCategory } from '../lib/firestore';
 import ContinueWatchingSection from '../components/ContinueWatchingSection';
 import InfoBar from '../components/InfoBar';
 
@@ -149,6 +149,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
     const [loadingPodcasts, setLoadingPodcasts] = useState(true);
     const [loadingHero, setLoadingHero] = useState(true);
     const [loadingCategories, setLoadingCategories] = useState(true);
+    const [serieCategories, setSerieCategories] = useState<SerieCategory[]>([]);
+    const [seriesByCategory, setSeriesByCategory] = useState<Record<string, Serie[]>>({});
+    const [loadingSeriesByCategory, setLoadingSeriesByCategory] = useState(true);
 
     // Simuler le chargement du Hero
     useEffect(() => {
@@ -344,6 +347,39 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
         fetchSeries();
     }, []);
 
+    // Charger les catégories et les séries par catégorie
+    useEffect(() => {
+        const fetchCategoriesAndSeries = async () => {
+            setLoadingSeriesByCategory(true);
+            try {
+                // Charger toutes les catégories
+                const categories = await serieCategoryService.getAllCategories();
+                console.log('📁 Catégories chargées:', categories);
+                setSerieCategories(categories);
+
+                // Charger les séries pour chaque catégorie
+                const seriesByCat: Record<string, Serie[]> = {};
+                for (const category of categories) {
+                    const categorySeries = await serieCategoryService.getSeriesByCategory(category.id);
+                    console.log(`📺 Séries pour la catégorie "${category.name}" (ID: ${category.id}):`, categorySeries.length, categorySeries);
+                    if (categorySeries.length > 0) {
+                        seriesByCat[category.id] = categorySeries;
+                    } else {
+                        console.log(`⚠️ Aucune série trouvée pour la catégorie "${category.name}". Assurez-vous que les séries ont un champ "categoryId" avec la valeur "${category.id}"`);
+                    }
+                }
+                console.log('📊 Séries par catégorie:', seriesByCat);
+                console.log('📊 Nombre total de catégories avec séries:', Object.keys(seriesByCat).length);
+                setSeriesByCategory(seriesByCat);
+            } catch (error) {
+                console.error('Error fetching categories and series:', error);
+            } finally {
+                setLoadingSeriesByCategory(false);
+            }
+        };
+        fetchCategoriesAndSeries();
+    }, []);
+
     // Récupérer les podcasts
     useEffect(() => {
         const fetchPodcasts = async () => {
@@ -528,7 +564,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                                                     </div>
                                                 </div>
                                             </div>
-                                            <h4 className="text-white text-sm md:text-base font-semibold truncate group-hover:text-red-500 transition-colors">
+                                            <h4 className="text-white text-sm md:text-base font-semibold break-words group-hover:text-red-500 transition-colors">
                                                 {mediaContent.title}
                                             </h4>
                                         </div>
@@ -583,7 +619,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                                                     </div>
                                                 </div>
                                             </div>
-                                            <h4 className="text-white text-sm md:text-base font-semibold truncate group-hover:text-red-500 transition-colors">
+                                            <h4 className="text-white text-sm md:text-base font-semibold break-words group-hover:text-red-500 transition-colors">
                                                 {mediaContent.title}
                                             </h4>
                                         </div>
@@ -638,7 +674,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                                                     </div>
                                                 </div>
                                             </div>
-                                            <h4 className="text-white text-sm md:text-base font-semibold truncate group-hover:text-red-500 transition-colors">
+                                            <h4 className="text-white text-sm md:text-base font-semibold break-words group-hover:text-red-500 transition-colors">
                                                 {mediaContent.title}
                                             </h4>
                                         </div>
@@ -778,7 +814,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                                                 </div>
                                             </div>
                                         </div>
-                                        <h4 className="text-gray-900 dark:text-white text-sm md:text-base font-semibold truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                        <h4 className="text-gray-900 dark:text-white text-sm md:text-base font-semibold break-words group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                                             {item.title}
                                         </h4>
                                     </div>
@@ -871,6 +907,90 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                                 })}
                             </div>
                         </div>
+                    )}
+
+                    {/* Sections par catégorie - Mode Prime Video */}
+                    {!loadingSeriesByCategory && (
+                        <>
+                            {serieCategories.length === 0 ? (
+                                <div className="px-4 md:px-6 lg:px-8 py-4 text-sm text-gray-500 dark:text-gray-400">
+                                    💡 Aucune catégorie créée. Créez des catégories dans la page Admin pour organiser vos séries.
+                                </div>
+                            ) : (
+                                serieCategories.map((category) => {
+                                    const categorySeries = seriesByCategory[category.id] || [];
+                                    
+                                    // Afficher la catégorie même si elle est vide
+                                    if (categorySeries.length === 0) {
+                                        return (
+                                            <div key={category.id} className="py-6 md:py-8 lg:py-10 mt-4 md:mt-6">
+                                                <div className="px-4 md:px-6 lg:px-8 mb-6">
+                                                    <div className="flex items-center gap-3">
+                                                        <div
+                                                            className="w-1 h-8 rounded-full"
+                                                            style={{ backgroundColor: category.color || '#3B82F6' }}
+                                                        />
+                                                        <h3 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
+                                                            {category.name}
+                                                        </h3>
+                                                    </div>
+                                                </div>
+                                                <div className="px-4 md:px-6 lg:px-8">
+                                                    <p className="text-sm text-gray-500 dark:text-gray-400 italic">
+                                                        Aucune série dans cette catégorie. Assignez des séries à cette catégorie dans la page Admin.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+
+                                    return (
+                                        <div key={category.id} className="py-6 md:py-8 lg:py-10 mt-4 md:mt-6">
+                                            <div className="px-4 md:px-6 lg:px-8 mb-6">
+                                                <div className="flex items-center gap-3">
+                                                    <div
+                                                        className="w-1 h-8 rounded-full"
+                                                        style={{ backgroundColor: category.color || '#3B82F6' }}
+                                                    />
+                                                    <h3 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
+                                                        {category.name}
+                                                    </h3>
+                                                </div>
+                                                {category.description && (
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 ml-4">
+                                                        {category.description}
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <div className="flex space-x-3 md:space-x-4 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-4">
+                                                {categorySeries.map((serie) => {
+                                                    const mediaContent: MediaContent = {
+                                                        id: serie.uid_serie,
+                                                        type: MediaType.Series,
+                                                        title: serie.title_serie,
+                                                        author: '',
+                                                        theme: '',
+                                                        imageUrl: serie.back_path || serie.image_path,
+                                                        duration: serie.runtime_h_m,
+                                                        description: serie.overview_serie,
+                                                        languages: [],
+                                                        video_path_hd: ''
+                                                    };
+                                                    return (
+                                                        <PrimeMediaCard
+                                                            key={serie.uid_serie}
+                                                            item={mediaContent}
+                                                            onSelect={onSelectMedia}
+                                                            onPlay={onPlay}
+                                                        />
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </>
                     )}
 
                     {/* Section Podcasts */}
@@ -1156,6 +1276,89 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                             })}
                         </div>
                     </section>
+                )}
+
+                {/* Sections par catégorie */}
+                {!loadingSeriesByCategory && (
+                    <>
+                        {serieCategories.length === 0 ? (
+                            <div className="px-4 md:px-6 lg:px-8 py-4 text-sm text-gray-500 dark:text-gray-400">
+                                💡 Aucune catégorie créée. Créez des catégories dans la page Admin pour organiser vos séries.
+                            </div>
+                        ) : (
+                            serieCategories.map((category) => {
+                                const categorySeries = seriesByCategory[category.id] || [];
+                                console.log(`🔍 Affichage catégorie "${category.name}" (ID: ${category.id}):`, categorySeries.length, 'séries');
+                                
+                                // Afficher la catégorie même si elle est vide
+                                if (categorySeries.length === 0) {
+                                    return (
+                                        <section key={category.id} className="py-4 md:py-6">
+                                            <div className="px-4 md:px-6 lg:px-8 mb-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div
+                                                        className="w-1 h-8 rounded-full"
+                                                        style={{ backgroundColor: category.color || '#3B82F6' }}
+                                                    />
+                                                    <h3 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">
+                                                        {category.name}
+                                                    </h3>
+                                                </div>
+                                            </div>
+                                            <div className="px-4 md:px-6 lg:px-8">
+                                                <p className="text-sm text-gray-500 dark:text-gray-400 italic">
+                                                    Aucune série dans cette catégorie. Assignez des séries à cette catégorie dans la page Admin (Onglet "Vidéos App" → Cliquer sur "Modifier" sur une série).
+                                                </p>
+                                            </div>
+                                        </section>
+                                    );
+                                }
+
+                                return (
+                                    <section key={category.id} className="py-8 md:py-12">
+                                        <div className="px-4 md:px-6 lg:px-8 mb-6">
+                                            <div className="flex items-center gap-3">
+                                                <div
+                                                    className="w-1 h-8 rounded-full"
+                                                    style={{ backgroundColor: category.color || '#3B82F6' }}
+                                                />
+                                                <h3 className="text-2xl md:text-3xl lg:text-4xl font-black text-gray-900 dark:text-white tracking-tight">
+                                                    {category.name}
+                                                </h3>
+                                            </div>
+                                            {category.description && (
+                                                <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 ml-4">
+                                                    {category.description}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div className="flex space-x-4 md:space-x-6 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-6 scroll-smooth snap-x snap-mandatory">
+                                            {categorySeries.map((serie) => {
+                                                const mediaContent: MediaContent = {
+                                                    id: serie.uid_serie,
+                                                    type: MediaType.Series,
+                                                    title: serie.title_serie,
+                                                    author: '',
+                                                    theme: '',
+                                                    imageUrl: serie.back_path || serie.image_path,
+                                                    duration: serie.runtime_h_m,
+                                                    description: serie.overview_serie,
+                                                    languages: [],
+                                                    video_path_hd: ''
+                                                };
+                                                return (
+                                                    <div key={serie.uid_serie} className="snap-start flex-shrink-0">
+                                                        <MediaCard item={mediaContent} variant="poster" onSelect={onSelectMedia} onPlay={onPlay} />
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </section>
+                                );
+                            })
+                        )}
+                    </>
                 )}
             </div>
 
