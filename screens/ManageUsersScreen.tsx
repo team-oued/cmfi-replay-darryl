@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UserProfile, userService } from '../lib/firestore';
+import { UserProfile, userService, userMetricsService } from '../lib/firestore';
 import { useAppContext } from '../context/AppContext';
 import { ArrowLeftIcon, SearchIcon } from '../components/icons';
 import { Timestamp } from 'firebase/firestore';
@@ -11,6 +11,14 @@ const ManageUsersScreen: React.FC = () => {
     const [users, setUsers] = useState<(UserProfile & { lastSeen?: Date | Timestamp })[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
+    
+    // États pour les métriques
+    const [top10MostConnected, setTop10MostConnected] = useState<Array<{ user: UserProfile; connectionCount: number }>>([]);
+    const [averageSessionDuration, setAverageSessionDuration] = useState<number>(0);
+    const [top10MostActive, setTop10MostActive] = useState<Array<{ user: UserProfile; viewCount: number }>>([]);
+    const [peakHours, setPeakHours] = useState<Array<{ hour: number; connectionCount: number }>>([]);
+    const [top10TotalOnlineTime, setTop10TotalOnlineTime] = useState<Array<{ user: UserProfile; totalOnlineTime: number }>>([]);
+    const [loadingMetrics, setLoadingMetrics] = useState(true);
 
     useEffect(() => {
         // S'abonner aux mises à jour en temps réel des utilisateurs (incluant les inactifs)
@@ -29,6 +37,34 @@ const ManageUsersScreen: React.FC = () => {
         }, true); // includeInactive = true pour voir aussi les offline récents
 
         return () => unsubscribe();
+    }, []);
+
+    // Charger les métriques
+    useEffect(() => {
+        const loadMetrics = async () => {
+            setLoadingMetrics(true);
+            try {
+                const [mostConnected, avgDuration, mostActive, peak, totalTime] = await Promise.all([
+                    userMetricsService.getTop10MostConnectedUsers(),
+                    userMetricsService.getAverageSessionDuration(),
+                    userMetricsService.getTop10MostActiveUsers(),
+                    userMetricsService.getPeakHours(),
+                    userMetricsService.getTop10TotalOnlineTime()
+                ]);
+                
+                setTop10MostConnected(mostConnected);
+                setAverageSessionDuration(avgDuration);
+                setTop10MostActive(mostActive);
+                setPeakHours(peak);
+                setTop10TotalOnlineTime(totalTime);
+            } catch (error) {
+                console.error('Error loading metrics:', error);
+            } finally {
+                setLoadingMetrics(false);
+            }
+        };
+        
+        loadMetrics();
     }, []);
 
     const formatLastSeen = (lastSeen?: Date | Timestamp, updatedAt?: Date | Timestamp): string => {
@@ -218,7 +254,7 @@ const ManageUsersScreen: React.FC = () => {
                             )}
                         </div>
 
-                        {/* Statistiques */}
+                        {/* Statistiques de base */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                             <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
                                 <div className="text-sm text-gray-500 dark:text-gray-400">En ligne</div>
@@ -233,6 +269,150 @@ const ManageUsersScreen: React.FC = () => {
                                 <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">{offlineUsers.length}</div>
                             </div>
                         </div>
+
+                        {/* Métriques avancées */}
+                        {loadingMetrics ? (
+                            <div className="flex items-center justify-center py-8">
+                                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-amber-500"></div>
+                            </div>
+                        ) : (
+                            <div className="space-y-6 mb-6">
+                                {/* Top 10 utilisateurs les plus connectés */}
+                                <section className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
+                                    <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">
+                                        🔝 Top 10 utilisateurs les plus connectés
+                                    </h2>
+                                    {top10MostConnected.length > 0 ? (
+                                        <div className="space-y-2">
+                                            {top10MostConnected.map((item, index) => (
+                                                <div key={item.user.uid} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-lg font-bold text-amber-600 dark:text-amber-400 w-8">
+                                                            #{index + 1}
+                                                        </span>
+                                                        <span className="font-medium text-gray-900 dark:text-white">
+                                                            {item.user.display_name || item.user.email}
+                                                        </span>
+                                                    </div>
+                                                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                                                        {item.connectionCount} connexion{item.connectionCount > 1 ? 's' : ''}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="text-gray-500 dark:text-gray-400">Aucune donnée disponible</p>
+                                    )}
+                                </section>
+
+                                {/* Temps moyen de session */}
+                                <section className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
+                                    <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">
+                                        ⏱️ Temps moyen de session
+                                    </h2>
+                                    <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">
+                                        {averageSessionDuration > 0 
+                                            ? `${Math.round(averageSessionDuration / 60000)} min`
+                                            : 'N/A'}
+                                    </div>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                                        Durée moyenne que les utilisateurs restent en ligne
+                                    </p>
+                                </section>
+
+                                {/* Top 10 utilisateurs les plus actifs */}
+                                <section className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
+                                    <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">
+                                        🎬 Top 10 utilisateurs les plus actifs
+                                    </h2>
+                                    {top10MostActive.length > 0 ? (
+                                        <div className="space-y-2">
+                                            {top10MostActive.map((item, index) => (
+                                                <div key={item.user.uid} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-lg font-bold text-purple-600 dark:text-purple-400 w-8">
+                                                            #{index + 1}
+                                                        </span>
+                                                        <span className="font-medium text-gray-900 dark:text-white">
+                                                            {item.user.display_name || item.user.email}
+                                                        </span>
+                                                    </div>
+                                                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                                                        {item.viewCount} vue{item.viewCount > 1 ? 's' : ''}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="text-gray-500 dark:text-gray-400">Aucune donnée disponible</p>
+                                    )}
+                                </section>
+
+                                {/* Heures de pointe */}
+                                <section className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
+                                    <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">
+                                        📊 Heures de pointe
+                                    </h2>
+                                    {peakHours.length > 0 ? (
+                                        <div className="space-y-2">
+                                            {peakHours.map((item, index) => (
+                                                <div key={item.hour} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-lg font-bold text-green-600 dark:text-green-400 w-8">
+                                                            #{index + 1}
+                                                        </span>
+                                                        <span className="font-medium text-gray-900 dark:text-white">
+                                                            {item.hour}h - {item.hour + 1}h
+                                                        </span>
+                                                    </div>
+                                                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                                                        {item.connectionCount} connexion{item.connectionCount > 1 ? 's' : ''}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="text-gray-500 dark:text-gray-400">Aucune donnée disponible</p>
+                                    )}
+                                </section>
+
+                                {/* Top 10 temps total en ligne */}
+                                <section className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
+                                    <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">
+                                        ⏰ Top 10 temps total en ligne
+                                    </h2>
+                                    {top10TotalOnlineTime.length > 0 ? (
+                                        <div className="space-y-2">
+                                            {top10TotalOnlineTime.map((item, index) => {
+                                                const hours = Math.floor(item.totalOnlineTime / (1000 * 60 * 60));
+                                                const days = Math.floor(hours / 24);
+                                                const displayTime = days > 0 
+                                                    ? `${days} jour${days > 1 ? 's' : ''}`
+                                                    : `${hours} heure${hours > 1 ? 's' : ''}`;
+                                                
+                                                return (
+                                                    <div key={item.user.uid} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                                        <div className="flex items-center gap-3">
+                                                            <span className="text-lg font-bold text-indigo-600 dark:text-indigo-400 w-8">
+                                                                #{index + 1}
+                                                            </span>
+                                                            <span className="font-medium text-gray-900 dark:text-white">
+                                                                {item.user.display_name || item.user.email}
+                                                            </span>
+                                                        </div>
+                                                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                                                            {displayTime}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <p className="text-gray-500 dark:text-gray-400">Aucune donnée disponible</p>
+                                    )}
+                                </section>
+                            </div>
+                        )}
 
                         {/* Liste des utilisateurs en ligne */}
                         {onlineUsers.length > 0 && (

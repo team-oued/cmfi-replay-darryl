@@ -2810,6 +2810,215 @@ export const viewService = {
     }
 };
 
+// Service pour les métriques utilisateurs
+export const userMetricsService = {
+    /**
+     * Top 10 utilisateurs qui se connectent le plus
+     * Basé sur le nombre de fois où presence passe à 'online' (estimé via lastSeen)
+     */
+    async getTop10MostConnectedUsers(): Promise<Array<{ user: UserProfile; connectionCount: number }>> {
+        try {
+            const usersSnapshot = await getDocs(collection(db, USERS_COLLECTION));
+            const users = usersSnapshot.docs.map(doc => doc.data() as UserProfile);
+            
+            // Calculer le nombre de connexions estimé basé sur lastSeen et createdAt
+            const usersWithConnections = users.map(user => {
+                let connectionCount = 0;
+                
+                // Si l'utilisateur a un lastSeen récent, c'est qu'il s'est connecté récemment
+                if (user.lastSeen) {
+                    const lastSeenDate = user.lastSeen instanceof Date 
+                        ? user.lastSeen 
+                        : user.lastSeen instanceof Timestamp 
+                            ? user.lastSeen.toDate() 
+                            : new Date(user.lastSeen);
+                    
+                    const createdAtDate = user.createdAt instanceof Date 
+                        ? user.createdAt 
+                        : user.createdAt instanceof Timestamp 
+                            ? user.createdAt.toDate() 
+                            : new Date(user.created_time || Date.now());
+                    
+                    // Estimer le nombre de connexions basé sur la fréquence de lastSeen
+                    const daysSinceCreation = Math.max(1, (Date.now() - createdAtDate.getTime()) / (1000 * 60 * 60 * 24));
+                    const daysSinceLastSeen = (Date.now() - lastSeenDate.getTime()) / (1000 * 60 * 60 * 24);
+                    
+                    // Si l'utilisateur est actif (online/away), estimer les connexions
+                    if (user.presence === 'online' || user.presence === 'away') {
+                        // Estimer 1 connexion par jour d'activité
+                        connectionCount = Math.max(1, Math.floor(daysSinceCreation / Math.max(1, daysSinceLastSeen)));
+                    }
+                }
+                
+                return { user, connectionCount };
+            });
+            
+            return usersWithConnections
+                .sort((a, b) => b.connectionCount - a.connectionCount)
+                .slice(0, 10);
+        } catch (error) {
+            console.error('Error getting top 10 most connected users:', error);
+            return [];
+        }
+    },
+
+    /**
+     * Temps moyen de session (durée moyenne en ligne)
+     */
+    async getAverageSessionDuration(): Promise<number> {
+        try {
+            const usersSnapshot = await getDocs(collection(db, USERS_COLLECTION));
+            const users = usersSnapshot.docs.map(doc => doc.data() as UserProfile);
+            
+            let totalSessionTime = 0;
+            let activeUsersCount = 0;
+            
+            users.forEach(user => {
+                if (user.lastSeen && (user.presence === 'online' || user.presence === 'away')) {
+                    const lastSeenDate = user.lastSeen instanceof Date 
+                        ? user.lastSeen 
+                        : user.lastSeen instanceof Timestamp 
+                            ? user.lastSeen.toDate() 
+                            : new Date(user.lastSeen);
+                    
+                    // Estimer la durée de session basée sur lastSeen
+                    const sessionDuration = Date.now() - lastSeenDate.getTime();
+                    
+                    // Si la session est récente (< 1 heure), l'inclure
+                    if (sessionDuration < 3600000) { // 1 heure en ms
+                        totalSessionTime += sessionDuration;
+                        activeUsersCount++;
+                    }
+                }
+            });
+            
+            return activeUsersCount > 0 ? totalSessionTime / activeUsersCount : 0;
+        } catch (error) {
+            console.error('Error getting average session duration:', error);
+            return 0;
+        }
+    },
+
+    /**
+     * Top 10 utilisateurs les plus actifs (basé sur le nombre de vues)
+     */
+    async getTop10MostActiveUsers(): Promise<Array<{ user: UserProfile; viewCount: number }>> {
+        try {
+            const viewsSnapshot = await getDocs(collection(db, USER_VIEW_COLLECTION));
+            const views = viewsSnapshot.docs.map(doc => doc.data() as UserView);
+            
+            // Compter les vues par utilisateur
+            const viewCountByUser: Record<string, number> = {};
+            views.forEach(view => {
+                viewCountByUser[view.user_uid] = (viewCountByUser[view.user_uid] || 0) + 1;
+            });
+            
+            // Récupérer les profils utilisateurs
+            const usersSnapshot = await getDocs(collection(db, USERS_COLLECTION));
+            const usersMap = new Map<string, UserProfile>();
+            usersSnapshot.docs.forEach(doc => {
+                const user = doc.data() as UserProfile;
+                usersMap.set(user.uid, user);
+            });
+            
+            // Créer la liste des utilisateurs avec leur nombre de vues
+            const usersWithViews = Array.from(viewCountByUser.entries())
+                .map(([uid, viewCount]) => ({
+                    user: usersMap.get(uid)!,
+                    viewCount
+                }))
+                .filter(item => item.user) // Filtrer les utilisateurs qui n'existent plus
+                .sort((a, b) => b.viewCount - a.viewCount)
+                .slice(0, 10);
+            
+            return usersWithViews;
+        } catch (error) {
+            console.error('Error getting top 10 most active users:', error);
+            return [];
+        }
+    },
+
+    /**
+     * Heures de pointe (heures où les utilisateurs se connectent le plus)
+     */
+    async getPeakHours(): Promise<Array<{ hour: number; connectionCount: number }>> {
+        try {
+            const usersSnapshot = await getDocs(collection(db, USERS_COLLECTION));
+            const users = usersSnapshot.docs.map(doc => doc.data() as UserProfile);
+            
+            // Compter les connexions par heure (basé sur lastSeen)
+            const hourCounts: Record<number, number> = {};
+            
+            users.forEach(user => {
+                if (user.lastSeen) {
+                    const lastSeenDate = user.lastSeen instanceof Date 
+                        ? user.lastSeen 
+                        : user.lastSeen instanceof Timestamp 
+                            ? user.lastSeen.toDate() 
+                            : new Date(user.lastSeen);
+                    
+                    const hour = lastSeenDate.getHours();
+                    hourCounts[hour] = (hourCounts[hour] || 0) + 1;
+                }
+            });
+            
+            // Convertir en tableau et trier
+            return Object.entries(hourCounts)
+                .map(([hour, count]) => ({ hour: parseInt(hour), connectionCount: count }))
+                .sort((a, b) => b.connectionCount - a.connectionCount)
+                .slice(0, 5); // Top 5 heures
+        } catch (error) {
+            console.error('Error getting peak hours:', error);
+            return [];
+        }
+    },
+
+    /**
+     * Top 10 utilisateurs avec le plus de temps total en ligne
+     */
+    async getTop10TotalOnlineTime(): Promise<Array<{ user: UserProfile; totalOnlineTime: number }>> {
+        try {
+            const usersSnapshot = await getDocs(collection(db, USERS_COLLECTION));
+            const users = usersSnapshot.docs.map(doc => doc.data() as UserProfile);
+            
+            const usersWithTime = users.map(user => {
+                let totalOnlineTime = 0;
+                
+                if (user.lastSeen && user.createdAt) {
+                    const lastSeenDate = user.lastSeen instanceof Date 
+                        ? user.lastSeen 
+                        : user.lastSeen instanceof Timestamp 
+                            ? user.lastSeen.toDate() 
+                            : new Date(user.lastSeen);
+                    
+                    const createdAtDate = user.createdAt instanceof Date 
+                        ? user.createdAt 
+                        : user.createdAt instanceof Timestamp 
+                            ? user.createdAt.toDate() 
+                            : new Date(user.created_time || Date.now());
+                    
+                    // Estimer le temps total en ligne basé sur la différence entre createdAt et lastSeen
+                    // Si l'utilisateur est actif, ajouter le temps depuis lastSeen
+                    if (user.presence === 'online' || user.presence === 'away') {
+                        totalOnlineTime = Date.now() - createdAtDate.getTime();
+                    } else {
+                        totalOnlineTime = lastSeenDate.getTime() - createdAtDate.getTime();
+                    }
+                }
+                
+                return { user, totalOnlineTime };
+            });
+            
+            return usersWithTime
+                .sort((a, b) => b.totalOnlineTime - a.totalOnlineTime)
+                .slice(0, 10);
+        } catch (error) {
+            console.error('Error getting top 10 total online time:', error);
+            return [];
+        }
+    }
+};
+
 // Export du service d'abonnement
 export { subscriptionService } from './subscriptionService';
 
