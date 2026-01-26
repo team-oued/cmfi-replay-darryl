@@ -29,21 +29,23 @@ const EpisodeListItem: React.FC<{ episode: Episode | EpisodeSerie, onClick: () =
     const thumbnailUrl = isEpisodeSerie ? episode.picture_path : episode.thumbnailUrl;
 
     return (
-        <div onClick={onClick} className={`flex items-center space-x-4 p-2 rounded-lg ${playingClasses} cursor-pointer transition-all duration-200 relative`}>
+        <div onClick={onClick} className={`flex items-start space-x-3 sm:space-x-4 p-3 sm:p-2 rounded-lg ${playingClasses} cursor-pointer transition-all duration-200 relative min-h-[80px] sm:min-h-[72px]`}>
             {isPlaying && <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-500 rounded-l-lg"></div>}
-            <div className="relative w-32 h-20 bg-gray-300 dark:bg-gray-700 rounded-lg overflow-hidden flex-shrink-0">
+            <div className="relative w-16 h-12 sm:w-20 sm:h-14 md:w-24 md:h-16 lg:w-28 lg:h-18 bg-gray-300 dark:bg-gray-700 rounded-lg overflow-hidden flex-shrink-0 mt-1">
                 <img src={thumbnailUrl} alt={episodeTitle} className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
                     {isPlaying ? (
-                        <VolumeHighIcon className="w-8 h-8 text-white/90" />
+                        <VolumeHighIcon className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 text-white/90" />
                     ) : (
-                        <PlayIcon className="w-8 h-8 text-white/80" />
+                        <PlayIcon className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 text-white/80" />
                     )}
                 </div>
             </div>
-            <div className="flex-1 min-w-0">
-                <h4 className={`font-semibold truncate ${isPlaying ? 'text-amber-800 dark:text-amber-300' : 'text-gray-900 dark:text-white'}`}>{episodeNumber}. {episodeTitle}</h4>
-                <p className="text-gray-500 dark:text-gray-400 text-sm">{episodeDuration}</p>
+            <div className="flex-1 min-w-0 py-1">
+                <h4 className={`font-semibold text-xs sm:text-sm ${isPlaying ? 'text-amber-800 dark:text-amber-300' : 'text-gray-900 dark:text-white'} leading-snug line-clamp-2 sm:line-clamp-1 mb-1`}>
+                    {episodeNumber}. {episodeTitle}
+                </h4>
+                <p className="text-gray-500 dark:text-gray-400 text-xs sm:text-sm">{episodeDuration}</p>
             </div>
         </div>
     );
@@ -333,7 +335,7 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
                 </header>
             </div>
 
-            <div className="p-4 md:p-6 lg:p-8 -mt-24 md:-mt-32 lg:-mt-40 relative z-10 space-y-4 md:space-y-6 max-w-7xl mx-auto">
+            <div className="p-3 sm:p-4 md:p-6 lg:p-8 -mt-20 sm:-mt-24 md:-mt-32 lg:-mt-40 relative z-10 space-y-4 md:space-y-6 max-w-7xl mx-auto">
                 {/* Titre avec meilleure gestion du texte */}
                 <div className="space-y-3 md:space-y-4">
                     <h1 className="text-2xl md:text-3xl lg:text-4xl font-black text-gray-900 dark:text-white drop-shadow-lg leading-tight break-words">
@@ -402,7 +404,7 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
                     </div>
                     
                     {/* Boutons secondaires - Même ligne pour les films */}
-                    <div className={`grid ${type === MediaType.Movie ? 'grid-cols-3' : 'grid-cols-2'} gap-2 sm:gap-3 md:gap-4`}>
+                    <div className={`grid ${type === MediaType.Movie ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2'} gap-2 sm:gap-3 md:gap-4`}>
                         {type === MediaType.Movie && (
                             <button
                                 onClick={handleLike}
@@ -473,22 +475,25 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
 
                 {(type === MediaType.Series || type === MediaType.Podcast) && (
                     <div className="space-y-4 md:space-y-6">
-                        <div className="flex items-center justify-between">
+                        {/* Header avec titre et sélecteur de saison */}
+                        <div className="space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
                             <h2 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white">{t('episodes')}</h2>
                             {/* Menu déroulant pour sélectionner la saison */}
                             {firestoreSeasons.length > 0 && (
-                                <select
-                                    value={selectedSeasonUid || ''}
-                                    onChange={(e) => setSelectedSeasonUid(e.target.value)}
-                                    className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                                >
-                                    {firestoreSeasons.map(season => (
-                                        <option key={season.uid_season} value={season.uid_season}>
-                                            {t('season')} {season.season_number}
-                                            {season.title_season ? ` - ${season.title_season}` : ''}
-                                        </option>
-                                    ))}
-                                </select>
+                                <div className="sm:max-w-xs">
+                                    <select
+                                        value={selectedSeasonUid || ''}
+                                        onChange={(e) => setSelectedSeasonUid(e.target.value)}
+                                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent appearance-none cursor-pointer"
+                                    >
+                                        {firestoreSeasons.map(season => (
+                                            <option key={season.uid_season} value={season.uid_season}>
+                                                {t('season')} {season.season_number}
+                                                {season.title_season ? ` - ${season.title_season}` : ''}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
                             )}
                         </div>
                         {isLoading ? (
