@@ -17,7 +17,12 @@ const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ onBack }) => {
     const [photoUrl, setPhotoUrl] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+    const handleToggleSidebar = () => {
+        setIsSidebarOpen(!isSidebarOpen);
+    };
 
     // Initialiser les champs avec les données de l'utilisateur
     useEffect(() => {
@@ -52,14 +57,47 @@ const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ onBack }) => {
             if (!user) {
                 throw new Error('Not authenticated');
             }
-            const filePath = `avatars/${user.uid}/${Date.now()}_${file.name}`;
+            
+            // Create a unique filename with timestamp and user ID for better security
+            const timestamp = Date.now();
+            const fileExtension = file.name.split('.').pop();
+            const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+            const filePath = `avatars/${user.uid}/${timestamp}_${sanitizedFileName}`;
+            
+            console.log('Uploading to path:', filePath);
+            
             const storageRef = ref(storage, filePath);
-            await uploadBytes(storageRef, file);
+            
+            // Add metadata for better security and content type
+            const metadata = {
+                contentType: file.type,
+                customMetadata: {
+                    uploadedBy: user.uid,
+                    originalName: file.name
+                }
+            };
+            
+            await uploadBytes(storageRef, file, metadata);
             const downloadUrl = await getDownloadURL(storageRef);
             setPhotoUrl(downloadUrl);
+            console.log('Upload successful:', downloadUrl);
         } catch (error) {
             console.error('Error uploading photo:', error);
-            setError('Erreur lors du téléchargement de la photo');
+            
+            // Provide more specific error messages
+            if (error instanceof Error) {
+                if (error.message.includes('storage/unauthorized') || error.message.includes('permission')) {
+                    setError('Permission refusée pour le téléchargement. Veuillez contacter l\'administrateur.');
+                } else if (error.message.includes('storage/quota-exceeded')) {
+                    setError('Espace de stockage plein. Veuillez réessayer plus tard.');
+                } else if (error.message.includes('storage/file-size-exceeded')) {
+                    setError('Fichier trop volumineux. La taille maximale est de 5MB.');
+                } else {
+                    setError(`Erreur lors du téléchargement: ${error.message}`);
+                }
+            } else {
+                setError('Erreur lors du téléchargement de la photo');
+            }
         } finally {
             setLoading(false);
         }
@@ -95,7 +133,12 @@ const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ onBack }) => {
 
     return (
         <div>
-            <Header title={t('editProfileScreenTitle')} onBack={onBack} />
+            <Header 
+                title={t('editProfileScreenTitle')} 
+                onBack={onBack}
+                isSidebarOpen={isSidebarOpen}
+                onToggleSidebar={handleToggleSidebar}
+            />
             <div className="p-4 space-y-8 animate-fadeIn">
                 <div className="flex flex-col items-center space-y-4">
                     <div className="relative">
