@@ -12,9 +12,10 @@ import { PlayIcon } from '../components/icons';
 
 import { MediaContent, User, MediaType } from '../types';
 import { useAppContext, HomeViewMode } from '../context/AppContext';
-import { userService, generateDefaultAvatar, likeService, movieService, episodeSerieService, statsVuesService, ContinueWatchingItem, viewService, Movie, Serie, serieService, serieCategoryService, SerieCategory } from '../lib/firestore';
+import { userService, generateDefaultAvatar, likeService, movieService, episodeSerieService, statsVuesService, ContinueWatchingItem, viewService, Movie, Serie, serieService, serieCategoryService, SerieCategory, UserProfile } from '../lib/firestore';
 import ContinueWatchingSection from '../components/ContinueWatchingSection';
 import InfoBar from '../components/InfoBar';
+import ProfileCompletionModal from '../components/ProfileCompletionModal';
 
 const MediaRow: React.FC<{ title: string; items: MediaContent[]; onSelectMedia: (item: MediaContent) => void; onPlay: (item: MediaContent) => void; variant?: 'poster' | 'thumbnail' | 'list' }> = ({ title, items, onSelectMedia, onPlay, variant }) => {
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
@@ -133,8 +134,45 @@ interface HomeScreenProps {
 }
 
 const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigateToCategory }) => {
-    const { t, user, userProfile, homeViewMode: viewMode } = useAppContext();
+    const { t, user, userProfile, homeViewMode: viewMode, setUserProfile } = useAppContext();
+    const [showProfileModal, setShowProfileModal] = useState(false);
     const [mostLikedItems, setMostLikedItems] = useState<Array<{ content: MediaContent; likeCount: number; viewCount?: number }>>([]);
+
+    // Vérifier si le profil doit être complété
+    useEffect(() => {
+        console.log('🔍 Vérification profil:', {
+            userProfile: !!userProfile,
+            user: !!user,
+            country: userProfile?.country,
+            phoneNumber: userProfile?.phoneNumber,
+            shouldShow: userProfile && user && (!userProfile.country || !userProfile.phoneNumber)
+        });
+        
+        if (userProfile && user) {
+            // Vérifier si les champs sont vides ou undefined
+            const countryMissing = !userProfile.country || userProfile.country.trim() === '';
+            const phoneMissing = !userProfile.phoneNumber || userProfile.phoneNumber.trim() === '';
+            const needsCompletion = countryMissing || phoneMissing;
+            
+            console.log('📋 Profil à compléter?', {
+                countryMissing,
+                phoneMissing,
+                needsCompletion,
+                country: userProfile.country,
+                phoneNumber: userProfile.phoneNumber
+            });
+            
+            if (needsCompletion) {
+                console.log('✅ Affichage du modal');
+                setShowProfileModal(true);
+            } else {
+                console.log('❌ Profil complet, pas de modal');
+                setShowProfileModal(false);
+            }
+        } else {
+            console.log('⏳ En attente du chargement du profil ou de l\'utilisateur');
+        }
+    }, [userProfile, user]);
     const [loadingMostLiked, setLoadingMostLiked] = useState(true);
     const [mostWatchedItems, setMostWatchedItems] = useState<Array<{ content: MediaContent; likeCount: number; viewCount: number }>>([]);
     const [loadingMostWatched, setLoadingMostWatched] = useState(true);
@@ -1461,6 +1499,28 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
             </div>
 
             {/* Section Active Now supprimée */}
+
+            {/* Modal de complétion du profil */}
+            {showProfileModal && userProfile && (
+                <ProfileCompletionModal
+                    userProfile={userProfile}
+                    onComplete={(updatedProfile) => {
+                        console.log('✅ Profil complété:', updatedProfile);
+                        setUserProfile(updatedProfile);
+                        setShowProfileModal(false);
+                    }}
+                />
+            )}
+            
+            {/* Debug: Afficher l'état du modal */}
+            {process.env.NODE_ENV === 'development' && (
+                <div className="fixed bottom-4 right-4 bg-black text-white p-2 text-xs z-[10000] rounded">
+                    Modal: {showProfileModal ? 'VISIBLE' : 'CACHÉ'} | 
+                    UserProfile: {userProfile ? 'OUI' : 'NON'} | 
+                    Country: {userProfile?.country || 'VIDE'} | 
+                    Phone: {userProfile?.phoneNumber || 'VIDE'}
+                </div>
+            )}
         </div>
     );
 };

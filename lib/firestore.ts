@@ -36,6 +36,8 @@ export interface UserProfile {
     updatedAt?: Date | Timestamp;
     isAdmin?: boolean;
     lastSeen?: Date | Timestamp; // Timestamp de la dernière activité
+    country?: string; // Code pays (ex: "FR", "US")
+    phoneNumber?: string; // Numéro de téléphone avec indicateur (ex: "+33 6 12 34 56 78")
 }
 
 // Interface pour les catégories de séries
