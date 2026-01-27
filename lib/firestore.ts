@@ -189,6 +189,21 @@ export interface UserView {
     user_uid: string; // uid de l'utilisateur
 }
 
+// Interface pour une navigation individuelle
+export interface NavigationEntry {
+    page_path: string; // Chemin de la page (ex: /home, /movies, /watch/abc123)
+    page_name: string; // Nom lisible de la page (ex: "Accueil", "Films", "Lecture")
+    timestamp: Date | Timestamp;
+}
+
+// Interface pour la collection user_navigation (1 document par utilisateur)
+export interface UserNavigation {
+    id?: string;
+    user_uid: string;
+    lastTwoPages: NavigationEntry[]; // Maximum 2 pages (les 2 dernières quand en ligne)
+    updatedAt: Date | Timestamp;
+}
+
 // Interface pour les notifications
 export interface Notification {
     id: string;
@@ -218,6 +233,7 @@ const USER_VIEW_COLLECTION = 'user_view';
 const APP_SETTINGS_COLLECTION = 'appSettings';
 const ADS_COLLECTION = 'ads';
 const NOTIFICATIONS_COLLECTION = 'notifications';
+const USER_NAVIGATION_COLLECTION = 'user_navigation';
 
 // Fonction utilitaire pour générer un avatar par défaut
 export const generateDefaultAvatar = (name?: string): string => {
@@ -4000,6 +4016,127 @@ export const notificationService = {
         } catch (error) {
             console.error('Error deleting all notifications:', error);
             throw error;
+        }
+    }
+};
+
+// Service pour le tracking de navigation des utilisateurs
+export const navigationTrackingService = {
+    // Limites de stockage
+    MAX_PAGES_TO_KEEP: 5, // Garder seulement les 5 dernières pages
+    MIN_TIME_BETWEEN_SAME_PAGE: 3000, // 3 secondes minimum entre deux navigations vers la même page
+
+    /**
+     * Enregistre une navigation (changement de page) - Écrase le document utilisateur
+     * Garde seulement les 5 dernières pages visitées quand l'utilisateur était en ligne
+     */
+    async recordNavigation(
+        userUid: string,
+        pagePath: string,
+        pageName: string,
+        isOnline: boolean = true
+    ): Promise<void> {
+        try {
+            // Ne pas enregistrer si l'utilisateur est hors ligne
+            if (!isOnline) {
+                return;
+            }
+
+            const userNavRef = doc(db, USER_NAVIGATION_COLLECTION, userUid);
+            const userNavDoc = await getDoc(userNavRef);
+
+            const now = Timestamp.now();
+            const newEntry: NavigationEntry = {
+                page_path: pagePath,
+                page_name: pageName,
+                timestamp: now
+            };
+
+            if (!userNavDoc.exists()) {
+                // Créer un nouveau document avec la première navigation
+                const newData: Omit<UserNavigation, 'id'> = {
+                    user_uid: userUid,
+                    lastTwoPages: [newEntry],
+                    updatedAt: now
+                };
+                await setDoc(userNavRef, newData);
+            } else {
+                // Mettre à jour le document existant
+                const existingData = userNavDoc.data() as UserNavigation;
+                let lastTwoPages = existingData.lastTwoPages || [];
+
+                // Vérifier si c'est la même page que la dernière (éviter les doublons rapides)
+                if (lastTwoPages.length > 0) {
+                    const lastPage = lastTwoPages[lastTwoPages.length - 1];
+                    const lastPageTime = lastPage.timestamp instanceof Date 
+                        ? lastPage.timestamp.getTime() 
+                        : lastPage.timestamp instanceof Timestamp 
+                            ? lastPage.timestamp.toMillis() 
+                            : new Date(lastPage.timestamp).getTime();
+                    
+                    const nowTime = now.toMillis();
+                    const timeSinceLastNav = nowTime - lastPageTime;
+                    
+                    // Si c'est la même page et moins de 3 secondes, ne pas enregistrer
+                    if (lastPage.page_path === pagePath && timeSinceLastNav < this.MIN_TIME_BETWEEN_SAME_PAGE) {
+                        return; // Ignorer cette navigation
+                    }
+                }
+
+                // Ajouter la nouvelle navigation
+                lastTwoPages.push(newEntry);
+
+                // Garder seulement les 2 dernières
+                if (lastTwoPages.length > this.MAX_PAGES_TO_KEEP) {
+                    lastTwoPages = lastTwoPages.slice(-this.MAX_PAGES_TO_KEEP);
+                }
+
+                // Mettre à jour le document (écraser)
+                await updateDoc(userNavRef, {
+                    lastTwoPages: lastTwoPages.map(entry => ({
+                        ...entry,
+                        timestamp: entry.timestamp instanceof Date 
+                            ? Timestamp.fromDate(entry.timestamp) 
+                            : entry.timestamp instanceof Timestamp 
+                                ? entry.timestamp 
+                                : Timestamp.fromDate(new Date(entry.timestamp))
+                    })),
+                    updatedAt: now
+                });
+            }
+        } catch (error) {
+            console.error('Error recording navigation:', error);
+            // Ne pas bloquer l'application en cas d'erreur
+        }
+    },
+
+    /**
+     * Récupère les 5 dernières pages visitées d'un utilisateur (quand il était en ligne)
+     */
+    async getUserNavigationHistory(userUid: string): Promise<NavigationEntry[]> {
+        try {
+            const userNavRef = doc(db, USER_NAVIGATION_COLLECTION, userUid);
+            const userNavDoc = await getDoc(userNavRef);
+
+            if (!userNavDoc.exists()) {
+                return [];
+            }
+
+            const data = userNavDoc.data() as UserNavigation;
+            const lastTwoPages = data.lastTwoPages || [];
+
+            // Convertir les timestamps en Date pour la compatibilité
+            return lastTwoPages.map(entry => ({
+                ...entry,
+                timestamp: entry.timestamp instanceof Timestamp 
+                    ? entry.timestamp.toDate() 
+                    : entry.timestamp instanceof Date 
+                        ? entry.timestamp 
+                        : new Date(entry.timestamp)
+            }));
+        } catch (error) {
+            console.error('Error getting user navigation history:', error);
+            return [];
         }
     }
 };

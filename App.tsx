@@ -47,7 +47,7 @@ import Header from './components/Header';
 import { ActiveTab, MediaContent, MediaType } from './types';
 import { serieService, seasonSerieService, episodeSerieService, EpisodeSerie } from './lib/firestore';
 import { usePageTitle } from './lib/pageTitle';
-import { initializeMovieViews } from './lib/firestore';
+import { initializeMovieViews, navigationTrackingService } from './lib/firestore';
 
 const getTitleFromPath = (path: string, t: (key: string) => string): string => {
     if (path === '/home') return t('home');
@@ -80,9 +80,56 @@ const AppContent: React.FC = () => {
     } = useAppContext();
     const location = useLocation();
     const navigate = useNavigate();
+    const { userProfile } = useAppContext();
 
     // Mettre à jour le titre de la page en fonction de la route actuelle
     usePageTitle();
+
+    // Tracking de navigation avec limitation
+    useEffect(() => {
+        if (!isAuthenticated || !userProfile?.uid) return;
+
+        // Ne pas tracker les pages d'authentification
+        if (location.pathname === '/login' || location.pathname === '/register' || location.pathname === '/forgot-password') {
+            return;
+        }
+
+        const getPageName = (path: string): string => {
+            if (path === '/home') return 'Accueil';
+            if (path === '/movies') return 'Films';
+            if (path === '/series') return 'Séries';
+            if (path === '/podcasts') return 'Podcasts';
+            if (path.startsWith('/movie/')) return 'Détail Film';
+            if (path.startsWith('/serie/')) return 'Détail Série';
+            if (path.startsWith('/podcast/')) return 'Détail Podcast';
+            if (path.startsWith('/watch/')) return 'Lecture Vidéo';
+            if (path === '/search') return 'Recherche';
+            if (path === '/profile') return 'Profil';
+            if (path === '/preferences') return 'Préférences';
+            if (path === '/editprofile') return 'Modifier Profil';
+            if (path === '/change-password') return 'Changer Mot de Passe';
+            if (path === '/history') return 'Historique';
+            if (path === '/bookmarks' || path === '/favorites') return 'Favoris';
+            if (path === '/manage-users') return 'Gestion Utilisateurs';
+            if (path === '/admin') return 'Administration';
+            if (path === '/notifications') return 'Notifications';
+            if (path === '/manage-notifications') return 'Gérer Notifications';
+            return 'Page Inconnue';
+        };
+
+        const isOnline = userProfile.presence === 'online' || userProfile.presence === 'away';
+        const pageName = getPageName(location.pathname);
+        
+        // Enregistrer la navigation (avec déduplication automatique)
+        navigationTrackingService.recordNavigation(
+            userProfile.uid,
+            location.pathname,
+            pageName,
+            isOnline
+        ).catch(error => {
+            console.error('Error tracking navigation:', error);
+        });
+    }, [location.pathname, isAuthenticated, userProfile]);
 
     // Utiliser localStorage pour persister hasStarted
     const [hasStarted, setHasStarted] = useState(() => {
