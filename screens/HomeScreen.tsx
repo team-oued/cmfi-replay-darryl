@@ -779,6 +779,18 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                         </div>
                     )}
                 </div>
+
+                {/* Modal de complétion du profil */}
+                {showProfileModal && userProfile && (
+                    <ProfileCompletionModal
+                        userProfile={userProfile}
+                        onComplete={(updatedProfile) => {
+                            console.log('✅ Profil complété:', updatedProfile);
+                            setUserProfile(updatedProfile);
+                            setShowProfileModal(false);
+                        }}
+                    />
+                )}
             </div>
         );
     }
@@ -1161,6 +1173,18 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                         </div>
                     )}
                 </div>
+
+                {/* Modal de complétion du profil */}
+                {showProfileModal && userProfile && (
+                    <ProfileCompletionModal
+                        userProfile={userProfile}
+                        onComplete={(updatedProfile) => {
+                            console.log('✅ Profil complété:', updatedProfile);
+                            setUserProfile(updatedProfile);
+                            setShowProfileModal(false);
+                        }}
+                    />
+                )}
             </div>
         );
     }
