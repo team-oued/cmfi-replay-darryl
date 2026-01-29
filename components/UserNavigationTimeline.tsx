@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { NavigationEntry, navigationTrackingService } from '../lib/firestore';
+import { NavigationEntry, navigationTrackingService, movieService, episodeSerieService } from '../lib/firestore';
 import { Timestamp } from 'firebase/firestore';
 
 interface UserNavigationTimelineProps {
@@ -33,9 +33,50 @@ const UserNavigationTimeline: React.FC<UserNavigationTimelineProps> = ({ userUid
             setLoading(true);
             try {
                 const history = await navigationTrackingService.getUserNavigationHistory(userUid);
+                
+                // Enrichir les navigations avec les titres de vidéo si manquants
+                const enrichedHistory = await Promise.all(history.map(async (nav) => {
+                    // Si le titre est déjà présent, ne rien faire
+                    if (nav.video_title) {
+                        return nav;
+                    }
+
+                    // Si c'est une page de lecture sans titre, essayer de le récupérer
+                    if (nav.page_path.startsWith('/watch/')) {
+                        const videoUid = nav.page_path.replace('/watch/', '');
+                        try {
+                            // Essayer comme film
+                            const movie = await movieService.getMovieByUid(videoUid);
+                            if (movie) {
+                                return { ...nav, video_title: movie.title, video_uid: videoUid };
+                            }
+
+                            // Essayer comme épisode
+                            let episode = await episodeSerieService.getEpisodeByUid(videoUid);
+                            if (!episode) {
+                                episode = await episodeSerieService.getEpisodeById(videoUid);
+                            }
+                            if (episode) {
+                                let title = '';
+                                if (episode.title && episode.title.trim()) {
+                                    title = episode.title;
+                                } else if (episode.title_serie) {
+                                    title = `${episode.title_serie} - Épisode ${episode.episode_number || episode.episode_numero || ''}`;
+                                } else {
+                                    title = `Épisode ${episode.episode_number || episode.episode_numero || ''}`;
+                                }
+                                return { ...nav, video_title: title, video_uid: videoUid };
+                            }
+                        } catch (error) {
+                            console.error('Error fetching video title for navigation:', error);
+                        }
+                    }
+
+                    return nav;
+                }));
+
                 // Trier par timestamp décroissant (plus récent en premier)
-                // L'historique contient déjà les 2 dernières pages, on les trie juste
-                setNavigations(history.sort((a, b) => {
+                setNavigations(enrichedHistory.sort((a, b) => {
                     const aTime = a.timestamp instanceof Date 
                         ? a.timestamp.getTime() 
                         : a.timestamp instanceof Timestamp 
@@ -152,6 +193,16 @@ const UserNavigationTimeline: React.FC<UserNavigationTimelineProps> = ({ userUid
                                                     En ligne
                                                 </span>
                                             </div>
+                                            
+                                            {/* Afficher le titre de la vidéo si disponible */}
+                                            {nav.video_title && (
+                                                <div className="mb-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                                                    <p className="text-sm font-medium text-blue-900 dark:text-blue-300 flex items-center gap-2">
+                                                        <span>🎬</span>
+                                                        <span className="break-words">{nav.video_title}</span>
+                                                    </p>
+                                                </div>
+                                            )}
                                             
                                             <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
                                                 <div className="flex items-center gap-1.5">

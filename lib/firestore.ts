@@ -196,6 +196,8 @@ export interface NavigationEntry {
     page_path: string; // Chemin de la page (ex: /home, /movies, /watch/abc123)
     page_name: string; // Nom lisible de la page (ex: "Accueil", "Films", "Lecture")
     timestamp: Date | Timestamp;
+    video_title?: string; // Titre de la vidéo si c'est une page de lecture (ex: "Episode 1 - Titre de l'épisode")
+    video_uid?: string; // UID de la vidéo si c'est une page de lecture
 }
 
 // Interface pour la collection user_navigation (1 document par utilisateur)
@@ -3037,6 +3039,160 @@ export const userMetricsService = {
     }
 };
 
+// Service pour les statistiques géographiques des utilisateurs
+export const userGeographyService = {
+    /**
+     * Récupère la répartition des utilisateurs par pays
+     * @returns Un tableau avec les statistiques par pays
+     */
+    async getUsersByCountry(): Promise<Array<{ countryCode: string; countryName: string; userCount: number; percentage: number }>> {
+        try {
+            const usersSnapshot = await getDocs(collection(db, USERS_COLLECTION));
+            const users = usersSnapshot.docs.map(doc => doc.data() as UserProfile);
+            
+            // Compter les utilisateurs par pays
+            const countryCounts: Record<string, number> = {};
+            let totalUsersWithCountry = 0;
+            
+            users.forEach(user => {
+                if (user.country && user.country.trim()) {
+                    countryCounts[user.country] = (countryCounts[user.country] || 0) + 1;
+                    totalUsersWithCountry++;
+                }
+            });
+            
+            // Convertir en tableau et calculer les pourcentages
+            const countryStats = Object.entries(countryCounts)
+                .map(([countryCode, userCount]) => {
+                    const countryName = getCountryName(countryCode);
+                    return {
+                        countryCode,
+                        countryName,
+                        userCount,
+                        percentage: totalUsersWithCountry > 0 ? (userCount / totalUsersWithCountry) * 100 : 0
+                    };
+                })
+                .sort((a, b) => b.userCount - a.userCount); // Trier par nombre d'utilisateurs décroissant
+            
+            return countryStats;
+        } catch (error) {
+            console.error('Error getting users by country:', error);
+            return [];
+        }
+    },
+
+    /**
+     * Récupère le nombre total d'utilisateurs avec un pays renseigné
+     */
+    async getTotalUsersWithCountry(): Promise<number> {
+        try {
+            const usersSnapshot = await getDocs(collection(db, USERS_COLLECTION));
+            const users = usersSnapshot.docs.map(doc => doc.data() as UserProfile);
+            return users.filter(user => user.country && user.country.trim()).length;
+        } catch (error) {
+            console.error('Error getting total users with country:', error);
+            return 0;
+        }
+    },
+
+    /**
+     * Récupère le nombre total d'utilisateurs avec un numéro de téléphone renseigné
+     */
+    async getTotalUsersWithPhoneNumber(): Promise<number> {
+        try {
+            const usersSnapshot = await getDocs(collection(db, USERS_COLLECTION));
+            const users = usersSnapshot.docs.map(doc => doc.data() as UserProfile);
+            return users.filter(user => user.phoneNumber && user.phoneNumber.trim()).length;
+        } catch (error) {
+            console.error('Error getting total users with phone number:', error);
+            return 0;
+        }
+    },
+
+    /**
+     * Récupère le nombre total d'utilisateurs ayant complété le formulaire (pays ET numéro de téléphone)
+     */
+    async getTotalUsersWithCompleteProfile(): Promise<number> {
+        try {
+            const usersSnapshot = await getDocs(collection(db, USERS_COLLECTION));
+            const users = usersSnapshot.docs.map(doc => doc.data() as UserProfile);
+            return users.filter(user => 
+                user.country && user.country.trim() && 
+                user.phoneNumber && user.phoneNumber.trim()
+            ).length;
+        } catch (error) {
+            console.error('Error getting total users with complete profile:', error);
+            return 0;
+        }
+    },
+
+    /**
+     * Récupère le nombre total d'utilisateurs
+     */
+    async getTotalUsers(): Promise<number> {
+        try {
+            const usersSnapshot = await getDocs(collection(db, USERS_COLLECTION));
+            return usersSnapshot.docs.length;
+        } catch (error) {
+            console.error('Error getting total users:', error);
+            return 0;
+        }
+    }
+};
+
+// Fonction utilitaire pour obtenir le nom du pays à partir du code
+function getCountryName(countryCode: string): string {
+    const countryNames: Record<string, string> = {
+        'FR': 'France',
+        'US': 'États-Unis',
+        'CA': 'Canada',
+        'GB': 'Royaume-Uni',
+        'DE': 'Allemagne',
+        'ES': 'Espagne',
+        'IT': 'Italie',
+        'BE': 'Belgique',
+        'CH': 'Suisse',
+        'CM': 'Cameroun',
+        'SN': 'Sénégal',
+        'CI': 'Côte d\'Ivoire',
+        'ML': 'Mali',
+        'BF': 'Burkina Faso',
+        'NE': 'Niger',
+        'TD': 'Tchad',
+        'CF': 'République centrafricaine',
+        'GA': 'Gabon',
+        'CG': 'Congo',
+        'CD': 'République démocratique du Congo',
+        'GN': 'Guinée',
+        'BJ': 'Bénin',
+        'TG': 'Togo',
+        'GH': 'Ghana',
+        'NG': 'Nigeria',
+        'AO': 'Angola',
+        'ZA': 'Afrique du Sud',
+        'KE': 'Kenya',
+        'TZ': 'Tanzanie',
+        'UG': 'Ouganda',
+        'RW': 'Rwanda',
+        'ET': 'Éthiopie',
+        'MG': 'Madagascar',
+        'MU': 'Maurice',
+        'RE': 'La Réunion',
+        'MQ': 'Martinique',
+        'GP': 'Guadeloupe',
+        'GF': 'Guyane française',
+        'PF': 'Polynésie française',
+        'NC': 'Nouvelle-Calédonie',
+        'YT': 'Mayotte',
+        'PM': 'Saint-Pierre-et-Miquelon',
+        'BL': 'Saint-Barthélemy',
+        'MF': 'Saint-Martin',
+        'WF': 'Wallis-et-Futuna'
+    };
+    
+    return countryNames[countryCode] || countryCode;
+}
+
 // Export du service d'abonnement
 export { subscriptionService } from './subscriptionService';
 
@@ -4036,7 +4192,9 @@ export const navigationTrackingService = {
         userUid: string,
         pagePath: string,
         pageName: string,
-        isOnline: boolean = true
+        isOnline: boolean = true,
+        videoTitle?: string,
+        videoUid?: string
     ): Promise<void> {
         try {
             // Ne pas enregistrer si l'utilisateur est hors ligne
@@ -4051,7 +4209,9 @@ export const navigationTrackingService = {
             const newEntry: NavigationEntry = {
                 page_path: pagePath,
                 page_name: pageName,
-                timestamp: now
+                timestamp: now,
+                ...(videoTitle && { video_title: videoTitle }),
+                ...(videoUid && { video_uid: videoUid })
             };
 
             if (!userNavDoc.exists()) {

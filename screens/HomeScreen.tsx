@@ -149,14 +149,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
         });
         
         if (userProfile && user) {
-            // Vérifier si les champs sont vides ou undefined
+            // Vérifier si le pays est manquant (seul champ obligatoire)
             const countryMissing = !userProfile.country || userProfile.country.trim() === '';
-            const phoneMissing = !userProfile.phoneNumber || userProfile.phoneNumber.trim() === '';
-            const needsCompletion = countryMissing || phoneMissing;
+            const needsCompletion = countryMissing; // Seul le pays est obligatoire
             
             console.log('📋 Profil à compléter?', {
                 countryMissing,
-                phoneMissing,
                 needsCompletion,
                 country: userProfile.country,
                 phoneNumber: userProfile.phoneNumber

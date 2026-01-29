@@ -5,6 +5,7 @@ import { useAppContext } from '../context/AppContext';
 import { ArrowLeftIcon, SearchIcon } from '../components/icons';
 import { Timestamp } from 'firebase/firestore';
 import UserNavigationTimeline from '../components/UserNavigationTimeline';
+import UserGeographyMap from '../components/UserGeographyMap';
 
 const ManageUsersScreen: React.FC = () => {
     const navigate = useNavigate();
@@ -411,6 +412,17 @@ const ManageUsersScreen: React.FC = () => {
                                     ) : (
                                         <p className="text-gray-500 dark:text-gray-400">Aucune donnée disponible</p>
                                     )}
+                                </section>
+
+                                {/* Cartographie des pays */}
+                                <section className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
+                                    <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">
+                                        🌍 Répartition géographique des utilisateurs
+                                    </h2>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                                        Statistiques basées sur les utilisateurs ayant complété leur profil avec leur pays actuel
+                                    </p>
+                                    <UserGeographyMap />
                                 </section>
                             </div>
                         )}

@@ -45,9 +45,8 @@ import BottomNav from './components/BottomNav';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import { ActiveTab, MediaContent, MediaType } from './types';
-import { serieService, seasonSerieService, episodeSerieService, EpisodeSerie } from './lib/firestore';
+import { serieService, seasonSerieService, episodeSerieService, EpisodeSerie, initializeMovieViews, navigationTrackingService, movieService } from './lib/firestore';
 import { usePageTitle } from './lib/pageTitle';
-import { initializeMovieViews, navigationTrackingService } from './lib/firestore';
 
 const getTitleFromPath = (path: string, t: (key: string) => string): string => {
     if (path === '/home') return t('home');
@@ -120,13 +119,55 @@ const AppContent: React.FC = () => {
         const isOnline = userProfile.presence === 'online' || userProfile.presence === 'away';
         const pageName = getPageName(location.pathname);
         
-        // Enregistrer la navigation (avec déduplication automatique)
-        navigationTrackingService.recordNavigation(
-            userProfile.uid,
-            location.pathname,
-            pageName,
-            isOnline
-        ).catch(error => {
+        // Si c'est une page de lecture, récupérer le titre de la vidéo
+        const recordNavigationWithVideoTitle = async () => {
+            let videoTitle: string | undefined;
+            let videoUid: string | undefined;
+
+            if (location.pathname.startsWith('/watch/')) {
+                const videoUidFromPath = location.pathname.replace('/watch/', '');
+                videoUid = videoUidFromPath;
+
+                try {
+                    // Essayer de récupérer comme film
+                    const movie = await movieService.getMovieByUid(videoUidFromPath);
+                    if (movie) {
+                        videoTitle = movie.title;
+                    } else {
+                        // Essayer de récupérer comme épisode
+                        let episode = await episodeSerieService.getEpisodeByUid(videoUidFromPath);
+                        if (!episode) {
+                            episode = await episodeSerieService.getEpisodeById(videoUidFromPath);
+                        }
+                        if (episode) {
+                            // Format: "Titre de l'épisode" ou "Série - Épisode X"
+                            if (episode.title && episode.title.trim()) {
+                                videoTitle = episode.title;
+                            } else if (episode.title_serie) {
+                                videoTitle = `${episode.title_serie} - Épisode ${episode.episode_number || episode.episode_numero || ''}`;
+                            } else {
+                                videoTitle = `Épisode ${episode.episode_number || episode.episode_numero || ''}`;
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error fetching video title for navigation:', error);
+                    // Continuer sans le titre si erreur
+                }
+            }
+
+            // Enregistrer la navigation (avec déduplication automatique)
+            await navigationTrackingService.recordNavigation(
+                userProfile.uid,
+                location.pathname,
+                pageName,
+                isOnline,
+                videoTitle,
+                videoUid
+            );
+        };
+
+        recordNavigationWithVideoTitle().catch(error => {
             console.error('Error tracking navigation:', error);
         });
     }, [location.pathname, isAuthenticated, userProfile]);

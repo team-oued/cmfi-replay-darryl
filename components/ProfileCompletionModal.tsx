@@ -100,16 +100,13 @@ const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({ userPro
             return;
         }
 
-        if (!phoneNumber.trim()) {
-            setError('Veuillez entrer votre numéro de téléphone');
-            return;
-        }
-
-        // Validation basique du numéro de téléphone
-        const phoneRegex = /^[\d\s\-\+\(\)]+$/;
-        if (!phoneRegex.test(phoneNumber)) {
-            setError('Format de numéro de téléphone invalide');
-            return;
+        // Le téléphone est optionnel, mais si renseigné, on valide le format
+        if (phoneNumber.trim()) {
+            const phoneRegex = /^[\d\s\-\+\(\)]+$/;
+            if (!phoneRegex.test(phoneNumber)) {
+                setError('Format de numéro de téléphone invalide');
+                return;
+            }
         }
 
         setLoading(true);
@@ -117,13 +114,18 @@ const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({ userPro
 
         try {
             const countryData = COUNTRIES.find(c => c.code === selectedCountry);
-            const fullPhoneNumber = countryData 
-                ? `${countryData.dialCode} ${phoneNumber.replace(/^\+?\d+/, '').trim() || phoneNumber.trim()}`
-                : phoneNumber;
+            let fullPhoneNumber: string | undefined = undefined;
+            
+            // Si le téléphone est renseigné, on le formate
+            if (phoneNumber.trim()) {
+                fullPhoneNumber = countryData 
+                    ? `${countryData.dialCode} ${phoneNumber.replace(/^\+?\d+/, '').trim() || phoneNumber.trim()}`
+                    : phoneNumber.trim();
+            }
 
             const updatedProfile = await userService.updateUserProfile(userProfile.uid, {
                 country: selectedCountry,
-                phoneNumber: fullPhoneNumber
+                ...(fullPhoneNumber && { phoneNumber: fullPhoneNumber })
             });
 
             onComplete(updatedProfile);
@@ -138,32 +140,79 @@ const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({ userPro
     console.log('🎨 ProfileCompletionModal render - selectedCountry:', selectedCountry, 'phoneNumber:', phoneNumber);
     
     return (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-                {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                        Compléter votre profil
-                    </h2>
-                    <button
-                        onClick={() => {/* Ne pas permettre de fermer sans remplir */}}
-                        className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                        disabled
-                    >
-                        <XMarkIcon className="w-6 h-6" />
-                    </button>
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-70 p-4 backdrop-blur-sm">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border-2 border-amber-500/20 transform transition-all duration-300 scale-100">
+                {/* Header avec gradient et icône */}
+                <div className="relative bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 p-6 rounded-t-2xl">
+                    <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+                            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                        </div>
+                        <div className="flex-1">
+                            <h2 className="text-2xl font-bold text-white mb-1">
+                                Complétez votre profil
+                            </h2>
+                            <p className="text-amber-100 text-sm">
+                                Quelques secondes pour une meilleure expérience
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => {/* Ne pas permettre de fermer sans remplir */}}
+                            className="text-white/70 hover:text-white transition-colors"
+                            disabled
+                            title="Veuillez compléter votre profil pour continuer"
+                        >
+                            <XMarkIcon className="w-6 h-6" />
+                        </button>
+                    </div>
+                </div>
+
+                {/* Message rassurant avec bénéfices */}
+                <div className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-b border-gray-200 dark:border-gray-700">
+                    <div className="flex items-start gap-4">
+                        <div className="flex-shrink-0 w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                            <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                        <div className="flex-1">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                                Pourquoi compléter votre profil ?
+                            </h3>
+                            <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+                                <li className="flex items-start gap-2">
+                                    <span className="text-green-500 dark:text-green-400 mt-0.5">✓</span>
+                                    <span><strong>Expérience personnalisée</strong> : contenu adapté à votre région et préférences</span>
+                                </li>
+                                <li className="flex items-start gap-2">
+                                    <span className="text-green-500 dark:text-green-400 mt-0.5">✓</span>
+                                    <span><strong>Notifications ciblées</strong> : recevez des alertes pertinentes pour votre région</span>
+                                </li>
+                                <li className="flex items-start gap-2">
+                                    <span className="text-green-500 dark:text-green-400 mt-0.5">✓</span>
+                                    <span><strong>Support amélioré</strong> : nous pouvons mieux vous assister si besoin</span>
+                                </li>
+                                <li className="flex items-start gap-2">
+                                    <span className="text-green-500 dark:text-green-400 mt-0.5">✓</span>
+                                    <span><strong>Confidentialité garantie</strong> : vos données sont sécurisées et utilisées uniquement pour améliorer votre expérience</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Content */}
                 <div className="p-6 space-y-6">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Veuillez compléter votre profil en renseignant votre pays actuel et votre numéro de téléphone.
-                    </p>
 
                     {/* Pays */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Pays actuel <span className="text-red-500">*</span>
+                        <label className="block text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                            <span className="flex items-center gap-2">
+                                <span className="text-xl">🌍</span>
+                                Pays actuel <span className="text-red-500">*</span>
+                            </span>
                         </label>
                         <div className="relative">
                             <button
@@ -210,9 +259,18 @@ const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({ userPro
 
                     {/* Numéro de téléphone */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Numéro de téléphone <span className="text-red-500">*</span>
+                        <label className="block text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                            <span className="flex items-center gap-2">
+                                <span className="text-xl">📱</span>
+                                Numéro de téléphone 
+                                <span className="text-xs font-normal text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-full">
+                                    Recommandé
+                                </span>
+                            </span>
                         </label>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                            Facultatif mais recommandé pour une meilleure expérience
+                        </p>
                         <div className="flex gap-2">
                             {selectedCountryData && (
                                 <div className="px-4 py-3 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg flex items-center">
@@ -225,11 +283,11 @@ const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({ userPro
                                 type="tel"
                                 value={phoneNumber}
                                 onChange={(e) => setPhoneNumber(e.target.value)}
-                                placeholder={selectedCountryData ? "6 12 34 56 78" : "Numéro de téléphone"}
+                                placeholder={selectedCountryData ? "6 12 34 56 78 (optionnel)" : "Numéro de téléphone (optionnel)"}
                                 className="flex-1 px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
                             />
                         </div>
-                        {selectedCountryData && (
+                        {selectedCountryData && phoneNumber.trim() && (
                             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                                 Format: {selectedCountryData.dialCode} X XX XX XX XX
                             </p>
@@ -243,15 +301,38 @@ const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({ userPro
                     )}
                 </div>
 
-                {/* Footer */}
-                <div className="p-6 border-t border-gray-200 dark:border-gray-700 flex justify-end">
-                    <button
-                        onClick={handleSave}
-                        disabled={loading || !selectedCountry || !phoneNumber.trim()}
-                        className="px-6 py-2 bg-amber-500 hover:bg-amber-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
-                    >
-                        {loading ? 'Enregistrement...' : 'Enregistrer'}
-                    </button>
+                {/* Footer avec bouton plus visible */}
+                <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+                    <div className="flex items-center justify-between gap-4">
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                            <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                            </svg>
+                            Vos informations sont sécurisées et confidentielles
+                        </div>
+                        <button
+                            onClick={handleSave}
+                            disabled={loading || !selectedCountry}
+                            className="px-8 py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed text-white rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 disabled:transform-none flex items-center gap-2"
+                        >
+                            {loading ? (
+                                <>
+                                    <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Enregistrement...
+                                </>
+                            ) : (
+                                <>
+                                    Enregistrer et continuer
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                                    </svg>
+                                </>
+                            )}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
