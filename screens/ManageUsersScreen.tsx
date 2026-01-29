@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UserProfile, userService, userMetricsService } from '../lib/firestore';
+import { UserProfile, userService, userMetricsService, userGeographyService } from '../lib/firestore';
 import { useAppContext } from '../context/AppContext';
 import { ArrowLeftIcon, SearchIcon } from '../components/icons';
 import { Timestamp } from 'firebase/firestore';
@@ -20,6 +20,8 @@ const ManageUsersScreen: React.FC = () => {
     const [top10MostActive, setTop10MostActive] = useState<Array<{ user: UserProfile; viewCount: number }>>([]);
     const [peakHours, setPeakHours] = useState<Array<{ hour: number; connectionCount: number }>>([]);
     const [top10TotalOnlineTime, setTop10TotalOnlineTime] = useState<Array<{ user: UserProfile; totalOnlineTime: number }>>([]);
+    const [totalUsersWithRGPD, setTotalUsersWithRGPD] = useState<number>(0);
+    const [totalUsers, setTotalUsers] = useState<number>(0);
     const [loadingMetrics, setLoadingMetrics] = useState(true);
 
     useEffect(() => {
@@ -46,12 +48,14 @@ const ManageUsersScreen: React.FC = () => {
         const loadMetrics = async () => {
             setLoadingMetrics(true);
             try {
-                const [mostConnected, avgDuration, mostActive, peak, totalTime] = await Promise.all([
+                const [mostConnected, avgDuration, mostActive, peak, totalTime, rgpdCount, total] = await Promise.all([
                     userMetricsService.getTop10MostConnectedUsers(),
                     userMetricsService.getAverageSessionDuration(),
                     userMetricsService.getTop10MostActiveUsers(),
                     userMetricsService.getPeakHours(),
-                    userMetricsService.getTop10TotalOnlineTime()
+                    userMetricsService.getTop10TotalOnlineTime(),
+                    userGeographyService.getTotalUsersWithRGPDConsent(),
+                    userGeographyService.getTotalUsers()
                 ]);
                 
                 setTop10MostConnected(mostConnected);
@@ -59,6 +63,8 @@ const ManageUsersScreen: React.FC = () => {
                 setTop10MostActive(mostActive);
                 setPeakHours(peak);
                 setTop10TotalOnlineTime(totalTime);
+                setTotalUsersWithRGPD(rgpdCount);
+                setTotalUsers(total);
             } catch (error) {
                 console.error('Error loading metrics:', error);
             } finally {
@@ -257,7 +263,7 @@ const ManageUsersScreen: React.FC = () => {
                         </div>
 
                         {/* Statistiques de base */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                             <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
                                 <div className="text-sm text-gray-500 dark:text-gray-400">En ligne</div>
                                 <div className="text-2xl font-bold text-green-600 dark:text-green-400">{onlineUsers.length}</div>
@@ -269,6 +275,18 @@ const ManageUsersScreen: React.FC = () => {
                             <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
                                 <div className="text-sm text-gray-500 dark:text-gray-400">Hors ligne</div>
                                 <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">{offlineUsers.length}</div>
+                            </div>
+                            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+                                <div className="text-sm text-blue-600 dark:text-blue-400 font-medium flex items-center gap-2">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                                    </svg>
+                                    RGPD accepté
+                                </div>
+                                <div className="text-2xl font-bold text-blue-700 dark:text-blue-300 mt-1">{loadingMetrics ? '...' : totalUsersWithRGPD}</div>
+                                <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                                    {loadingMetrics ? '' : totalUsers > 0 ? `${Math.round((totalUsersWithRGPD / totalUsers) * 100)}% du total` : '0%'}
+                                </div>
                             </div>
                         </div>
 

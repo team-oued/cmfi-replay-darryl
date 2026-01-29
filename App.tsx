@@ -44,6 +44,7 @@ import WatchScreen from './screens/WatchScreen';
 import BottomNav from './components/BottomNav';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
+import RGPDConsentModal from './components/RGPDConsentModal';
 import { ActiveTab, MediaContent, MediaType } from './types';
 import { serieService, seasonSerieService, episodeSerieService, EpisodeSerie, initializeMovieViews, navigationTrackingService, movieService } from './lib/firestore';
 import { usePageTitle } from './lib/pageTitle';
@@ -79,7 +80,17 @@ const AppContent: React.FC = () => {
     } = useAppContext();
     const location = useLocation();
     const navigate = useNavigate();
-    const { userProfile } = useAppContext();
+    const { userProfile, setUserProfile } = useAppContext();
+    const [showRGPDModal, setShowRGPDModal] = useState(false);
+
+    // Vérifier si le consentement RGPD est nécessaire
+    useEffect(() => {
+        if (isAuthenticated && userProfile && !userProfile.hasAcceptedPrivacyPolicy) {
+            setShowRGPDModal(true);
+        } else {
+            setShowRGPDModal(false);
+        }
+    }, [isAuthenticated, userProfile]);
 
     // Mettre à jour le titre de la page en fonction de la route actuelle
     usePageTitle();
@@ -535,6 +546,18 @@ const AppContent: React.FC = () => {
                 <div className="fixed bottom-0 left-0 right-0 z-20 lg:hidden">
                     <BottomNav />
                 </div>
+            )}
+
+            {/* Modal RGPD - Affiché si l'utilisateur n'a pas accepté la politique */}
+            {showRGPDModal && userProfile && (
+                <RGPDConsentModal
+                    userProfile={userProfile}
+                    onAccept={(updatedProfile) => {
+                        console.log('✅ Consentement RGPD accepté:', updatedProfile);
+                        setUserProfile(updatedProfile);
+                        setShowRGPDModal(false);
+                    }}
+                />
             )}
         </div>
     );

@@ -28,6 +28,7 @@ export interface UserProfile {
     photo_url?: string;
     presence: 'online' | 'offline' | 'idle' | 'away';
     hasAcceptedPrivacyPolicy: boolean;
+    rgpdAcceptedAt?: Date | Timestamp; // Date d'acceptation de la politique RGPD
     created_time: string;
     theme: 'light' | 'dark';
     language: string;
@@ -2942,7 +2943,7 @@ export const userMetricsService = {
             });
             
             // Créer la liste des utilisateurs avec leur nombre de vues
-            const usersWithViews = Array.from(viewCountByUser.entries())
+            const usersWithViews = Object.entries(viewCountByUser)
                 .map(([uid, viewCount]) => ({
                     user: usersMap.get(uid)!,
                     viewCount
@@ -3135,6 +3136,20 @@ export const userGeographyService = {
             return usersSnapshot.docs.length;
         } catch (error) {
             console.error('Error getting total users:', error);
+            return 0;
+        }
+    },
+
+    /**
+     * Récupère le nombre d'utilisateurs ayant accepté la politique RGPD
+     */
+    async getTotalUsersWithRGPDConsent(): Promise<number> {
+        try {
+            const usersSnapshot = await getDocs(collection(db, USERS_COLLECTION));
+            const users = usersSnapshot.docs.map(doc => doc.data() as UserProfile);
+            return users.filter(user => user.hasAcceptedPrivacyPolicy === true).length;
+        } catch (error) {
+            console.error('Error getting total users with RGPD consent:', error);
             return 0;
         }
     }
