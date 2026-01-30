@@ -3152,6 +3152,28 @@ export const userGeographyService = {
             console.error('Error getting total users with RGPD consent:', error);
             return 0;
         }
+    },
+
+    /**
+     * Récupère tous les utilisateurs d'un pays spécifique
+     * @param countryCode Code pays (ex: "FR", "US")
+     * @returns Liste des utilisateurs du pays
+     */
+    async getUsersByCountryCode(countryCode: string): Promise<UserProfile[]> {
+        try {
+            const q = query(
+                collection(db, USERS_COLLECTION),
+                where('country', '==', countryCode)
+            );
+            const querySnapshot = await getDocs(q);
+            return querySnapshot.docs.map(doc => ({
+                uid: doc.id,
+                ...doc.data()
+            } as UserProfile));
+        } catch (error) {
+            console.error('Error getting users by country code:', error);
+            return [];
+        }
     }
 };
 

@@ -105,19 +105,38 @@ const WatchScreen: React.FC<WatchScreenProps> = ({ onReturnHome }) => {
         }
     };
 
-    const handleNavigateEpisode = async (direction: 'next' | 'prev') => {
+    const handleNavigateEpisode = async (directionOrEpisode: 'next' | 'prev' | EpisodeSerie) => {
         if (!episode || !media) return;
 
         try {
+            // Si on passe directement un épisode, naviguer vers lui
+            if (typeof directionOrEpisode !== 'string') {
+                const targetEpisode = directionOrEpisode as EpisodeSerie;
+                if (targetEpisode.uid_episode) {
+                    navigate(`/watch/${targetEpisode.uid_episode}`);
+                    return;
+                }
+                console.error('Épisode invalide: pas de uid_episode', targetEpisode);
+                return;
+            }
+
+            // Sinon, c'est une direction ('next' ou 'prev')
+            const direction = directionOrEpisode as 'next' | 'prev';
             let allEpisodes = episodesCache;
 
             // Si le cache est vide, charger tous les épisodes
             if (allEpisodes.length === 0) {
                 const serie = await serieService.getSerieByUid(media.id);
-                if (!serie) return;
+                if (!serie) {
+                    console.error('Série non trouvée pour media.id:', media.id);
+                    return;
+                }
 
                 const seasons = await import('../lib/firestore').then(m => m.seasonSerieService.getSeasonsBySerie(serie.uid_serie));
-                if (seasons.length === 0) return;
+                if (seasons.length === 0) {
+                    console.error('Aucune saison trouvée pour la série:', serie.uid_serie);
+                    return;
+                }
 
                 const episodesBySeason = await Promise.all(
                     seasons.map(async (s) => await episodeSerieService.getEpisodesBySeason(s.uid_season))
@@ -126,15 +145,29 @@ const WatchScreen: React.FC<WatchScreenProps> = ({ onReturnHome }) => {
                 setEpisodesCache(allEpisodes);
             }
 
-            if (allEpisodes.length === 0) return;
+            if (allEpisodes.length === 0) {
+                console.error('Aucun épisode trouvé');
+                return;
+            }
 
             const currentIndex = allEpisodes.findIndex(e => e.uid_episode === episode.uid_episode);
-            if (currentIndex === -1) return;
+            if (currentIndex === -1) {
+                console.error('Épisode actuel non trouvé dans la liste:', episode.uid_episode);
+                return;
+            }
 
             const newIndex = direction === 'next' ? currentIndex + 1 : currentIndex - 1;
-            if (newIndex < 0 || newIndex >= allEpisodes.length) return;
+            if (newIndex < 0 || newIndex >= allEpisodes.length) {
+                console.error('Index invalide:', newIndex, 'pour', allEpisodes.length, 'épisodes');
+                return;
+            }
 
             const newEpisode = allEpisodes[newIndex];
+            if (!newEpisode.uid_episode) {
+                console.error('Nouvel épisode sans uid_episode:', newEpisode);
+                return;
+            }
+            
             navigate(`/watch/${newEpisode.uid_episode}`);
         } catch (error) {
             console.error('Erreur lors de la navigation entre épisodes:', error);

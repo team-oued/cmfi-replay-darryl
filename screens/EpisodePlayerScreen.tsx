@@ -801,7 +801,7 @@ interface EpisodePlayerScreenProps {
     item: MediaContent;
     episode: EpisodeSerie;
     onBack: () => void;
-    onNavigateEpisode: (direction: 'next' | 'prev') => void;
+    onNavigateEpisode: (direction: 'next' | 'prev' | EpisodeSerie) => void;
     onReturnHome: () => void;
 }
 
@@ -979,7 +979,7 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
         loadPlaybackPosition();
     }, [userProfile?.uid, episode?.uid_episode]);
 
-    // Track view after 30 seconds of watching (only when video is playing)
+    // Track view after 10 seconds of watching (only when video is playing)
     const watchTimeRef = useRef(0);
     const hasRecordedViewRef = useRef(false);
 
@@ -990,7 +990,7 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
             if (videoIsPlaying && !hasRecordedViewRef.current) {
                 watchTimeRef.current += 1;
 
-                if (watchTimeRef.current >= 30) {
+                if (watchTimeRef.current >= 10) {
                     hasRecordedViewRef.current = true;
                     // Enregistrer la vue
                     viewService.recordView(episode.uid_episode, 'episode', userProfile.uid)
@@ -1112,6 +1112,10 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
             handleAuthRequired('continuer à regarder et découvrir plus de contenu');
             return;
         }
+
+        // Réinitialiser le flag pour permettre une nouvelle vue si l'utilisateur regarde la vidéo à nouveau
+        watchTimeRef.current = 0;
+        hasRecordedViewRef.current = false;
 
         if (autoplay && hasNextEpisode) {
             onNavigateEpisode('next');
@@ -1250,12 +1254,12 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
                 </button>
             </header>
 
-            <div className="container mx-auto px-4 md:px-6 lg:px-8 py-4 lg:py-8 pt-20">
+            <div className="container mx-auto px-4 md:px-6 lg:px-8 py-1 md:py-4 lg:py-8 pt-16 md:pt-20">
 
                 {/* Conteneur principal avec grille pour la mise en page */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
                     {/* Colonne de gauche - Lecteur vidéo et métadonnées */}
-                    <div className="lg:col-span-2 space-y-6">
+                    <div className="lg:col-span-2 space-y-2 md:space-y-4">
                         {/* Titre de la saison avec lien vers la série */}
                         {currentSeason && serieUid && (
                             <div className="flex items-center gap-2 text-sm md:text-base">
@@ -1307,12 +1311,12 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
                             )}
                         </div>
 
-                        <div className="space-y-6">
+                        <div className="space-y-2 md:space-y-4">
                             <div>
-                                <h1 className="text-3xl md:text-4xl font-black text-gray-900 dark:text-white mb-3 leading-tight">
+                                <h1 className="text-3xl md:text-4xl font-black text-gray-900 dark:text-white mb-2 leading-tight">
                                     {displayEpisode.title}
                                 </h1>
-                                <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
+                                <div className="flex items-center space-x-2 md:space-x-4 text-sm text-gray-600 dark:text-gray-400 mt-1 md:mt-0">
                                     <span className="px-3 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 rounded-full font-semibold">
                                         {item.author || item.theme}
                                     </span>
@@ -1323,7 +1327,7 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
                                 </div>
                             </div>
 
-                            <div className="flex items-center justify-around py-4 px-2 bg-white/50 dark:bg-gray-900/50 rounded-2xl backdrop-blur-sm border border-gray-200/50 dark:border-gray-800/50 shadow-lg">
+                            <div className="flex items-center justify-around py-2 md:py-4 px-2 bg-white/50 dark:bg-gray-900/50 rounded-2xl backdrop-blur-sm border border-gray-200/50 dark:border-gray-800/50 shadow-lg">
                                 <LikeButton
                                     label={hasLiked ? (t('likeVideo') + ' ✓') : t('likeVideo')}
                                     value={likeCount}
@@ -1343,7 +1347,7 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
                                 />
                             </div>
 
-                            <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-center justify-between gap-2 md:gap-4">
                                 <button
                                     onClick={() => onNavigateEpisode('prev')}
                                     disabled={!hasPrevEpisode}
@@ -1381,7 +1385,7 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
 
                 {/* Section des autres épisodes de la saison */}
                 {episodesInSeason.length > 0 && (
-                    <div className="mt-8 space-y-4">
+                    <div className="mt-0 md:mt-4 lg:mt-6 space-y-2 md:space-y-4">
                         <h3 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">
                             {t('otherEpisodes') || 'Autres épisodes de la saison'}
                         </h3>
@@ -1392,7 +1396,16 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
                                 .map(otherEpisode => (
                                     <div
                                         key={otherEpisode.uid_episode}
-                                        onClick={() => onNavigateEpisode(otherEpisode)}
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            console.log('🔍 Clic sur épisode:', otherEpisode.uid_episode, otherEpisode.title);
+                                            if (otherEpisode.uid_episode) {
+                                                onNavigateEpisode(otherEpisode);
+                                            } else {
+                                                console.error('Épisode sans uid_episode:', otherEpisode);
+                                            }
+                                        }}
                                         className="group relative bg-gray-100/50 dark:bg-gray-800/40 rounded-lg overflow-hidden cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-xl"
                                     >
                                         <div className="relative aspect-video bg-gray-300 dark:bg-gray-700">

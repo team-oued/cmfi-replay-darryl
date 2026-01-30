@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { XMarkIcon } from '@heroicons/react/24/outline';
 import { useNavigate } from 'react-router-dom';
 import { UserProfile, userService, userMetricsService, userGeographyService } from '../lib/firestore';
 import { useAppContext } from '../context/AppContext';
@@ -23,6 +25,9 @@ const ManageUsersScreen: React.FC = () => {
     const [totalUsersWithRGPD, setTotalUsersWithRGPD] = useState<number>(0);
     const [totalUsers, setTotalUsers] = useState<number>(0);
     const [loadingMetrics, setLoadingMetrics] = useState(true);
+    const [selectedCountry, setSelectedCountry] = useState<{ code: string; name: string } | null>(null);
+    const [countryUsers, setCountryUsers] = useState<UserProfile[]>([]);
+    const [loadingCountryUsers, setLoadingCountryUsers] = useState(false);
 
     useEffect(() => {
         // S'abonner aux mises à jour en temps réel des utilisateurs (incluant les inactifs)
@@ -74,6 +79,20 @@ const ManageUsersScreen: React.FC = () => {
         
         loadMetrics();
     }, []);
+
+    const handleCountryClick = async (countryCode: string, countryName: string) => {
+        setSelectedCountry({ code: countryCode, name: countryName });
+        setLoadingCountryUsers(true);
+        try {
+            const users = await userGeographyService.getUsersByCountryCode(countryCode);
+            setCountryUsers(users);
+        } catch (error) {
+            console.error('Error loading country users:', error);
+            setCountryUsers([]);
+        } finally {
+            setLoadingCountryUsers(false);
+        }
+    };
 
     const formatLastSeen = (lastSeen?: Date | Timestamp, updatedAt?: Date | Timestamp): string => {
         // Utiliser updatedAt comme fallback si lastSeen n'existe pas
@@ -290,6 +309,19 @@ const ManageUsersScreen: React.FC = () => {
                             </div>
                         </div>
 
+                        {/* Modal des utilisateurs par pays */}
+                        {selectedCountry && (
+                            <CountryUsersModal
+                                country={selectedCountry}
+                                users={countryUsers}
+                                loading={loadingCountryUsers}
+                                onClose={() => setSelectedCountry(null)}
+                                formatLastSeen={formatLastSeen}
+                                getStatusLabel={getStatusLabel}
+                                getStatusColor={getStatusColor}
+                            />
+                        )}
+
                         {/* Métriques avancées */}
                         {loadingMetrics ? (
                             <div className="flex items-center justify-center py-8">
@@ -440,7 +472,7 @@ const ManageUsersScreen: React.FC = () => {
                                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                                         Statistiques basées sur les utilisateurs ayant complété leur profil avec leur pays actuel
                                     </p>
-                                    <UserGeographyMap />
+                                    <UserGeographyMap onCountryClick={handleCountryClick} />
                                 </section>
                             </div>
                         )}
@@ -515,10 +547,14 @@ interface UserCardProps {
 
 const UserCard: React.FC<UserCardProps> = ({ user, formatLastSeen, getStatusLabel, getStatusColor }) => {
     const [showTimeline, setShowTimeline] = useState(false);
+    const [showDetails, setShowDetails] = useState(false);
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center space-x-4 p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow">
+            <div 
+                className="flex items-center space-x-4 p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow cursor-pointer"
+                onClick={() => setShowDetails(true)}
+            >
             <div className="relative">
                 <div className="w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 overflow-hidden flex items-center justify-center">
                     {user.photo_url ? (
@@ -564,7 +600,342 @@ const UserCard: React.FC<UserCardProps> = ({ user, formatLastSeen, getStatusLabe
                     <UserNavigationTimeline userUid={user.uid} height={300} />
                 </div>
             )}
+
+            {/* Modal des détails utilisateur */}
+            {showDetails && (
+                <UserDetailsModal 
+                    user={user} 
+                    onClose={() => setShowDetails(false)}
+                    formatLastSeen={formatLastSeen}
+                    getStatusLabel={getStatusLabel}
+                    getStatusColor={getStatusColor}
+                />
+            )}
         </div>
+    );
+};
+
+interface UserDetailsModalProps {
+    user: UserProfile & { lastSeen?: Date | Timestamp; updatedAt?: Date | Timestamp };
+    onClose: () => void;
+    formatLastSeen: (lastSeen?: Date | Timestamp, updatedAt?: Date | Timestamp) => string;
+    getStatusLabel: (presence: string) => string;
+    getStatusColor: (presence: string) => string;
+}
+
+const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ user, onClose, formatLastSeen, getStatusLabel, getStatusColor }) => {
+    const formatDate = (date?: Date | Timestamp): string => {
+        if (!date) return 'Non disponible';
+        const d = date instanceof Timestamp ? date.toDate() : date;
+        return d.toLocaleString('fr-FR', {
+            day: '2-digit',
+            month: 'long',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    };
+
+    const modalContent = (
+        <div 
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            onClick={onClose}
+            style={{ 
+                position: 'fixed', 
+                top: 0, 
+                left: 0, 
+                right: 0, 
+                bottom: 0,
+                zIndex: 9999
+            }}
+        >
+            <div 
+                className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto relative"
+                onClick={(e) => e.stopPropagation()}
+                style={{ 
+                    position: 'relative',
+                    zIndex: 10000,
+                    margin: 'auto'
+                }}
+            >
+                {/* Header */}
+                <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between">
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                        Détails de l'utilisateur
+                    </h2>
+                    <button
+                        onClick={onClose}
+                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+                    >
+                        <span className="text-2xl text-gray-500 dark:text-gray-400">×</span>
+                    </button>
+                </div>
+
+                {/* Content */}
+                <div className="p-6 space-y-6">
+                    {/* Photo et nom */}
+                    <div className="flex items-center space-x-4 pb-4 border-b border-gray-200 dark:border-gray-700">
+                        <div className="relative">
+                            <div className="w-20 h-20 rounded-full bg-gray-200 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 overflow-hidden flex items-center justify-center">
+                                {user.photo_url ? (
+                                    <img 
+                                        src={user.photo_url}
+                                        alt={user.display_name}
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                            const target = e.target as HTMLImageElement;
+                                            target.src = '';
+                                            target.style.display = 'none';
+                                        }}
+                                    />
+                                ) : null}
+                                {(!user.photo_url || user.photo_url === '') && (
+                                    <div className="w-full h-full flex items-center justify-center bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 text-2xl font-medium">
+                                        {user.display_name ? user.display_name.charAt(0).toUpperCase() : 'U'}
+                                    </div>
+                                )}
+                            </div>
+                            <span className={`absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-white dark:border-gray-800 ${getStatusColor(user.presence)}`}></span>
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                                {user.display_name || 'Utilisateur sans nom'}
+                            </h3>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                                {getStatusLabel(user.presence)}
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Informations de base */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg">
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Email</p>
+                            <p className="text-gray-900 dark:text-white font-medium">{user.email || 'Non disponible'}</p>
+                        </div>
+                        <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg">
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">UID</p>
+                            <p className="text-gray-900 dark:text-white font-mono text-xs break-all">{user.uid}</p>
+                        </div>
+                        <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg">
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Pays actuel</p>
+                            <p className="text-gray-900 dark:text-white font-medium">
+                                {user.country || 'Non renseigné'}
+                            </p>
+                        </div>
+                        <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg">
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Numéro de téléphone</p>
+                            <p className="text-gray-900 dark:text-white font-medium">
+                                {user.phoneNumber || 'Non renseigné'}
+                            </p>
+                        </div>
+                        <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg">
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Dernière activité</p>
+                            <p className="text-gray-900 dark:text-white font-medium">
+                                {formatLastSeen(user.lastSeen, user.updatedAt)}
+                            </p>
+                        </div>
+                        <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg">
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Date de création</p>
+                            <p className="text-gray-900 dark:text-white font-medium">
+                                {formatDate(user.createdAt)}
+                            </p>
+                        </div>
+                        <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg">
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Dernière mise à jour</p>
+                            <p className="text-gray-900 dark:text-white font-medium">
+                                {formatDate(user.updatedAt)}
+                            </p>
+                        </div>
+                        <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg">
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">RGPD accepté</p>
+                            <p className="text-gray-900 dark:text-white font-medium">
+                                {user.rgpdAcceptedAt ? (
+                                    <span className="flex items-center gap-2">
+                                        <span className="text-green-600 dark:text-green-400">✓ Oui</span>
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                                            ({formatDate(user.rgpdAcceptedAt)})
+                                        </span>
+                                    </span>
+                                ) : (
+                                    <span className="text-red-600 dark:text-red-400">✗ Non</span>
+                                )}
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Informations supplémentaires */}
+                    {(user.isPremium !== undefined || user.isAdmin !== undefined) && (
+                        <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-lg border border-amber-200 dark:border-amber-800">
+                            <p className="text-sm font-semibold text-amber-900 dark:text-amber-200 mb-2">Statut</p>
+                            <div className="flex flex-wrap gap-2">
+                                {user.isPremium && (
+                                    <span className="px-3 py-1 bg-amber-500 text-white rounded-full text-sm font-medium">
+                                        Premium
+                                    </span>
+                                )}
+                                {user.isAdmin && (
+                                    <span className="px-3 py-1 bg-purple-500 text-white rounded-full text-sm font-medium">
+                                        Administrateur
+                                    </span>
+                                )}
+                                {!user.isPremium && !user.isAdmin && (
+                                    <span className="px-3 py-1 bg-gray-500 text-white rounded-full text-sm font-medium">
+                                        Utilisateur standard
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+
+    // Utiliser React Portal pour rendre le modal au niveau du body
+    return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : null;
+};
+
+interface CountryUsersModalProps {
+    country: { code: string; name: string };
+    users: UserProfile[];
+    loading: boolean;
+    onClose: () => void;
+    formatLastSeen: (lastSeen?: Date | Timestamp, updatedAt?: Date | Timestamp) => string;
+    getStatusLabel: (presence: string) => string;
+    getStatusColor: (presence: string) => string;
+}
+
+const CountryUsersModal: React.FC<CountryUsersModalProps> = ({ 
+    country, 
+    users, 
+    loading, 
+    onClose, 
+    formatLastSeen,
+    getStatusLabel,
+    getStatusColor
+}) => {
+    const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
+
+    const modalContent = (
+        <div 
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            onClick={onClose}
+            style={{ 
+                position: 'fixed', 
+                top: 0, 
+                left: 0, 
+                right: 0, 
+                bottom: 0,
+                zIndex: 9999
+            }}
+        >
+            <div 
+                className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col relative"
+                onClick={(e) => e.stopPropagation()}
+                style={{ 
+                    position: 'relative',
+                    zIndex: 10000,
+                    margin: 'auto'
+                }}
+            >
+                {/* Header */}
+                <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between z-10">
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                            Utilisateurs de {country.name} ({country.code})
+                        </h2>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                            {users.length} utilisateur{users.length > 1 ? 's' : ''} trouvé{users.length > 1 ? 's' : ''}
+                        </p>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                        aria-label="Fermer"
+                    >
+                        <span className="text-2xl font-bold">×</span>
+                    </button>
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto p-6">
+                    {loading ? (
+                        <div className="flex items-center justify-center py-12">
+                            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-amber-500"></div>
+                        </div>
+                    ) : users.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {users.map((user) => (
+                                <div
+                                    key={user.uid}
+                                    className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow cursor-pointer"
+                                    onClick={() => setSelectedUser(user)}
+                                >
+                                    <div className="flex items-center space-x-3">
+                                        <div className="relative">
+                                            <div className="w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 overflow-hidden flex items-center justify-center">
+                                                {user.photo_url ? (
+                                                    <img 
+                                                        src={user.photo_url}
+                                                        alt={user.display_name}
+                                                        className="w-full h-full object-cover"
+                                                        onError={(e) => {
+                                                            const target = e.target as HTMLImageElement;
+                                                            target.src = '';
+                                                            target.style.display = 'none';
+                                                        }}
+                                                    />
+                                                ) : null}
+                                                {(!user.photo_url || user.photo_url === '') && (
+                                                    <div className="w-full h-full flex items-center justify-center bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 text-lg font-medium">
+                                                        {user.display_name ? user.display_name.charAt(0).toUpperCase() : 'U'}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white dark:border-gray-800 ${getStatusColor(user.presence)}`}></span>
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-gray-900 dark:text-white font-medium truncate">
+                                                {user.display_name || 'Utilisateur sans nom'}
+                                            </p>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                                {user.email}
+                                            </p>
+                                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                                                {getStatusLabel(user.presence)}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                            <p className="text-lg">Aucun utilisateur trouvé pour ce pays</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+
+    // Utiliser React Portal pour rendre le modal au niveau du body
+    const portal = typeof document !== 'undefined' ? createPortal(modalContent, document.body) : null;
+
+    return (
+        <>
+            {portal}
+            {selectedUser && (
+                <UserDetailsModal 
+                    user={selectedUser as UserProfile & { lastSeen?: Date | Timestamp; updatedAt?: Date | Timestamp }}
+                    onClose={() => setSelectedUser(null)}
+                    formatLastSeen={formatLastSeen}
+                    getStatusLabel={getStatusLabel}
+                    getStatusColor={getStatusColor}
+                />
+            )}
+        </>
     );
 };
 

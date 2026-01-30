@@ -673,7 +673,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                                         {t('podcastsTitle') || 'Podcasts'}
                                     </h3>
                                     <button
-                                        onClick={() => navigateToCategory(MediaType.Podcast)}
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            console.log('🔍 Clic sur bouton Podcasts (Netflix), navigation vers /podcasts');
+                                            navigateToCategory(MediaType.Podcast);
+                                        }}
                                         className="text-sm md:text-base text-red-500 hover:text-red-400 font-semibold transition-colors"
                                     >
                                         {t('viewAll') || 'Voir plus'} →
@@ -1055,7 +1060,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                                         {t('podcastsTitle') || 'Podcasts'}
                                     </h3>
                                     <button
-                                        onClick={() => navigateToCategory(MediaType.Podcast)}
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            console.log('🔍 Clic sur bouton Podcasts (Prime), navigation vers /podcasts');
+                                            navigateToCategory(MediaType.Podcast);
+                                        }}
                                         className="text-sm md:text-base text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold transition-colors"
                                     >
                                         {t('viewAll') || 'Voir plus'} →
@@ -1455,7 +1465,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                                     {t('podcastsTitle') || 'Podcasts'}
                                 </h3>
                                 <button
-                                    onClick={() => navigateToCategory(MediaType.Podcast)}
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        console.log('🔍 Clic sur bouton Podcasts, navigation vers /podcasts');
+                                        navigateToCategory(MediaType.Podcast);
+                                    }}
                                     className="text-sm md:text-base font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors flex items-center gap-2"
                                 >
                                     {t('viewAll') || 'Voir tout'}

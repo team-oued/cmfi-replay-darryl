@@ -274,6 +274,7 @@ const AppContent: React.FC = () => {
         const route = type === MediaType.Series ? 'series' :
             type === MediaType.Movie ? 'movies' :
                 'podcasts';
+        console.log('🔍 Navigation vers catégorie:', { type, route, fullPath: `/${route}` });
         navigate(`/${route}`);
     };
 

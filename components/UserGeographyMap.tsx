@@ -8,7 +8,11 @@ interface CountryStat {
     percentage: number;
 }
 
-const UserGeographyMap: React.FC = () => {
+interface UserGeographyMapProps {
+    onCountryClick?: (countryCode: string, countryName: string) => void;
+}
+
+const UserGeographyMap: React.FC<UserGeographyMapProps> = ({ onCountryClick }) => {
     const [countryStats, setCountryStats] = useState<CountryStat[]>([]);
     const [totalUsers, setTotalUsers] = useState<number>(0);
     const [totalUsersWithCountry, setTotalUsersWithCountry] = useState<number>(0);
@@ -114,7 +118,10 @@ const UserGeographyMap: React.FC = () => {
                         {countryStats.map((stat, index) => (
                             <div
                                 key={stat.countryCode}
-                                className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow"
+                                className={`bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 transition-shadow ${
+                                    onCountryClick ? 'cursor-pointer hover:shadow-md hover:border-amber-500 dark:hover:border-amber-400' : 'hover:shadow-md'
+                                }`}
+                                onClick={() => onCountryClick && onCountryClick(stat.countryCode, stat.countryName)}
                             >
                                 <div className="flex items-center justify-between mb-2">
                                     <div className="flex items-center gap-3">

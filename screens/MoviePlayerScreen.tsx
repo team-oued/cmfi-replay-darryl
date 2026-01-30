@@ -743,6 +743,9 @@ const MoviePlayerScreen: React.FC<MoviePlayerScreenProps> = ({ item, onBack }) =
         if (!userProfile) {
             handleAuthRequired('continuer à regarder et découvrir plus de contenu');
         }
+        // Réinitialiser le flag pour permettre une nouvelle vue si l'utilisateur regarde la vidéo à nouveau
+        watchTimeRef.current = 0;
+        hasRecordedViewRef.current = false;
     };
 
     useEffect(() => {
@@ -788,7 +791,7 @@ const MoviePlayerScreen: React.FC<MoviePlayerScreenProps> = ({ item, onBack }) =
         fetchLikeData();
     }, [item.id, movieData, userProfile]);
 
-    // Track view after 30 seconds of watching (only when video is playing)
+    // Track view after 10 seconds of watching (only when video is playing)
     const watchTimeRef = useRef(0);
     const hasRecordedViewRef = useRef(false);
 
@@ -802,7 +805,7 @@ const MoviePlayerScreen: React.FC<MoviePlayerScreenProps> = ({ item, onBack }) =
             if (videoIsPlaying && !hasRecordedViewRef.current) {
                 watchTimeRef.current += 1;
 
-                if (watchTimeRef.current >= 30) {
+                if (watchTimeRef.current >= 10) {
                     hasRecordedViewRef.current = true;
                     viewService.recordView(movieUid, 'movie', userProfile.uid)
                         .catch((error) => {
