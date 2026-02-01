@@ -199,6 +199,17 @@ const AppVideosTab: React.FC = () => {
         loadData();
         loadCategories();
     }, []);
+    
+    // S'assurer que les épisodes sont chargés quand on édite un épisode
+    useEffect(() => {
+        if (editingVideo && editingVideo.uid_season && editingVideo.uid_serie) {
+            const episodes = seriesData[editingVideo.uid_serie]?.episodes[editingVideo.uid_season];
+            if (!episodes || episodes.length === 0) {
+                console.log('Loading episodes for editing video...', editingVideo.uid_serie, editingVideo.uid_season);
+                loadSeasonEpisodes(editingVideo.uid_serie, editingVideo.uid_season);
+            }
+        }
+    }, [editingVideo, seriesData]);
 
     const loadCategories = async () => {
         try {
@@ -264,11 +275,14 @@ const AppVideosTab: React.FC = () => {
     // Charger les épisodes d'une saison de manière lazy
     const loadSeasonEpisodes = async (serieUid: string, seasonUid: string) => {
         // Vérifier si les épisodes sont déjà chargés
-        if (seriesData[serieUid]?.episodes[seasonUid]) {
+        const currentEpisodes = seriesData[serieUid]?.episodes[seasonUid];
+        if (currentEpisodes && currentEpisodes.length > 0) {
+            console.log(`Episodes already loaded for season ${seasonUid}:`, currentEpisodes.length);
             return; // Déjà chargés
         }
 
         try {
+            console.log(`Loading episodes for season ${seasonUid} in series ${serieUid}...`);
             // Charger les épisodes directement depuis Firestore
             // On doit récupérer les IDs Firestore pour pouvoir les mettre à jour
             const q = query(
@@ -278,10 +292,16 @@ const AppVideosTab: React.FC = () => {
                 orderBy('episode_numero', 'asc')
             );
             const snapshot = await getDocs(q);
-            const episodes = snapshot.docs.map(doc => ({
-                id: doc.id, // ID Firestore
-                ...doc.data()
-            }));
+            const episodes = snapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id, // ID Firestore
+                    ...data,
+                    uid_serie: serieUid // Ajouter uid_serie pour la navigation uniquement (pas dans Firestore)
+                };
+            });
+            
+            console.log(`Loaded ${episodes.length} episodes for season ${seasonUid} in series ${serieUid}`);
             
             // Mettre à jour les données
             setSeriesData(prev => ({
@@ -324,6 +344,11 @@ const AppVideosTab: React.FC = () => {
     };
 
     const toggleSeason = async (serieUid: string, seasonUid: string) => {
+        // Toujours garder la saison ouverte si on est en train d'éditer un épisode de cette saison
+        if (editingVideo && editingVideo.uid_season === seasonUid) {
+            return; // Ne pas permettre de fermer la saison si on édite un épisode
+        }
+        
         const newExpanded = new Set(expandedSeasons);
         const isExpanding = !newExpanded.has(seasonUid);
         
@@ -338,8 +363,29 @@ const AppVideosTab: React.FC = () => {
         setExpandedSeasons(newExpanded);
     };
 
-    const handleEdit = (video: any) => {
-        setEditingVideo(video);
+    const handleEdit = async (video: any) => {
+        // Trouver le uid_serie depuis les séries chargées pour la navigation
+        const serie = series.find(s => s.title_serie === video.title_serie || s.uid_serie === video.uid_serie);
+        const serieUid = serie?.uid_serie;
+        
+        if (!serieUid) {
+            console.error('Could not find serie for video:', video);
+            toast.error('Impossible de trouver la série associée');
+            return;
+        }
+        
+        // Charger les épisodes immédiatement si pas déjà chargés
+        const episodes = seriesData[serieUid]?.episodes[video.uid_season];
+        if (!episodes || episodes.length === 0) {
+            console.log('Loading episodes immediately for editing...', serieUid, video.uid_season);
+            await loadSeasonEpisodes(serieUid, video.uid_season);
+        }
+        
+        // Stocker uid_serie dans editingVideo pour la navigation, mais ne pas l'inclure dans editForm
+        setEditingVideo({
+            ...video,
+            uid_serie: serieUid // Pour la navigation uniquement
+        });
         setEditForm({
             title: video.title || '',
             original_title: video.original_title || '',
@@ -358,7 +404,24 @@ const AppVideosTab: React.FC = () => {
             title_serie: video.title_serie || '',
             hidden: video.hidden || false,
             uid_season: video.uid_season || ''
+            // Ne pas inclure uid_serie dans editForm car ce n'est pas un champ de l'épisode
         });
+        
+        // S'assurer que la série et la saison sont ouvertes
+        if (serieUid) {
+            setExpandedSeries(prev => {
+                const newSet = new Set(prev);
+                newSet.add(serieUid);
+                return newSet;
+            });
+        }
+        if (video.uid_season) {
+            setExpandedSeasons(prev => {
+                const newSet = new Set(prev);
+                newSet.add(video.uid_season);
+                return newSet;
+            });
+        }
     };
 
     const handleSave = async () => {
@@ -369,11 +432,87 @@ const AppVideosTab: React.FC = () => {
             // editingVideo.id est l'ID Firestore
             await episodeSerieService.updateEpisodeById(editingVideo.id, editForm);
             toast.success('Vidéo mise à jour avec succès');
-            setEditingVideo(null);
-            loadData();
+            
+            // Mettre à jour l'état local au lieu de recharger toutes les données
+            const seasonUid = editingVideo.uid_season;
+            const serieUid = editingVideo.uid_serie;
+            if (seasonUid && serieUid && seriesData[serieUid]?.episodes[seasonUid]) {
+                const updatedEpisodes = seriesData[serieUid].episodes[seasonUid].map((ep: any) => 
+                    ep.id === editingVideo.id ? { ...ep, ...editForm } : ep
+                );
+                setSeriesData(prev => ({
+                    ...prev,
+                    [serieUid]: {
+                        ...prev[serieUid],
+                        episodes: {
+                            ...prev[serieUid].episodes,
+                            [seasonUid]: updatedEpisodes
+                        }
+                    }
+                }));
+            }
+            
+            // Ne pas fermer le modal - l'utilisateur peut continuer à modifier
+            // Le modal restera ouvert pour permettre la navigation entre épisodes
         } catch (error: any) {
             console.error('Erreur lors de la mise à jour de l\'épisode:', error);
             toast.error(error.message || 'Erreur lors de la mise à jour');
+        }
+    };
+
+    // Navigation entre épisodes
+    const getCurrentEpisodeIndex = (): number => {
+        if (!editingVideo) return -1;
+        const seasonUid = editingVideo.uid_season;
+        const serieUid = editingVideo.uid_serie;
+        if (!serieUid || !seasonUid) {
+            console.warn('Missing serieUid or seasonUid:', { serieUid, seasonUid, editingVideo });
+            return -1;
+        }
+        const episodes = seriesData[serieUid]?.episodes[seasonUid] || [];
+        const index = episodes.findIndex((ep: any) => ep.id === editingVideo.id);
+        console.log('Current episode index:', index, 'out of', episodes.length, 'episodes');
+        return index;
+    };
+
+    const getCurrentSeasonEpisodes = (): any[] => {
+        if (!editingVideo) return [];
+        const seasonUid = editingVideo.uid_season;
+        const serieUid = editingVideo.uid_serie;
+        if (!serieUid || !seasonUid) {
+            console.warn('Missing serieUid or seasonUid:', { serieUid, seasonUid, editingVideo });
+            return [];
+        }
+        const episodes = seriesData[serieUid]?.episodes[seasonUid] || [];
+        console.log('Current season episodes:', episodes.length, 'episodes');
+        return episodes;
+    };
+
+    const handlePreviousEpisode = async () => {
+        const episodes = getCurrentSeasonEpisodes();
+        const currentIndex = getCurrentEpisodeIndex();
+        console.log('handlePreviousEpisode:', { currentIndex, episodesCount: episodes.length });
+        if (currentIndex > 0 && episodes.length > 0) {
+            const prevEpisode = episodes[currentIndex - 1];
+            console.log('Loading previous episode:', prevEpisode);
+            await handleEdit(prevEpisode);
+        } else {
+            console.warn('Cannot go to previous episode:', { currentIndex, episodesCount: episodes.length });
+            toast.warn('Impossible d\'aller à l\'épisode précédent');
+        }
+    };
+
+    const handleNextEpisode = async () => {
+        const episodes = getCurrentSeasonEpisodes();
+        const currentIndex = getCurrentEpisodeIndex();
+        console.log('handleNextEpisode:', { currentIndex, episodesCount: episodes.length });
+        if (currentIndex >= 0 && currentIndex < episodes.length - 1 && episodes.length > 0) {
+            const nextEpisode = episodes[currentIndex + 1];
+            console.log('Loading next episode:', nextEpisode);
+            await handleEdit(nextEpisode);
+        } else {
+            console.warn('Cannot go to next episode:', { currentIndex, episodesCount: episodes.length });
+            toast.warn('Impossible d\'aller à l\'épisode suivant');
         }
     };
 
@@ -614,10 +753,71 @@ const AppVideosTab: React.FC = () => {
             )}
 
             {/* Modal d'édition vidéo */}
-            {editingVideo && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-                        <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Modifier l'épisode</h2>
+            {editingVideo && (() => {
+                const episodes = getCurrentSeasonEpisodes();
+                const currentIndex = getCurrentEpisodeIndex();
+                const hasPrevious = currentIndex > 0;
+                const hasNext = currentIndex >= 0 && currentIndex < episodes.length - 1;
+                
+                console.log('Modal state:', { 
+                    episodesCount: episodes.length, 
+                    currentIndex, 
+                    hasPrevious, 
+                    hasNext,
+                    editingVideoId: editingVideo.id,
+                    serieUid: editingVideo.uid_serie,
+                    seasonUid: editingVideo.uid_season
+                });
+                
+                return (
+                <div 
+                    className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4"
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        zIndex: 9999,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                    }}
+                >
+                    <div 
+                        className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
+                        style={{
+                            position: 'relative',
+                            zIndex: 10000,
+                            margin: 'auto'
+                        }}
+                    >
+                        <div className="flex items-center justify-between mb-4">
+                            <div>
+                                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Modifier l'épisode</h2>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                    Épisode {currentIndex + 1} sur {episodes.length} • {editingVideo.title_serie}
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={handlePreviousEpisode}
+                                    disabled={!hasPrevious}
+                                    className="px-3 py-2 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+                                    title="Épisode précédent"
+                                >
+                                    ← Précédent
+                                </button>
+                                <button
+                                    onClick={handleNextEpisode}
+                                    disabled={!hasNext}
+                                    className="px-3 py-2 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+                                    title="Épisode suivant"
+                                >
+                                    Suivant →
+                                </button>
+                            </div>
+                        </div>
                         <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
@@ -806,21 +1006,36 @@ const AppVideosTab: React.FC = () => {
                             <div className="flex gap-2">
                                 <button
                                     onClick={handleSave}
-                                    className="flex-1 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600"
+                                    className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600"
                                 >
                                     Enregistrer
                                 </button>
+                                {hasNext && (
+                                    <button
+                                        onClick={async () => {
+                                            await handleSave();
+                                            // Attendre un peu pour que la sauvegarde soit terminée
+                                            setTimeout(() => {
+                                                handleNextEpisode();
+                                            }, 100);
+                                        }}
+                                        className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                                    >
+                                        Enregistrer et Suivant →
+                                    </button>
+                                )}
                                 <button
                                     onClick={() => setEditingVideo(null)}
-                                    className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600"
+                                    className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600"
                                 >
-                                    Annuler
+                                    Fermer
                                 </button>
                             </div>
                         </div>
                     </div>
                 </div>
-            )}
+                );
+            })()}
 
             {/* Modal d'édition saison */}
             {editingSeason && (
