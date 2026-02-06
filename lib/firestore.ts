@@ -83,6 +83,8 @@ export interface SeasonSerie {
     nb_episodes: number;
     year_season: number;
     premium_text: string;
+    isSecret?: boolean; // Si true, la saison n'est visible que par les utilisateurs autorisés
+    allowedUserIds?: string[]; // Liste des UIDs des utilisateurs autorisés à voir cette saison
 }
 
 // Interface pour la collection episodesSeries
@@ -1160,7 +1162,7 @@ export const seasonSerieService = {
         }
     },
 
-    async getSeasonsBySerie(uid_serie: string): Promise<SeasonSerie[]> {
+    async getSeasonsBySerie(uid_serie: string, userId?: string): Promise<SeasonSerie[]> {
         try {
             const q = query(
                 collection(db, SEASONS_SERIES_COLLECTION),
@@ -1168,7 +1170,20 @@ export const seasonSerieService = {
                 orderBy('season_number', 'asc')
             );
             const querySnapshot = await getDocs(q);
-            return querySnapshot.docs.map(doc => doc.data() as SeasonSerie);
+            const allSeasons = querySnapshot.docs.map(doc => doc.data() as SeasonSerie);
+            
+            // Filtrer les saisons secrètes selon les permissions
+            if (userId) {
+                return allSeasons.filter(season => {
+                    // Si la saison n'est pas secrète, elle est visible par tous
+                    if (!season.isSecret) return true;
+                    // Si la saison est secrète, vérifier si l'utilisateur est autorisé
+                    return season.allowedUserIds?.includes(userId) || false;
+                });
+            }
+            
+            // Si pas d'userId fourni, retourner seulement les saisons non secrètes
+            return allSeasons.filter(season => !season.isSecret);
         } catch (error) {
             console.error('Error getting seasons by serie:', error);
             return [];

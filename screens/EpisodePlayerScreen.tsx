@@ -898,7 +898,8 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
                     setEpisodesInSeason([]);
                     return; 
                 }
-                const seasons = await seasonSerieService.getSeasonsBySerie(serie.uid_serie);
+                const userUid = userProfile?.uid;
+                const seasons = await seasonSerieService.getSeasonsBySerie(serie.uid_serie, userUid);
                 if (seasons.length === 0) { 
                     setEpisodesInSerie([]); 
                     setEpisodesInSeason([]);

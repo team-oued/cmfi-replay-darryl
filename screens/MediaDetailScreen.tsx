@@ -141,8 +141,9 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
             // Récupérer la série depuis Firestore
             const serie = await serieService.getSerieByUid(item.id);
             if (serie) {
-                // Récupérer les saisons de la série
-                const seasons = await seasonSerieService.getSeasonsBySerie(serie.uid_serie);
+                // Récupérer les saisons de la série (filtrées selon les permissions)
+                const userUid = userProfile?.uid;
+                const seasons = await seasonSerieService.getSeasonsBySerie(serie.uid_serie, userUid);
                 setFirestoreSeasons(seasons);
 
                 // Récupérer les épisodes pour chaque saison

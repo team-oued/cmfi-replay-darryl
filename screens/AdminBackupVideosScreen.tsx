@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { adminApiService } from '../lib/adminApiService';
 import { adminAllowlistService } from '../lib/adminAllowlistService';
-import { serieService, seasonSerieService, episodeSerieService, serieCategoryService, Serie, SeasonSerie, EpisodeSerie, SerieCategory } from '../lib/firestore';
+import { serieService, seasonSerieService, episodeSerieService, serieCategoryService, userService, Serie, SeasonSerie, EpisodeSerie, SerieCategory, UserProfile } from '../lib/firestore';
 import CategoriesTab from './CategoriesTab';
 import { db } from '../lib/firebase';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
@@ -191,6 +191,10 @@ const AppVideosTab: React.FC = () => {
     const [editForm, setEditForm] = useState<any>({});
     const [editingSeason, setEditingSeason] = useState<any | null>(null);
     const [editSeasonForm, setEditSeasonForm] = useState<any>({});
+    const [showSeasonPermissions, setShowSeasonPermissions] = useState(false);
+    const [seasonPermissionsUsers, setSeasonPermissionsUsers] = useState<UserProfile[]>([]);
+    const [seasonPermissionsSearch, setSeasonPermissionsSearch] = useState('');
+    const [seasonPermissionsLoading, setSeasonPermissionsLoading] = useState(false);
     const [editingSerie, setEditingSerie] = useState<any | null>(null);
     const [editSerieForm, setEditSerieForm] = useState<any>({});
     const [categories, setCategories] = useState<SerieCategory[]>([]);
@@ -550,8 +554,68 @@ const AppVideosTab: React.FC = () => {
             season_number: season.season_number || 1,
             year_season: season.year_season || new Date().getFullYear(),
             premium_text: season.premium_text || '',
-            nb_episodes: season.nb_episodes || 0
+            nb_episodes: season.nb_episodes || 0,
+            isSecret: season.isSecret || false,
+            allowedUserIds: season.allowedUserIds || []
         });
+    };
+
+    const handleManageSeasonPermissions = async (season: any) => {
+        setEditingSeason(season);
+        setEditSeasonForm({
+            ...season,
+            isSecret: season.isSecret || false,
+            allowedUserIds: season.allowedUserIds || []
+        });
+        setShowSeasonPermissions(true);
+        setSeasonPermissionsLoading(true);
+        try {
+            // Charger tous les utilisateurs
+            const allUsers = await userService.getAllUsers(500);
+            setSeasonPermissionsUsers(allUsers);
+        } catch (error) {
+            console.error('Error loading users:', error);
+            toast.error('Erreur lors du chargement des utilisateurs');
+        } finally {
+            setSeasonPermissionsLoading(false);
+        }
+    };
+
+    const handleToggleUserPermission = (userId: string) => {
+        const currentAllowed = editSeasonForm.allowedUserIds || [];
+        const isAllowed = currentAllowed.includes(userId);
+        
+        if (isAllowed) {
+            // Retirer l'utilisateur
+            setEditSeasonForm({
+                ...editSeasonForm,
+                allowedUserIds: currentAllowed.filter((id: string) => id !== userId)
+            });
+        } else {
+            // Ajouter l'utilisateur
+            setEditSeasonForm({
+                ...editSeasonForm,
+                allowedUserIds: [...currentAllowed, userId],
+                isSecret: true // Activer automatiquement isSecret si on ajoute des utilisateurs
+            });
+        }
+    };
+
+    const handleSaveSeasonPermissions = async () => {
+        if (!editingSeason) return;
+
+        try {
+            await seasonSerieService.updateSeasonById(editingSeason.id, {
+                isSecret: editSeasonForm.isSecret,
+                allowedUserIds: editSeasonForm.allowedUserIds || []
+            });
+            toast.success('Permissions de la saison mises à jour avec succès');
+            setShowSeasonPermissions(false);
+            loadData();
+        } catch (error: any) {
+            console.error('Erreur lors de la mise à jour des permissions:', error);
+            toast.error(error.message || 'Erreur lors de la mise à jour');
+        }
     };
 
     const handleSaveSeason = async () => {
@@ -692,15 +756,35 @@ const AppVideosTab: React.FC = () => {
                                                                 </div>
                                                             </div>
                                                         </button>
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleEditSeason(season);
-                                                            }}
-                                                            className="ml-4 px-3 py-1.5 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors text-sm"
-                                                        >
-                                                            Modifier
-                                                        </button>
+                                                        <div className="flex items-center gap-2">
+                                                            {season.isSecret && (
+                                                                <span className="px-2 py-1 bg-purple-500 text-white rounded text-xs font-medium flex items-center gap-1">
+                                                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                                                    </svg>
+                                                                    Secret
+                                                                </span>
+                                                            )}
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleManageSeasonPermissions(season);
+                                                                }}
+                                                                className="px-3 py-1.5 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-sm"
+                                                                title="Gérer les permissions"
+                                                            >
+                                                                🔒 Permissions
+                                                            </button>
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleEditSeason(season);
+                                                                }}
+                                                                className="px-3 py-1.5 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors text-sm"
+                                                            >
+                                                                Modifier
+                                                            </button>
+                                                        </div>
                                                     </div>
 
                                                     {/* Épisodes (si la saison est expandée) */}
@@ -1037,8 +1121,205 @@ const AppVideosTab: React.FC = () => {
                 );
             })()}
 
+            {/* Modal de gestion des permissions de saison */}
+            {showSeasonPermissions && editingSeason && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4"
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        zIndex: 9999,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                    }}
+                >
+                    <div 
+                        className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl"
+                        style={{
+                            position: 'relative',
+                            zIndex: 10000,
+                            margin: 'auto'
+                        }}
+                    >
+                        <div className="flex items-center justify-between mb-4">
+                            <div>
+                                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                                    Gérer les permissions - {editingSeason.title_season}
+                                </h2>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                    Définir quels utilisateurs peuvent voir cette saison
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setShowSeasonPermissions(false)}
+                                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                                aria-label="Fermer"
+                            >
+                                <span className="text-2xl font-bold">×</span>
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto space-y-4">
+                            {/* Toggle Saison secrète */}
+                            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                                <div>
+                                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        Saison secrète
+                                    </label>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                        Si activé, seuls les utilisateurs sélectionnés pourront voir cette saison
+                                    </p>
+                                </div>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={editSeasonForm.isSecret || false}
+                                        onChange={(e) => {
+                                            setEditSeasonForm({
+                                                ...editSeasonForm,
+                                                isSecret: e.target.checked,
+                                                allowedUserIds: e.target.checked ? (editSeasonForm.allowedUserIds || []) : []
+                                            });
+                                        }}
+                                        className="sr-only peer"
+                                    />
+                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-amber-300 dark:peer-focus:ring-amber-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-amber-500"></div>
+                                </label>
+                            </div>
+
+                            {/* Recherche d'utilisateurs */}
+                            {editSeasonForm.isSecret && (
+                                <>
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <SearchIcon className="h-5 w-5 text-gray-400" />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            placeholder="Rechercher un utilisateur par nom ou email..."
+                                            value={seasonPermissionsSearch}
+                                            onChange={(e) => setSeasonPermissionsSearch(e.target.value)}
+                                            className="w-full pl-10 pr-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                        />
+                                    </div>
+
+                                    {/* Liste des utilisateurs */}
+                                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg max-h-96 overflow-y-auto">
+                                        {seasonPermissionsLoading ? (
+                                            <div className="flex items-center justify-center py-8">
+                                                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-amber-500"></div>
+                                            </div>
+                                        ) : (
+                                            <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                                                {seasonPermissionsUsers
+                                                    .filter(user => {
+                                                        if (!seasonPermissionsSearch) return true;
+                                                        const search = seasonPermissionsSearch.toLowerCase();
+                                                        return (
+                                                            user.display_name?.toLowerCase().includes(search) ||
+                                                            user.email?.toLowerCase().includes(search) ||
+                                                            user.uid?.toLowerCase().includes(search)
+                                                        );
+                                                    })
+                                                    .map((user) => {
+                                                        const isAllowed = (editSeasonForm.allowedUserIds || []).includes(user.uid);
+                                                        return (
+                                                            <div
+                                                                key={user.uid}
+                                                                className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                                                            >
+                                                                <div className="flex items-center justify-between">
+                                                                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                                        <div className="relative flex-shrink-0">
+                                                                            <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 overflow-hidden flex items-center justify-center">
+                                                                                {user.photo_url ? (
+                                                                                    <img 
+                                                                                        src={user.photo_url}
+                                                                                        alt={user.display_name}
+                                                                                        className="w-full h-full object-cover"
+                                                                                        onError={(e) => {
+                                                                                            const target = e.target as HTMLImageElement;
+                                                                                            target.src = '';
+                                                                                            target.style.display = 'none';
+                                                                                        }}
+                                                                                    />
+                                                                                ) : null}
+                                                                                {(!user.photo_url || user.photo_url === '') && (
+                                                                                    <div className="w-full h-full flex items-center justify-center bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 text-sm font-medium">
+                                                                                        {user.display_name ? user.display_name.charAt(0).toUpperCase() : 'U'}
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                            <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white dark:border-gray-800 ${
+                                                                                user.presence === 'online' ? 'bg-green-500' :
+                                                                                user.presence === 'away' ? 'bg-yellow-500' :
+                                                                                'bg-gray-400'
+                                                                            }`}></span>
+                                                                        </div>
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <p className="font-medium text-gray-900 dark:text-white truncate">
+                                                                                {user.display_name || 'Utilisateur sans nom'}
+                                                                            </p>
+                                                                            <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                                                                                {user.email}
+                                                                            </p>
+                                                                        </div>
+                                                                    </div>
+                                                                    <label className="relative inline-flex items-center cursor-pointer ml-4">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={isAllowed}
+                                                                            onChange={() => handleToggleUserPermission(user.uid)}
+                                                                            className="sr-only peer"
+                                                                        />
+                                                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-amber-300 dark:peer-focus:ring-amber-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-amber-500"></div>
+                                                                    </label>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Compteur d'utilisateurs autorisés */}
+                                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                                        {editSeasonForm.allowedUserIds?.length || 0} utilisateur{(editSeasonForm.allowedUserIds?.length || 0) > 1 ? 's' : ''} autorisé{(editSeasonForm.allowedUserIds?.length || 0) > 1 ? 's' : ''}
+                                    </div>
+                                </>
+                            )}
+
+                            {!editSeasonForm.isSecret && (
+                                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                                    <p>Activez "Saison secrète" pour gérer les permissions</p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Boutons d'action */}
+                        <div className="flex gap-2 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                            <button
+                                onClick={handleSaveSeasonPermissions}
+                                className="flex-1 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600"
+                            >
+                                Enregistrer les permissions
+                            </button>
+                            <button
+                                onClick={() => setShowSeasonPermissions(false)}
+                                className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600"
+                            >
+                                Annuler
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Modal d'édition saison */}
-            {editingSeason && (
+            {editingSeason && !showSeasonPermissions && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                         <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Modifier la saison</h2>
