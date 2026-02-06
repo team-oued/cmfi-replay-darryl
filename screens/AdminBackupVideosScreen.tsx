@@ -568,8 +568,9 @@ const AppVideosTab: React.FC = () => {
         setShowSeasonPermissions(true);
         setSeasonPermissionsLoading(true);
         try {
-            // Charger tous les utilisateurs
-            const allUsers = await userService.getAllUsers(500);
+            // Charger tous les utilisateurs (augmenté à 2000 pour couvrir plus d'utilisateurs)
+            const allUsers = await userService.getAllUsers(2000);
+            console.log(`✅ ${allUsers.length} utilisateurs chargés pour les permissions`);
             setSeasonPermissionsUsers(allUsers);
         } catch (error) {
             console.error('Error loading users:', error);

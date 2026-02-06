@@ -13,11 +13,13 @@ import {
     limit, 
     getDocs, 
     orderBy, 
+    startAfter,
     onSnapshot,
     Timestamp,
     writeBatch,
     DocumentReference,
-    addDoc
+    addDoc,
+    QueryDocumentSnapshot
 } from 'firebase/firestore';
 
 // Interfaces pour les collections
@@ -388,17 +390,68 @@ export const userService = {
         }
     },
 
-    async getAllUsers(limitCount: number = 100): Promise<UserProfile[]> {
+    async getAllUsers(limitCount: number = 1000): Promise<UserProfile[]> {
         try {
-            const q = query(
-                collection(db, USERS_COLLECTION),
-                limit(limitCount)
-            );
-            const querySnapshot = await getDocs(q);
-            return querySnapshot.docs.map(doc => doc.data() as UserProfile);
+            // Charger tous les utilisateurs avec pagination si nécessaire
+            const allUsers: UserProfile[] = [];
+            let lastDoc: QueryDocumentSnapshot | null = null;
+            const batchSize = 500; // Firestore limite à 500 par requête
+            
+            while (allUsers.length < limitCount) {
+                let q;
+                if (lastDoc) {
+                    q = query(
+                        collection(db, USERS_COLLECTION),
+                        orderBy('createdAt', 'desc'),
+                        startAfter(lastDoc),
+                        limit(Math.min(batchSize, limitCount - allUsers.length))
+                    );
+                } else {
+                    q = query(
+                        collection(db, USERS_COLLECTION),
+                        orderBy('createdAt', 'desc'),
+                        limit(Math.min(batchSize, limitCount - allUsers.length))
+                    );
+                }
+                
+                const querySnapshot = await getDocs(q);
+                
+                if (querySnapshot.empty) {
+                    break; // Plus de documents
+                }
+                
+                const batchUsers = querySnapshot.docs.map(doc => ({
+                    uid: doc.id,
+                    ...doc.data()
+                } as UserProfile));
+                
+                allUsers.push(...batchUsers);
+                
+                if (querySnapshot.docs.length < batchSize || allUsers.length >= limitCount) {
+                    break; // Dernière page ou limite atteinte
+                }
+                
+                lastDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
+            }
+            
+            return allUsers;
         } catch (error) {
             console.error('Error getting all users:', error);
-            return [];
+            // Fallback: essayer sans orderBy si createdAt n'existe pas
+            try {
+                const q = query(
+                    collection(db, USERS_COLLECTION),
+                    limit(limitCount)
+                );
+                const querySnapshot = await getDocs(q);
+                return querySnapshot.docs.map(doc => ({
+                    uid: doc.id,
+                    ...doc.data()
+                } as UserProfile));
+            } catch (fallbackError) {
+                console.error('Error in fallback getAllUsers:', fallbackError);
+                return [];
+            }
         }
     },
 
