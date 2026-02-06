@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { useNavigate } from 'react-router-dom';
-import { UserProfile, userService, userMetricsService, userGeographyService } from '../lib/firestore';
+import { UserProfile, userService, userMetricsService, userGeographyService, seasonSerieService, serieService, SeasonSerie, Serie } from '../lib/firestore';
 import { useAppContext } from '../context/AppContext';
 import { ArrowLeftIcon, SearchIcon } from '../components/icons';
 import { Timestamp } from 'firebase/firestore';
@@ -624,6 +624,10 @@ interface UserDetailsModalProps {
 }
 
 const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ user, onClose, formatLastSeen, getStatusLabel, getStatusColor }) => {
+    const [secretSeasons, setSecretSeasons] = useState<Array<{ season: SeasonSerie; serie: Serie | null }>>([]);
+    const [loadingSeasons, setLoadingSeasons] = useState(false);
+    const [seasonSearch, setSeasonSearch] = useState('');
+
     const formatDate = (date?: Date | Timestamp): string => {
         if (!date) return 'Non disponible';
         const d = date instanceof Timestamp ? date.toDate() : date;
@@ -634,6 +638,77 @@ const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ user, onClose, form
             hour: '2-digit',
             minute: '2-digit'
         });
+    };
+
+    // Charger toutes les saisons secrètes
+    useEffect(() => {
+        const loadSecretSeasons = async () => {
+            setLoadingSeasons(true);
+            try {
+                // Charger toutes les saisons
+                const allSeasons = await seasonSerieService.getAllSeasons();
+                // Filtrer seulement les saisons secrètes
+                const secretSeasonsList = allSeasons.filter(s => s.isSecret);
+                
+                // Pour chaque saison secrète, charger la série associée
+                const seasonsWithSeries = await Promise.all(
+                    secretSeasonsList.map(async (season) => {
+                        const serie = await serieService.getSerieByUid(season.uid_serie);
+                        return { season, serie };
+                    })
+                );
+                
+                setSecretSeasons(seasonsWithSeries);
+            } catch (error) {
+                console.error('Error loading secret seasons:', error);
+            } finally {
+                setLoadingSeasons(false);
+            }
+        };
+        
+        loadSecretSeasons();
+    }, []);
+
+    const handleToggleSeasonAccess = async (seasonUid: string) => {
+        try {
+            // Trouver la saison
+            const seasonData = secretSeasons.find(s => s.season.uid_season === seasonUid);
+            if (!seasonData) return;
+
+            const season = seasonData.season;
+            const currentAllowed = season.allowedUserIds || [];
+            const isAllowed = currentAllowed.includes(user.uid);
+
+            let newAllowedUserIds: string[];
+            if (isAllowed) {
+                // Retirer l'utilisateur
+                newAllowedUserIds = currentAllowed.filter(id => id !== user.uid);
+            } else {
+                // Ajouter l'utilisateur
+                newAllowedUserIds = [...currentAllowed, user.uid];
+            }
+
+            // Mettre à jour la saison dans Firestore
+            await seasonSerieService.updateSeasonByUid(seasonUid, {
+                allowedUserIds: newAllowedUserIds
+            });
+
+            // Mettre à jour l'état local
+            setSecretSeasons(prev => prev.map(s => {
+                if (s.season.uid_season === seasonUid) {
+                    return {
+                        ...s,
+                        season: {
+                            ...s.season,
+                            allowedUserIds: newAllowedUserIds
+                        }
+                    };
+                }
+                return s;
+            }));
+        } catch (error) {
+            console.error('Error updating season access:', error);
+        }
     };
 
     const modalContent = (
@@ -787,6 +862,87 @@ const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ user, onClose, form
                             </div>
                         </div>
                     )}
+
+                    {/* Gestion des saisons secrètes */}
+                    <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg border border-purple-200 dark:border-purple-800">
+                        <div className="flex items-center justify-between mb-4">
+                            <div>
+                                <p className="text-sm font-semibold text-purple-900 dark:text-purple-200 mb-1">
+                                    Saisons secrètes
+                                </p>
+                                <p className="text-xs text-purple-700 dark:text-purple-300">
+                                    Gérer les saisons secrètes accessibles par cet utilisateur
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Recherche de saisons */}
+                        <div className="relative mb-4">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <SearchIcon className="h-5 w-5 text-gray-400" />
+                            </div>
+                            <input
+                                type="text"
+                                placeholder="Rechercher une saison..."
+                                value={seasonSearch}
+                                onChange={(e) => setSeasonSearch(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            />
+                        </div>
+
+                        {/* Liste des saisons secrètes */}
+                        {loadingSeasons ? (
+                            <div className="flex items-center justify-center py-8">
+                                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500"></div>
+                            </div>
+                        ) : (
+                            <div className="space-y-2 max-h-64 overflow-y-auto">
+                                {secretSeasons
+                                    .filter(({ season, serie }) => {
+                                        if (!seasonSearch) return true;
+                                        const search = seasonSearch.toLowerCase();
+                                        return (
+                                            season.title_season?.toLowerCase().includes(search) ||
+                                            serie?.title_serie?.toLowerCase().includes(search) ||
+                                            season.uid_season?.toLowerCase().includes(search)
+                                        );
+                                    })
+                                    .map(({ season, serie }) => {
+                                        const hasAccess = (season.allowedUserIds || []).includes(user.uid);
+                                        return (
+                                            <div
+                                                key={season.uid_season}
+                                                className="flex items-center justify-between p-3 bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 hover:shadow-md transition-shadow"
+                                            >
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="font-medium text-gray-900 dark:text-white truncate">
+                                                        {season.title_season || 'Saison sans titre'}
+                                                    </p>
+                                                    <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                                                        {serie?.title_serie || 'Série inconnue'} - Saison {season.season_number}
+                                                    </p>
+                                                </div>
+                                                <label className="relative inline-flex items-center cursor-pointer ml-4">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={hasAccess}
+                                                        onChange={() => handleToggleSeasonAccess(season.uid_season)}
+                                                        className="sr-only peer"
+                                                    />
+                                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-500"></div>
+                                                </label>
+                                            </div>
+                                        );
+                                    })}
+                            </div>
+                        )}
+
+                        {!loadingSeasons && secretSeasons.length === 0 && (
+                            <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                                <p className="text-sm">Aucune saison secrète disponible</p>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
