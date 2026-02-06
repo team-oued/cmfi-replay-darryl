@@ -58,9 +58,7 @@ const AdminBackupVideosScreen: React.FC = () => {
                         apiError.message.includes('Unexpected token')) {
                         console.warn('Backend non disponible, mais autorisation Firestore OK. Accès autorisé.');
                         setIsAuthorized(true);
-                        toast.warn('⚠️ Le serveur backend n\'est pas démarré. Démarrez-le avec: cd server && npm run dev', {
-                            autoClose: 10000
-                        });
+                        // Message d'avertissement retiré à la demande de l'utilisateur
                     } else {
                         // Autre erreur (403, etc.)
                         throw apiError;
