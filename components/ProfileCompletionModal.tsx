@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { userService, UserProfile } from '../lib/firestore';
 
@@ -139,9 +140,9 @@ const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({ userPro
 
     console.log('🎨 ProfileCompletionModal render - selectedCountry:', selectedCountry, 'phoneNumber:', phoneNumber);
     
-    return (
+    return createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-70 p-4 backdrop-blur-sm">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border-2 border-amber-500/20 transform transition-all duration-300 scale-100">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col border-2 border-amber-500/20 transform transition-all duration-300 scale-100">
                 {/* Header avec gradient et icône */}
                 <div className="relative bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 p-6 rounded-t-2xl">
                     <div className="flex items-center gap-4">
@@ -204,7 +205,7 @@ const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({ userPro
                 </div>
 
                 {/* Content */}
-                <div className="p-6 space-y-6">
+                <div className="flex-1 p-6 space-y-6 overflow-y-auto">
 
                     {/* Pays */}
                     <div>
@@ -335,7 +336,8 @@ const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({ userPro
                     </div>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 
