@@ -1017,11 +1017,82 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
     useEffect(() => {
         if (!episode) return;
 
+        const testImageUrl = async (url: string): Promise<boolean> => {
+            return new Promise((resolve) => {
+                if (!url || url === '/cmfireplay.svg') {
+                    resolve(true);
+                    return;
+                }
+
+                const isVimeoUrl = url.includes('vimeocdn.com');
+                const isExternalUrl = url.startsWith('http');
+                
+                // Pour les URLs externes, faire un test plus approfondi
+                if (isExternalUrl) {
+                    try {
+                        const img = new Image();
+                        const timeoutId = setTimeout(() => {
+                            console.warn('Timeout lors du test de l\'image externe:', url);
+                            resolve(false);
+                        }, isVimeoUrl ? 3000 : 5000);
+                        
+                        img.onload = () => {
+                            clearTimeout(timeoutId);
+                            console.log('Image externe valide:', url);
+                            resolve(true);
+                        };
+                        
+                        img.onerror = () => {
+                            clearTimeout(timeoutId);
+                            console.warn('Image externe invalide:', url);
+                            resolve(false);
+                        };
+                        
+                        img.crossOrigin = 'anonymous';
+                        img.referrerPolicy = 'no-referrer-when-downgrade';
+                        img.src = url;
+                    } catch (error) {
+                        console.warn('Erreur lors du test de l\'image:', error);
+                        resolve(false);
+                    }
+                } else {
+                    // Pour les images locales, considérer comme valides
+                    resolve(true);
+                }
+            });
+        };
+
         const preloadImage = (src: string): Promise<string> => {
             return new Promise((resolve) => {
+                // Vérifier si c'est une URL Vimeo
+                const isVimeoUrl = src.includes('vimeocdn.com');
+                
                 const img = new Image();
-                img.onload = () => resolve(src);
-                img.onerror = () => resolve('/cmfireplay.svg'); // Image par défaut en cas d'erreur
+                let timeoutId: NodeJS.Timeout;
+                
+                // Timeout de 5 secondes pour les images externes
+                if (isVimeoUrl) {
+                    timeoutId = setTimeout(() => {
+                        console.warn('Timeout lors du chargement de l\'image Vimeo:', src);
+                        resolve('/cmfireplay.svg');
+                    }, 5000);
+                }
+                
+                img.onload = () => {
+                    if (timeoutId) clearTimeout(timeoutId);
+                    console.log('Image chargée avec succès:', src);
+                    resolve(src);
+                };
+                
+                img.onerror = (event) => {
+                    if (timeoutId) clearTimeout(timeoutId);
+                    console.warn('Erreur lors du chargement de l\'image:', src, event);
+                    resolve('/cmfireplay.svg');
+                };
+                
+                // Ajouter des attributs pour gérer CORS
+                img.crossOrigin = 'anonymous';
+                img.referrerPolicy = 'no-referrer-when-downgrade';
                 img.src = src;
             });
         };
@@ -1079,20 +1150,33 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
             const rawImageUrl = episode.picture_path || '/cmfireplay.svg';
             const currentUrl = window.location.href;
 
+            console.log('Test de l\'image de partage:', rawImageUrl);
+            
+            // Tester d'abord si l'URL est valide
+            const isImageValid = await testImageUrl(rawImageUrl);
+            let validImageUrl = rawImageUrl;
+            
+            if (!isImageValid) {
+                console.warn('Image invalide détectée, utilisation de l\'image par défaut');
+                validImageUrl = '/cmfireplay.svg';
+            }
+
             // Précharger l'image pour s'assurer qu'elle est valide
-            const validImageUrl = await preloadImage(rawImageUrl);
+            const finalImageUrl = await preloadImage(validImageUrl);
 
             // Mettre à jour le contenu des meta tags
             metaTitle.content = episodeTitle;
             metaDescription.content = episodeDescription;
-            metaImage.content = validImageUrl;
+            metaImage.content = finalImageUrl;
             metaUrl.content = currentUrl;
             metaTwitterTitle.content = episodeTitle;
             metaTwitterDescription.content = episodeDescription;
-            metaTwitterImage.content = validImageUrl;
+            metaTwitterImage.content = finalImageUrl;
 
             // Mettre à jour le titre de la page
             document.title = `${episodeTitle} - CMFI Replay`;
+            
+            console.log('Métadonnées de partage mises à jour avec:', finalImageUrl);
         };
 
         updateShareMetadata();
@@ -1126,16 +1210,46 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
         try {
             // Mettre à jour les métadonnées juste avant le partage
             const imageUrl = displayEpisode.picture_path || '/cmfireplay.svg';
+            const isVimeoUrl = imageUrl.includes('vimeocdn.com');
             
-            // Vérifier que l'image est accessible
+            console.log('Tentative de partage avec image:', imageUrl);
+            console.log('URL Vimeo détectée:', isVimeoUrl);
+            
+            // Vérifier que l'image est accessible avec une meilleure gestion d'erreur
             const img = new Image();
+            let imageLoadTimeout: NodeJS.Timeout;
+            
+            
+            if (isVimeoUrl) {
+                imageLoadTimeout = setTimeout(() => {
+                    console.warn('Timeout de chargement pour l\'image Vimeo, utilisation du fallback');
+                    toast.update(toastId, {
+                        render: 'Utilisation de l\'image par défaut...',
+                        type: 'warning',
+                        autoClose: 2000,
+                    });
+                }, 3000);
+            }
+            
+            img.crossOrigin = 'anonymous';
+            img.referrerPolicy = 'no-referrer-when-downgrade';
+            
             img.onload = () => {
+                if (imageLoadTimeout) clearTimeout(imageLoadTimeout);
+                console.log('Image de miniature chargée avec succès');
                 toast.dismiss(toastId);
             };
-            img.onerror = () => {
-                console.warn('Image de miniature non accessible, utilisation de l\'image par défaut');
-                toast.dismiss(toastId);
+            
+            img.onerror = (event) => {
+                if (imageLoadTimeout) clearTimeout(imageLoadTimeout);
+                console.warn('Erreur de chargement de l\'image:', event);
+                toast.update(toastId, {
+                    render: 'Image non disponible, utilisation de l\'image par défaut',
+                    type: 'warning',
+                    autoClose: 2000,
+                });
             };
+            
             img.src = imageUrl;
 
             if (navigator.share) {

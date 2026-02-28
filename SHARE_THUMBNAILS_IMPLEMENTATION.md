@@ -116,12 +116,33 @@ L'implémentation utilise les champs suivants de l'interface `EpisodeSerie`:
 1. **Image non affichée**: Vérifier l'URL `picture_path`
 2. **Métadonnées non mises à jour**: Attendre le chargement complet
 3. **Partage échoué**: Vérifier l'authentification utilisateur
+4. **URLs Vimeo non chargées**: Problèmes CORS ou timeouts
 
 ### Solutions
 
 - **Images invalides**: Fallback automatique sur `/cmfireplay.svg`
 - **Navigateurs anciens**: Fallback sur clipboard.copyText
 - **Réseau lent**: Notifications d'attente appropriées
+- **URLs Vimeo**: Timeout de 3 secondes avec gestion CORS spécifique
+
+### Gestion des URLs Vimeo
+
+Les URLs Vimeo (`https://i.vimeocdn.com/video/*`) sont traitées spécifiquement :
+
+- **Timeout réduit**: 3 secondes au lieu de 5
+- **Gestion CORS**: `crossOrigin="anonymous"` et `referrerPolicy="no-referrer-when-downgrade"`
+- **Validation double**: Test d'accessibilité + préchargement
+- **Fallback automatique**: Utilisation de `/cmfireplay.svg` en cas d'échec
+
+#### Exemple d'URL Vimeo problématique
+```
+https://i.vimeocdn.com/video/aaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbbbbbbbbbbb-c
+```
+
+Cette URL sera :
+1. Testée pour l'accessibilité (timeout 3s)
+2. Préchargée avec gestion CORS
+3. Remplacée par l'image par défaut si inaccessible
 
 ## Tests Recommandés
 
