@@ -1013,11 +1013,93 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
         hasRecordedViewRef.current = false;
     }, [episode?.uid_episode]);
 
+    // Mettre à jour les métadonnées de partage lorsque l'épisode change
+    useEffect(() => {
+        if (!episode) return;
+
+        const preloadImage = (src: string): Promise<string> => {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => resolve(src);
+                img.onerror = () => resolve('/cmfireplay.svg'); // Image par défaut en cas d'erreur
+                img.src = src;
+            });
+        };
+
+        const updateShareMetadata = async () => {
+            // Créer ou mettre à jour les meta tags pour le partage
+            let metaTitle = document.querySelector('meta[property="og:title"]') as HTMLMetaElement;
+            let metaDescription = document.querySelector('meta[property="og:description"]') as HTMLMetaElement;
+            let metaImage = document.querySelector('meta[property="og:image"]') as HTMLMetaElement;
+            let metaUrl = document.querySelector('meta[property="og:url"]') as HTMLMetaElement;
+            let metaTwitterTitle = document.querySelector('meta[name="twitter:title"]') as HTMLMetaElement;
+            let metaTwitterDescription = document.querySelector('meta[name="twitter:description"]') as HTMLMetaElement;
+            let metaTwitterImage = document.querySelector('meta[name="twitter:image"]') as HTMLMetaElement;
+
+            // Créer les meta tags s'ils n'existent pas
+            if (!metaTitle) {
+                metaTitle = document.createElement('meta');
+                metaTitle.setAttribute('property', 'og:title');
+                document.head.appendChild(metaTitle);
+            }
+            if (!metaDescription) {
+                metaDescription = document.createElement('meta');
+                metaDescription.setAttribute('property', 'og:description');
+                document.head.appendChild(metaDescription);
+            }
+            if (!metaImage) {
+                metaImage = document.createElement('meta');
+                metaImage.setAttribute('property', 'og:image');
+                document.head.appendChild(metaImage);
+            }
+            if (!metaUrl) {
+                metaUrl = document.createElement('meta');
+                metaUrl.setAttribute('property', 'og:url');
+                document.head.appendChild(metaUrl);
+            }
+            if (!metaTwitterTitle) {
+                metaTwitterTitle = document.createElement('meta');
+                metaTwitterTitle.setAttribute('name', 'twitter:title');
+                document.head.appendChild(metaTwitterTitle);
+            }
+            if (!metaTwitterDescription) {
+                metaTwitterDescription = document.createElement('meta');
+                metaTwitterDescription.setAttribute('name', 'twitter:description');
+                document.head.appendChild(metaTwitterDescription);
+            }
+            if (!metaTwitterImage) {
+                metaTwitterImage = document.createElement('meta');
+                metaTwitterImage.setAttribute('name', 'twitter:image');
+                document.head.appendChild(metaTwitterImage);
+            }
+
+            // Précharger et valider l'image
+            const episodeTitle = episode.title || 'Épisode';
+            const episodeDescription = episode.overview || episode.overviewFr || `Regardez "${episodeTitle}" sur CMFI Replay`;
+            const rawImageUrl = episode.picture_path || '/cmfireplay.svg';
+            const currentUrl = window.location.href;
+
+            // Précharger l'image pour s'assurer qu'elle est valide
+            const validImageUrl = await preloadImage(rawImageUrl);
+
+            // Mettre à jour le contenu des meta tags
+            metaTitle.content = episodeTitle;
+            metaDescription.content = episodeDescription;
+            metaImage.content = validImageUrl;
+            metaUrl.content = currentUrl;
+            metaTwitterTitle.content = episodeTitle;
+            metaTwitterDescription.content = episodeDescription;
+            metaTwitterImage.content = validImageUrl;
+
+            // Mettre à jour le titre de la page
+            document.title = `${episodeTitle} - CMFI Replay`;
+        };
+
+        updateShareMetadata();
+    }, [episode]);
 
     // Utiliser les données EpisodeSerie passées en prop
     const displayEpisode = episode;
-
-    const [showShareOptions, setShowShareOptions] = useState(false);
 
     const handleShare = async () => {
         if (!userProfile) {
@@ -1025,220 +1107,50 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
             return;
         }
 
-        // Afficher le panneau des options de partage
-        setShowShareOptions(true);
-    };
+        // Afficher une notification de préparation du partage
+        const toastId = toast.info('Préparation du partage...', {
+            position: 'bottom-center',
+            autoClose: 3000,
+            hideProgressBar: true,
+            closeOnClick: false,
+            pauseOnHover: false,
+            draggable: false,
+        });
 
-    const handleNativeShare = async () => {
-        const shareData: ShareData = {
+        const shareData = {
             title: displayEpisode.title,
             text: `Regardez "${displayEpisode.title}" sur CMFI Replay`,
             url: window.location.href,
         };
 
         try {
+            // Mettre à jour les métadonnées juste avant le partage
+            const imageUrl = displayEpisode.picture_path || '/cmfireplay.svg';
+            
+            // Vérifier que l'image est accessible
+            const img = new Image();
+            img.onload = () => {
+                toast.dismiss(toastId);
+            };
+            img.onerror = () => {
+                console.warn('Image de miniature non accessible, utilisation de l\'image par défaut');
+                toast.dismiss(toastId);
+            };
+            img.src = imageUrl;
+
             if (navigator.share) {
                 await navigator.share(shareData);
-                setShowShareOptions(false);
-            } else {
-                await copyShareLinkWithImage();
-                setShowShareOptions(false);
-            }
-        } catch (err) {
-            console.error('Erreur lors du partage:', err);
-            if (err.name !== 'AbortError') {
-                await copyShareLinkWithImage();
-                setShowShareOptions(false);
-            }
-        }
-    };
-
-    const handleCopyLink = async () => {
-        await copyShareLinkWithImage();
-        setShowShareOptions(false);
-    };
-
-    const handleSocialShare = (platform: string) => {
-        const shareUrl = encodeURIComponent(window.location.href);
-        const shareText = encodeURIComponent(`Regardez "${displayEpisode.title}" sur CMFI Replay`);
-        const shareImage = displayEpisode.picture_path ? encodeURIComponent(displayEpisode.picture_path) : '';
-        const shareDescription = encodeURIComponent(displayEpisode.overview || displayEpisode.overviewFr || 'Regardez cet épisode sur CMFI Replay');
-        
-        let url = '';
-        
-        switch (platform) {
-            case 'facebook':
-                url = `https://www.facebook.com/sharer/sharer.php?u=${shareUrl}`;
-                break;
-            case 'twitter':
-                url = `https://twitter.com/intent/tweet?text=${shareText}&url=${shareUrl}`;
-                break;
-            case 'linkedin':
-                url = `https://www.linkedin.com/sharing/share-offsite/?url=${shareUrl}`;
-                break;
-            case 'whatsapp':
-                url = `https://wa.me/?text=${shareText}%20${shareUrl}`;
-                break;
-            case 'telegram':
-                url = `https://t.me/share/url?url=${shareUrl}&text=${shareText}`;
-                break;
-            case 'email':
-                url = `mailto:?subject=${encodeURIComponent(`Regardez "${displayEpisode.title}" sur CMFI Replay`)}&body=${shareText}%0A%0A${shareUrl}`;
-                break;
-            case 'reddit':
-                url = `https://reddit.com/submit?url=${shareUrl}&title=${shareText}`;
-                break;
-            case 'pinterest':
-                url = `https://pinterest.com/pin/create/button/?url=${shareUrl}&description=${shareText}&media=${shareImage}`;
-                break;
-        }
-        
-        if (url) {
-            if (platform === 'email') {
-                window.location.href = url;
-            } else {
-                window.open(url, '_blank', 'width=600,height=400');
-            }
-            setShowShareOptions(false);
-        }
-    };
-
-    const ShareOptionsModal: React.FC = () => (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 max-w-md w-full shadow-2xl border border-gray-200 dark:border-gray-800">
-                <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">Partager l'épisode</h3>
-                    <button
-                        onClick={() => setShowShareOptions(false)}
-                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
-                    >
-                        <svg className="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                </div>
-
-                {/* Aperçu avec miniature */}
-                <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                    <div className="flex space-x-3">
-                        {displayEpisode.picture_path && (
-                            <img 
-                                src={displayEpisode.picture_path} 
-                                alt={displayEpisode.title}
-                                className="w-16 h-16 rounded-lg object-cover shadow-md"
-                                onError={(e) => {
-                                    e.currentTarget.style.display = 'none';
-                                }}
-                            />
-                        )}
-                        <div className="flex-1">
-                            <h4 className="font-semibold text-gray-900 dark:text-white line-clamp-2">
-                                {displayEpisode.title}
-                            </h4>
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                {displayEpisode.overview || displayEpisode.overviewFr || 'Regardez cet épisode sur CMFI Replay'}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Options de partage */}
-                <div className="space-y-3">
-                    <button
-                        onClick={handleNativeShare}
-                        className="w-full flex items-center space-x-3 p-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl transition-colors font-medium"
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m9.032 4.026a9.001 9.001 0 01-7.432 0m9.032-4.026A9.001 9.001 0 0112 3c-4.474 0-8.268 3.12-9.032 7.326m0 0A9.001 9.001 0 0012 21c4.474 0 8.268-3.12 9.032-7.326" />
-                        </svg>
-                        <span>Partager avec l'application</span>
-                    </button>
-
-                    <button
-                        onClick={handleCopyLink}
-                        className="w-full flex items-center space-x-3 p-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white rounded-xl transition-colors font-medium"
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                        </svg>
-                        <span>Copier le lien avec miniature</span>
-                    </button>
-
-                    {/* Réseaux sociaux */}
-                    <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">Partager sur les réseaux sociaux</p>
-                        <div className="grid grid-cols-3 gap-2">
-                            {[
-                                { name: 'Facebook', icon: 'M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z', color: 'bg-blue-600' },
-                                { name: 'Twitter', icon: 'M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z', color: 'bg-sky-500' },
-                                { name: 'WhatsApp', icon: 'M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.149-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414-.074-.123-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z', color: 'bg-green-600' },
-                                { name: 'LinkedIn', icon: 'M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z', color: 'bg-blue-700' },
-                                { name: 'Email', icon: 'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z', color: 'bg-gray-600' },
-                                { name: 'Reddit', icon: 'M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-7.004 4.87-3.874 0-7.004-2.176-7.004-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.701zM9.25 12C8.561 12 8 12.562 8 13.25c0 .687.561 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.687-.562-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0 .231.094h.004c.083 0 .166-.028.23-.094l2.234-2.234a.327.327 0 0 0 0-.462l-2.234-2.233a.327.327 0 0 0-.462 0l-2.234 2.233a.327.327 0 0 0 0 .462l2.234 2.234z', color: 'bg-orange-600' },
-                            ].map((social) => (
-                                <button
-                                    key={social.name}
-                                    onClick={() => handleSocialShare(social.name.toLowerCase())}
-                                    className={`${social.color} text-white p-3 rounded-xl hover:opacity-90 transition-opacity flex flex-col items-center space-y-1`}
-                                >
-                                    <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
-                                        <path d={social.icon} />
-                                    </svg>
-                                    <span className="text-xs font-medium">{social.name}</span>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-
-    const copyShareLinkWithImage = async () => {
-        const shareText = `🎬 ${displayEpisode.title}\n\nRegardez cet épisode sur CMFI Replay !\n\n${window.location.href}`;
-        
-        try {
-            // Précharger l'image pour vérifier qu'elle est accessible
-            if (displayEpisode.picture_path) {
-                await preloadImage(displayEpisode.picture_path);
-            }
-            
-            await navigator.clipboard.writeText(shareText);
-            
-            // Afficher une notification améliorée avec aperçu de l'image
-            toast.success(
-                <div className="flex items-center space-x-3">
-                    {displayEpisode.picture_path && (
-                        <img 
-                            src={displayEpisode.picture_path} 
-                            alt={displayEpisode.title}
-                            className="w-12 h-12 rounded object-cover shadow-md"
-                            onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                            }}
-                        />
-                    )}
-                    <div>
-                        <div className="font-semibold">Lien copié avec miniature !</div>
-                        <div className="text-xs opacity-75">Partagez avec vos amis</div>
-                    </div>
-                </div>,
-                {
+                toast.success('Épisode partagé avec succès !', {
                     position: 'bottom-center',
-                    autoClose: 3000,
+                    autoClose: 2000,
                     hideProgressBar: true,
                     closeOnClick: true,
                     pauseOnHover: true,
                     draggable: true,
-                    theme: 'colored',
-                    className: 'min-w-[300px]',
-                }
-            );
-        } catch (error) {
-            console.error('Erreur lors de la copie:', error);
-            // Fallback si l'image ne peut pas être préchargée
-            try {
-                await navigator.clipboard.writeText(`🎬 ${displayEpisode.title}\n\nRegardez cet épisode sur CMFI Replay !\n\n${window.location.href}`);
+                });
+            } else {
+                // Fallback pour les navigateurs qui ne supportent pas l'API Web Share
+                await navigator.clipboard.writeText(window.location.href);
                 toast.success('Lien copié dans le presse-papier !', {
                     position: 'bottom-center',
                     autoClose: 2000,
@@ -1248,37 +1160,18 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
                     draggable: true,
                     theme: 'colored',
                 });
-            } catch (fallbackError) {
-                console.error('Erreur lors du fallback:', fallbackError);
-                toast.error('Erreur lors de la copie du lien', {
+            }
+        } catch (err) {
+            toast.dismiss(toastId);
+            console.error('Erreur lors du partage:', err);
+            if (err.name !== 'AbortError') {
+                toast.error('Erreur lors du partage', {
                     position: 'bottom-center',
                     autoClose: 2000,
                     hideProgressBar: true,
                 });
             }
         }
-    };
-
-    const preloadImage = (src: string): Promise<void> => {
-        return new Promise((resolve, reject) => {
-            const img = new Image();
-            img.onload = () => resolve();
-            img.onerror = () => reject(new Error(`Impossible de charger l'image: ${src}`));
-            img.src = src;
-        });
-    };
-
-    const generateShareLinkWithPreview = () => {
-        // Créer un lien avec des paramètres pour le partage sur les réseaux sociaux
-        const baseUrl = window.location.origin;
-        const episodeParams = new URLSearchParams({
-            title: displayEpisode.title,
-            image: displayEpisode.picture_path || '',
-            description: displayEpisode.overview || displayEpisode.overviewFr || '',
-            episode: displayEpisode.uid_episode
-        });
-        
-        return `${baseUrl}/share?${episodeParams.toString()}`;
     };
 
     const handleLike = async () => {
@@ -1671,8 +1564,6 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
                         onClose={() => setShowAuthPrompt(false)}
                     />
                 )}
-
-                {showShareOptions && <ShareOptionsModal />}
             </div>
         </div>
     );
