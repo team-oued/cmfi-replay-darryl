@@ -18,6 +18,7 @@ import AuthPrompt from '../components/AuthPrompt';
 import PremiumPaywall from '../components/PremiumPaywall';
 import AdPlayer from '../components/AdPlayer';
 import { appSettingsService } from '../lib/appSettingsService';
+import { openGraphService } from '../lib/openGraphService';
 
 // --- Reusable formatter ---
 const formatNumber = (num: number) => {
@@ -950,15 +951,25 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
         }
     }, [episode.uid_episode, userProfile]);
 
-    // Mettre à jour le titre de la page avec le nom de l'épisode
+    // Mettre à jour les métadonnées OpenGraph avec les informations de l'épisode
     useEffect(() => {
         if (episode?.title) {
-            document.title = `${episode.title}`;
+            const metadata = openGraphService.createEpisodeMetadata({
+                title: episode.title,
+                overview: episode.overview || episode.overviewFr,
+                picture_path: episode.picture_path,
+                backdrop_path: episode.backdrop_path,
+                runtime: episode.runtime,
+                episode_numero: episode.episode_numero,
+                original_title: episode.original_title
+            });
+            
+            openGraphService.updateMetadata(metadata);
         }
         
-        // Restaurer le titre par défaut lors du démontage du composant
+        // Restaurer les métadonnées par défaut lors du démontage du composant
         return () => {
-            document.title = 'CMFI Replay';
+            openGraphService.resetMetadata();
         };
     }, [episode]);
 
@@ -1023,19 +1034,48 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
             return;
         }
 
+        // Utiliser la miniature de l'épisode (picture_path prioritaire, sinon backdrop_path)
+        const thumbnailUrl = displayEpisode.picture_path || displayEpisode.backdrop_path;
+
         const shareData = {
             title: displayEpisode.title,
             text: `Regardez "${displayEpisode.title}" sur CMFI Replay`,
             url: window.location.href,
         };
 
+        // Ajouter l'image si disponible et supporté par le navigateur
+        if (thumbnailUrl && navigator.share && navigator.canShare) {
+            try {
+                // Vérifier si le navigateur supporte le partage d'images
+                const imageData = {
+                    ...shareData,
+                    files: [] // Pour les futures versions avec support de fichiers
+                };
+                
+                // Certains navigateurs supportent les métadonnées avec images
+                if (navigator.canShare && navigator.canShare(imageData)) {
+                    // Tenter d'inclure l'URL de l'image dans les métadonnées
+                    shareData.text += `\n\n${thumbnailUrl}`;
+                }
+            } catch (error) {
+                console.log('Support d\'image de partage non disponible, utilisation du fallback');
+            }
+        }
+
         try {
             if (navigator.share) {
                 await navigator.share(shareData);
             } else {
                 // Fallback pour les navigateurs qui ne supportent pas l'API Web Share
-                await navigator.clipboard.writeText(window.location.href);
-                toast.success('Lien copié dans le presse-papier !', {
+                // Inclure l'URL de l'image dans le texte copié
+                const shareText = thumbnailUrl 
+                    ? `${shareData.text}\n\nImage: ${thumbnailUrl}\n\nLien: ${shareData.url}`
+                    : `${shareData.text}\n\nLien: ${shareData.url}`;
+                
+                await navigator.clipboard.writeText(shareText);
+                toast.success(thumbnailUrl 
+                    ? 'Lien et miniature copiés dans le presse-papier !' 
+                    : 'Lien copié dans le presse-papier !', {
                     position: 'bottom-center',
                     autoClose: 2000,
                     hideProgressBar: true,
