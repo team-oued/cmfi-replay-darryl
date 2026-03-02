@@ -19,7 +19,6 @@ import PremiumPaywall from '../components/PremiumPaywall';
 import PromotionPlayer from '../components/PromotionPlayer';
 import { appSettingsService } from '../lib/appSettingsService';
 import { updateMetaTags, clearMetaTags } from '../lib/metaTags';
-import { updateMetaTagsWithContent } from '../lib/initialMetaTags';
 
 // --- Reusable formatter ---
 const formatNumber = (num: number) => {
@@ -1021,11 +1020,12 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
     // Mettre à jour les métadonnées Open Graph pour le partage
     useEffect(() => {
         if (displayEpisode) {
-            updateMetaTagsWithContent({
+            updateMetaTags({
                 title: displayEpisode.title,
                 description: displayEpisode.overview || displayEpisode.overviewFr || `Épisode ${displayEpisode.episode_numero} de ${displayEpisode.title_serie}`,
                 image: displayEpisode.picture_path,
-                type: 'episode'
+                url: window.location.href,
+                type: 'video.episode'
             });
         }
 

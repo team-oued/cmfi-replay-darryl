@@ -5,7 +5,6 @@ import { MediaType } from '../types';
 import { Movie, movieService, likeService, commentService, Comment, generateDefaultAvatar, viewService, getLastWatchedPositionForMovie, statsVuesService } from '../lib/firestore';
 import { appSettingsService } from '../lib/appSettingsService';
 import { updateMetaTags, clearMetaTags } from '../lib/metaTags';
-import { updateMetaTagsWithContent } from '../lib/initialMetaTags';
 import {
     PlayIcon, PauseIcon, ArrowLeftIcon,
     LikeIcon, ShareIcon, PlusIcon,
@@ -835,11 +834,12 @@ const MoviePlayerScreen: React.FC<MoviePlayerScreenProps> = ({ item, onBack }) =
     useEffect(() => {
         if (displayItem) {
             const movieData = displayItem as Movie;
-            updateMetaTagsWithContent({
+            updateMetaTags({
                 title: displayItem.title,
                 description: movieData.overview || `Découvrez "${displayItem.title}" sur CMFI Replay`,
                 image: movieData.picture_path,
-                type: 'movie'
+                url: window.location.href,
+                type: 'video.movie'
             });
         }
 
