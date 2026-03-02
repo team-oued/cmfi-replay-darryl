@@ -9,6 +9,7 @@ import { serieService, Serie, seasonSerieService, SeasonSerie, episodeSerieServi
 import { Movie, movieService, likeService, commentService, Comment as FirestoreComment } from '../lib/firestore';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { updateMetaTags, clearMetaTags } from '../lib/metaTags';
 
 interface MediaDetailScreenProps {
     item: MediaContent;
@@ -77,6 +78,35 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
     const descriptionThreshold = 150;
     const isLongDescription = description && description.length > descriptionThreshold;
     const isBookmarked = bookmarkedIds.includes(item.id);
+
+    // Mettre à jour les métadonnées Open Graph pour le partage
+    useEffect(() => {
+        const getMetaType = () => {
+            switch (type) {
+                case MediaType.Movie:
+                    return 'video.movie';
+                case MediaType.Series:
+                    return 'video.tv_show';
+                case MediaType.Podcast:
+                    return 'video.tv_show';
+                default:
+                    return 'website';
+            }
+        };
+
+        updateMetaTags({
+            title: title,
+            description: description || `Découvrez "${title}" sur CMFI Replay`,
+            image: imageUrl,
+            url: window.location.href,
+            type: getMetaType()
+        });
+
+        // Nettoyer les métadonnées lors du démontage
+        return () => {
+            clearMetaTags();
+        };
+    }, [title, description, imageUrl, type]);
 
     // Charger les données depuis Firestore si c'est une série
     useEffect(() => {

@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { MediaType } from '../types';
 import { Movie, movieService, likeService, commentService, Comment, generateDefaultAvatar, viewService, getLastWatchedPositionForMovie, statsVuesService } from '../lib/firestore';
 import { appSettingsService } from '../lib/appSettingsService';
+import { updateMetaTags, clearMetaTags } from '../lib/metaTags';
 import {
     PlayIcon, PauseIcon, ArrowLeftIcon,
     LikeIcon, ShareIcon, PlusIcon,
@@ -14,7 +15,7 @@ import { useAppContext } from '../context/AppContext';
 import { toast } from 'react-toastify';
 import AuthPrompt from '../components/AuthPrompt';
 import PremiumPaywall from '../components/PremiumPaywall';
-import AdPlayer from '../components/AdPlayer';
+import PromotionPlayer from '../components/PromotionPlayer';
 
 // --- Reusable formatter ---
 const formatNumber = (num: number) => {
@@ -826,9 +827,27 @@ const MoviePlayerScreen: React.FC<MoviePlayerScreenProps> = ({ item, onBack }) =
         hasRecordedViewRef.current = false;
     }, [movieData?.uid, item.id]);
 
-
     // Utiliser les données de la collection Movie si disponibles, sinon fallback sur MediaContent
     const displayItem = movieData || item;
+
+    // Mettre à jour les métadonnées Open Graph pour le partage
+    useEffect(() => {
+        if (displayItem) {
+            const movieData = displayItem as Movie;
+            updateMetaTags({
+                title: displayItem.title,
+                description: movieData.overview || `Découvrez "${displayItem.title}" sur CMFI Replay`,
+                image: movieData.picture_path,
+                url: window.location.href,
+                type: 'video.movie'
+            });
+        }
+
+        // Nettoyer les métadonnées lors du démontage
+        return () => {
+            clearMetaTags();
+        };
+    }, [displayItem]);
 
     const handleShare = async () => {
         if (!userProfile) {
@@ -1093,8 +1112,8 @@ const MoviePlayerScreen: React.FC<MoviePlayerScreenProps> = ({ item, onBack }) =
                     <div className="lg:col-span-2 space-y-6">
                         <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl ring-2 ring-black/20 dark:ring-white/5">
                             {showAd && (
-                                <AdPlayer
-                                    onAdEnd={() => {
+                                <PromotionPlayer
+                                    onPromotionEnd={() => {
                                         setShowAd(false);
                                         // Sauvegarder que la pub a été vue pour cette session
                                         sessionStorage.setItem(getAdStateKey(), 'true');

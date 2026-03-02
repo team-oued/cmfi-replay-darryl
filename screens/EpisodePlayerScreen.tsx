@@ -16,8 +16,9 @@ import { useAppContext } from '../context/AppContext';
 import { toast } from 'react-toastify';
 import AuthPrompt from '../components/AuthPrompt';
 import PremiumPaywall from '../components/PremiumPaywall';
-import AdPlayer from '../components/AdPlayer';
+import PromotionPlayer from '../components/PromotionPlayer';
 import { appSettingsService } from '../lib/appSettingsService';
+import { updateMetaTags, clearMetaTags } from '../lib/metaTags';
 
 // --- Reusable formatter ---
 const formatNumber = (num: number) => {
@@ -1013,193 +1014,32 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
         hasRecordedViewRef.current = false;
     }, [episode?.uid_episode]);
 
-    // Mettre à jour les métadonnées de partage lorsque l'épisode change
-    useEffect(() => {
-        if (!episode) return;
-
-        const testImageUrl = async (url: string): Promise<boolean> => {
-            return new Promise((resolve) => {
-                if (!url || url === '/cmfireplay.svg') {
-                    resolve(true);
-                    return;
-                }
-
-                const isVimeoUrl = url.includes('vimeocdn.com');
-                const isExternalUrl = url.startsWith('http');
-                
-                // Pour les URLs externes, faire un test plus approfondi
-                if (isExternalUrl) {
-                    try {
-                        const img = new Image();
-                        const timeoutId = setTimeout(() => {
-                            console.warn('Timeout lors du test de l\'image externe:', url);
-                            resolve(false);
-                        }, isVimeoUrl ? 3000 : 5000);
-                        
-                        img.onload = () => {
-                            clearTimeout(timeoutId);
-                            console.log('Image externe valide:', url);
-                            resolve(true);
-                        };
-                        
-                        img.onerror = () => {
-                            clearTimeout(timeoutId);
-                            console.warn('Image externe invalide:', url);
-                            resolve(false);
-                        };
-                        
-                        img.crossOrigin = 'anonymous';
-                        img.referrerPolicy = 'no-referrer-when-downgrade';
-                        img.src = url;
-                    } catch (error) {
-                        console.warn('Erreur lors du test de l\'image:', error);
-                        resolve(false);
-                    }
-                } else {
-                    // Pour les images locales, considérer comme valides
-                    resolve(true);
-                }
-            });
-        };
-
-        const preloadImage = (src: string): Promise<string> => {
-            return new Promise((resolve) => {
-                // Vérifier si c'est une URL Vimeo
-                const isVimeoUrl = src.includes('vimeocdn.com');
-                
-                const img = new Image();
-                let timeoutId: NodeJS.Timeout;
-                
-                // Timeout de 5 secondes pour les images externes
-                if (isVimeoUrl) {
-                    timeoutId = setTimeout(() => {
-                        console.warn('Timeout lors du chargement de l\'image Vimeo:', src);
-                        resolve('/cmfireplay.svg');
-                    }, 5000);
-                }
-                
-                img.onload = () => {
-                    if (timeoutId) clearTimeout(timeoutId);
-                    console.log('Image chargée avec succès:', src);
-                    resolve(src);
-                };
-                
-                img.onerror = (event) => {
-                    if (timeoutId) clearTimeout(timeoutId);
-                    console.warn('Erreur lors du chargement de l\'image:', src, event);
-                    resolve('/cmfireplay.svg');
-                };
-                
-                // Ajouter des attributs pour gérer CORS
-                img.crossOrigin = 'anonymous';
-                img.referrerPolicy = 'no-referrer-when-downgrade';
-                img.src = src;
-            });
-        };
-
-        const updateShareMetadata = async () => {
-            // Créer ou mettre à jour les meta tags pour le partage
-            let metaTitle = document.querySelector('meta[property="og:title"]') as HTMLMetaElement;
-            let metaDescription = document.querySelector('meta[property="og:description"]') as HTMLMetaElement;
-            let metaImage = document.querySelector('meta[property="og:image"]') as HTMLMetaElement;
-            let metaUrl = document.querySelector('meta[property="og:url"]') as HTMLMetaElement;
-            let metaTwitterTitle = document.querySelector('meta[name="twitter:title"]') as HTMLMetaElement;
-            let metaTwitterDescription = document.querySelector('meta[name="twitter:description"]') as HTMLMetaElement;
-            let metaTwitterImage = document.querySelector('meta[name="twitter:image"]') as HTMLMetaElement;
-
-            // Créer les meta tags s'ils n'existent pas
-            if (!metaTitle) {
-                metaTitle = document.createElement('meta');
-                metaTitle.setAttribute('property', 'og:title');
-                document.head.appendChild(metaTitle);
-            }
-            if (!metaDescription) {
-                metaDescription = document.createElement('meta');
-                metaDescription.setAttribute('property', 'og:description');
-                document.head.appendChild(metaDescription);
-            }
-            if (!metaImage) {
-                metaImage = document.createElement('meta');
-                metaImage.setAttribute('property', 'og:image');
-                document.head.appendChild(metaImage);
-            }
-            if (!metaUrl) {
-                metaUrl = document.createElement('meta');
-                metaUrl.setAttribute('property', 'og:url');
-                document.head.appendChild(metaUrl);
-            }
-            if (!metaTwitterTitle) {
-                metaTwitterTitle = document.createElement('meta');
-                metaTwitterTitle.setAttribute('name', 'twitter:title');
-                document.head.appendChild(metaTwitterTitle);
-            }
-            if (!metaTwitterDescription) {
-                metaTwitterDescription = document.createElement('meta');
-                metaTwitterDescription.setAttribute('name', 'twitter:description');
-                document.head.appendChild(metaTwitterDescription);
-            }
-            if (!metaTwitterImage) {
-                metaTwitterImage = document.createElement('meta');
-                metaTwitterImage.setAttribute('name', 'twitter:image');
-                document.head.appendChild(metaTwitterImage);
-            }
-
-            // Précharger et valider l'image
-            const episodeTitle = episode.title || 'Épisode';
-            const episodeDescription = episode.overview || episode.overviewFr || `Regardez "${episodeTitle}" sur CMFI Replay`;
-            const rawImageUrl = episode.picture_path || '/cmfireplay.svg';
-            const currentUrl = window.location.href;
-
-            console.log('Test de l\'image de partage:', rawImageUrl);
-            
-            // Tester d'abord si l'URL est valide
-            const isImageValid = await testImageUrl(rawImageUrl);
-            let validImageUrl = rawImageUrl;
-            
-            if (!isImageValid) {
-                console.warn('Image invalide détectée, utilisation de l\'image par défaut');
-                validImageUrl = '/cmfireplay.svg';
-            }
-
-            // Précharger l'image pour s'assurer qu'elle est valide
-            const finalImageUrl = await preloadImage(validImageUrl);
-
-            // Mettre à jour le contenu des meta tags
-            metaTitle.content = episodeTitle;
-            metaDescription.content = episodeDescription;
-            metaImage.content = finalImageUrl;
-            metaUrl.content = currentUrl;
-            metaTwitterTitle.content = episodeTitle;
-            metaTwitterDescription.content = episodeDescription;
-            metaTwitterImage.content = finalImageUrl;
-
-            // Mettre à jour le titre de la page
-            document.title = `${episodeTitle} - CMFI Replay`;
-            
-            console.log('Métadonnées de partage mises à jour avec:', finalImageUrl);
-        };
-
-        updateShareMetadata();
-    }, [episode]);
-
     // Utiliser les données EpisodeSerie passées en prop
     const displayEpisode = episode;
+
+    // Mettre à jour les métadonnées Open Graph pour le partage
+    useEffect(() => {
+        if (displayEpisode) {
+            updateMetaTags({
+                title: displayEpisode.title,
+                description: displayEpisode.overview || displayEpisode.overviewFr || `Épisode ${displayEpisode.episode_numero} de ${displayEpisode.title_serie}`,
+                image: displayEpisode.picture_path,
+                url: window.location.href,
+                type: 'video.episode'
+            });
+        }
+
+        // Nettoyer les métadonnées lors du démontage
+        return () => {
+            clearMetaTags();
+        };
+    }, [displayEpisode]);
 
     const handleShare = async () => {
         if (!userProfile) {
             handleAuthRequired('partager cette vidéo');
             return;
         }
-
-        // Afficher une notification de préparation du partage
-        const toastId = toast.info('Préparation du partage...', {
-            position: 'bottom-center',
-            autoClose: 3000,
-            hideProgressBar: true,
-            closeOnClick: false,
-            pauseOnHover: false,
-            draggable: false,
-        });
 
         const shareData = {
             title: displayEpisode.title,
@@ -1208,60 +1048,8 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
         };
 
         try {
-            // Mettre à jour les métadonnées juste avant le partage
-            const imageUrl = displayEpisode.picture_path || '/cmfireplay.svg';
-            const isVimeoUrl = imageUrl.includes('vimeocdn.com');
-            
-            console.log('Tentative de partage avec image:', imageUrl);
-            console.log('URL Vimeo détectée:', isVimeoUrl);
-            
-            // Vérifier que l'image est accessible avec une meilleure gestion d'erreur
-            const img = new Image();
-            let imageLoadTimeout: NodeJS.Timeout;
-            
-            
-            if (isVimeoUrl) {
-                imageLoadTimeout = setTimeout(() => {
-                    console.warn('Timeout de chargement pour l\'image Vimeo, utilisation du fallback');
-                    toast.update(toastId, {
-                        render: 'Utilisation de l\'image par défaut...',
-                        type: 'warning',
-                        autoClose: 2000,
-                    });
-                }, 3000);
-            }
-            
-            img.crossOrigin = 'anonymous';
-            img.referrerPolicy = 'no-referrer-when-downgrade';
-            
-            img.onload = () => {
-                if (imageLoadTimeout) clearTimeout(imageLoadTimeout);
-                console.log('Image de miniature chargée avec succès');
-                toast.dismiss(toastId);
-            };
-            
-            img.onerror = (event) => {
-                if (imageLoadTimeout) clearTimeout(imageLoadTimeout);
-                console.warn('Erreur de chargement de l\'image:', event);
-                toast.update(toastId, {
-                    render: 'Image non disponible, utilisation de l\'image par défaut',
-                    type: 'warning',
-                    autoClose: 2000,
-                });
-            };
-            
-            img.src = imageUrl;
-
             if (navigator.share) {
                 await navigator.share(shareData);
-                toast.success('Épisode partagé avec succès !', {
-                    position: 'bottom-center',
-                    autoClose: 2000,
-                    hideProgressBar: true,
-                    closeOnClick: true,
-                    pauseOnHover: true,
-                    draggable: true,
-                });
             } else {
                 // Fallback pour les navigateurs qui ne supportent pas l'API Web Share
                 await navigator.clipboard.writeText(window.location.href);
@@ -1276,7 +1064,6 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
                 });
             }
         } catch (err) {
-            toast.dismiss(toastId);
             console.error('Erreur lors du partage:', err);
             if (err.name !== 'AbortError') {
                 toast.error('Erreur lors du partage', {
@@ -1515,8 +1302,8 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
                         
                         <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl ring-2 ring-black/20 dark:ring-white/5">
                             {showAd && (
-                                <AdPlayer
-                                    onAdEnd={() => {
+                                <PromotionPlayer
+                                    onPromotionEnd={() => {
                                         setShowAd(false);
                                         // Sauvegarder que la pub a été vue pour cette session
                                         sessionStorage.setItem(getAdStateKey(), 'true');

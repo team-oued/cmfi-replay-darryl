@@ -85,13 +85,13 @@ const COUNTRIES = [
 ].sort((a, b) => a.name.localeCompare(b.name));
 
 const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({ userProfile, onComplete }) => {
-    console.log('🎯 ProfileCompletionModal rendu avec:', { userProfile });
     
     const [selectedCountry, setSelectedCountry] = useState<string>(userProfile.country || '');
     const [phoneNumber, setPhoneNumber] = useState<string>(userProfile.phoneNumber || '');
     const [isCountryDropdownOpen, setIsCountryDropdownOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [isWhySectionCollapsed, setIsWhySectionCollapsed] = useState(true);
 
     const selectedCountryData = COUNTRIES.find(c => c.code === selectedCountry);
 
@@ -138,13 +138,12 @@ const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({ userPro
         }
     };
 
-    console.log('🎨 ProfileCompletionModal render - selectedCountry:', selectedCountry, 'phoneNumber:', phoneNumber);
     
     return createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-70 p-4 backdrop-blur-sm">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col border-2 border-amber-500/20 transform transition-all duration-300 scale-100">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col border-2 border-amber-500/20 transform transition-all duration-300 scale-100">
                 {/* Header avec gradient et icône */}
-                <div className="relative bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 p-6 rounded-t-2xl">
+                <div className="relative bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 p-6 rounded-t-2xl flex-shrink-0">
                     <div className="flex items-center gap-4">
                         <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
                             <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -160,52 +159,68 @@ const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({ userPro
                             </p>
                         </div>
                         <button
-                            onClick={() => {/* Ne pas permettre de fermer sans remplir */}}
+                            onClick={() => onComplete(userProfile)}
                             className="text-white/70 hover:text-white transition-colors"
-                            disabled
-                            title="Veuillez compléter votre profil pour continuer"
+                            title="Fermer"
                         >
                             <XMarkIcon className="w-6 h-6" />
                         </button>
                     </div>
                 </div>
 
-                {/* Message rassurant avec bénéfices */}
-                <div className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-b border-gray-200 dark:border-gray-700">
-                    <div className="flex items-start gap-4">
-                        <div className="flex-shrink-0 w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
-                            <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                        </div>
-                        <div className="flex-1">
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                                Pourquoi compléter votre profil ?
-                            </h3>
-                            <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
-                                <li className="flex items-start gap-2">
-                                    <span className="text-green-500 dark:text-green-400 mt-0.5">✓</span>
-                                    <span><strong>Expérience personnalisée</strong> : contenu adapté à votre région et préférences</span>
-                                </li>
-                                <li className="flex items-start gap-2">
-                                    <span className="text-green-500 dark:text-green-400 mt-0.5">✓</span>
-                                    <span><strong>Notifications ciblées</strong> : recevez des alertes pertinentes pour votre région</span>
-                                </li>
-                                <li className="flex items-start gap-2">
-                                    <span className="text-green-500 dark:text-green-400 mt-0.5">✓</span>
-                                    <span><strong>Support amélioré</strong> : nous pouvons mieux vous assister si besoin</span>
-                                </li>
-                                <li className="flex items-start gap-2">
-                                    <span className="text-green-500 dark:text-green-400 mt-0.5">✓</span>
-                                    <span><strong>Confidentialité garantie</strong> : vos données sont sécurisées et utilisées uniquement pour améliorer votre expérience</span>
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-
+                
                 {/* Content */}
-                <div className="flex-1 p-6 space-y-6 overflow-y-auto">
+                <div className="flex-1 p-6 space-y-6 overflow-y-auto min-h-0">
+
+                    {/* Message rassurant avec bénéfices */}
+                    <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-gray-200 dark:border-gray-700 rounded-lg">
+                        <button
+                            type="button"
+                            onClick={() => setIsWhySectionCollapsed(!isWhySectionCollapsed)}
+                            className="w-full flex items-start gap-4 text-left"
+                        >
+                            <div className="flex-shrink-0 w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                                <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                            <div className="flex-1">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                                        Pourquoi compléter votre profil ?
+                                    </h3>
+                                    <svg
+                                        className={`w-5 h-5 text-gray-500 transition-transform duration-200 ${isWhySectionCollapsed ? '' : 'rotate-180'}`}
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </div>
+                                {!isWhySectionCollapsed && (
+                                    <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+                                        <li className="flex items-start gap-2">
+                                            <span className="text-green-500 dark:text-green-400 mt-0.5">✓</span>
+                                            <span><strong>Expérience personnalisée</strong> : contenu adapté à votre région et préférences</span>
+                                        </li>
+                                        <li className="flex items-start gap-2">
+                                            <span className="text-green-500 dark:text-green-400 mt-0.5">✓</span>
+                                            <span><strong>Notifications ciblées</strong> : recevez des alertes pertinentes pour votre région</span>
+                                        </li>
+                                        <li className="flex items-start gap-2">
+                                            <span className="text-green-500 dark:text-green-400 mt-0.5">✓</span>
+                                            <span><strong>Support amélioré</strong> : nous pouvons mieux vous assister si besoin</span>
+                                        </li>
+                                        <li className="flex items-start gap-2">
+                                            <span className="text-green-500 dark:text-green-400 mt-0.5">✓</span>
+                                            <span><strong>Confidentialité garantie</strong> : vos données sont sécurisées et utilisées uniquement pour améliorer votre expérience</span>
+                                        </li>
+                                    </ul>
+                                )}
+                            </div>
+                        </button>
+                    </div>
 
                     {/* Pays */}
                     <div>
@@ -303,7 +318,7 @@ const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({ userPro
                 </div>
 
                 {/* Footer avec bouton plus visible */}
-                <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+                <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 flex-shrink-0">
                     <div className="flex items-center justify-between gap-4">
                         <div className="text-xs text-gray-500 dark:text-gray-400">
                             <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
