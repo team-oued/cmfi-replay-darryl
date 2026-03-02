@@ -12,73 +12,58 @@ export interface MetaTagsData {
  * Met à jour les métadonnées Open Graph dans le head du document
  */
 export const updateMetaTags = (data: MetaTagsData) => {
-    // Attendre que le DOM soit complètement chargé
-    const updateTags = () => {
-        const head = document.head;
+    const head = document.head;
+    
+    // Créer ou mettre à jour les métadonnées Open Graph
+    const tags = [
+        { property: 'og:title', content: data.title },
+        { property: 'og:description', content: data.description },
+        { property: 'og:url', content: data.url },
+        { property: 'og:type', content: data.type || 'website' },
+        { property: 'og:site_name', content: 'CMFI Replay' },
+        // Twitter Card
+        { name: 'twitter:card', content: 'summary_large_image' },
+        { name: 'twitter:title', content: data.title },
+        { name: 'twitter:description', content: data.description },
+        { name: 'twitter:site', content: '@CMFI_Replay' }
+    ];
+
+    // Ajouter l'image si disponible
+    if (data.image) {
+        tags.push(
+            { property: 'og:image', content: data.image },
+            { property: 'og:image:alt', content: data.title },
+            { property: 'og:image:width', content: '1200' },
+            { property: 'og:image:height', content: '630' },
+            { name: 'twitter:image', content: data.image }
+        );
+    }
+
+    // Mettre à jour ou créer chaque tag
+    tags.forEach(tag => {
+        const selector = tag.property 
+            ? `meta[property="${tag.property}"]`
+            : `meta[name="${tag.name}"]`;
         
-        // Créer ou mettre à jour les métadonnées Open Graph
-        const tags = [
-            { property: 'og:title', content: data.title },
-            { property: 'og:description', content: data.description },
-            { property: 'og:url', content: data.url },
-            { property: 'og:type', content: data.type || 'website' },
-            { property: 'og:site_name', content: 'CMFI Replay' },
-            // Twitter Card
-            { name: 'twitter:card', content: 'summary_large_image' },
-            { name: 'twitter:title', content: data.title },
-            { name: 'twitter:description', content: data.description },
-            { name: 'twitter:site', content: '@CMFI_Replay' }
-        ];
-
-        // Ajouter l'image si disponible
-        if (data.image) {
-            tags.push(
-                { property: 'og:image', content: data.image },
-                { property: 'og:image:alt', content: data.title },
-                { property: 'og:image:width', content: '1200' },
-                { property: 'og:image:height', content: '630' },
-                { name: 'twitter:image', content: data.image }
-            );
-        }
-
-        // Mettre à jour ou créer chaque tag
-        tags.forEach(tag => {
-            const selector = tag.property 
-                ? `meta[property="${tag.property}"]`
-                : `meta[name="${tag.name}"]`;
-            
-            let element = head.querySelector(selector) as HTMLMetaElement;
-            
-            if (!element) {
-                element = document.createElement('meta');
-                if (tag.property) {
-                    element.setAttribute('property', tag.property);
-                } else {
-                    element.setAttribute('name', tag.name);
-                }
-                head.appendChild(element);
+        let element = head.querySelector(selector) as HTMLMetaElement;
+        
+        if (!element) {
+            element = document.createElement('meta');
+            if (tag.property) {
+                element.setAttribute('property', tag.property);
+            } else {
+                element.setAttribute('name', tag.name);
             }
-            
-            element.setAttribute('content', tag.content);
-        });
-
-        // Mettre à jour le titre de la page
-        const titleElement = head.querySelector('title');
-        if (titleElement) {
-            titleElement.textContent = `${data.title} - CMFI Replay`;
+            head.appendChild(element);
         }
+        
+        element.setAttribute('content', tag.content);
+    });
 
-        // Forcer la mise à jour pour WhatsApp (déclencher un reflow)
-        setTimeout(() => {
-            document.dispatchEvent(new Event('DOMContentLoaded'));
-        }, 100);
-    };
-
-    // Si le DOM est chargé, mettre à jour immédiatement, sinon attendre
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', updateTags);
-    } else {
-        updateTags();
+    // Mettre à jour le titre de la page
+    const titleElement = head.querySelector('title');
+    if (titleElement) {
+        titleElement.textContent = `${data.title} - CMFI Replay`;
     }
 };
 

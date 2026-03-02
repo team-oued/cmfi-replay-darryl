@@ -10,6 +10,7 @@ import { Movie, movieService, likeService, commentService, Comment as FirestoreC
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { updateMetaTags, clearMetaTags } from '../lib/metaTags';
+import { updateMetaTagsWithContent } from '../lib/initialMetaTags';
 
 interface MediaDetailScreenProps {
     item: MediaContent;
@@ -81,25 +82,15 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
 
     // Mettre à jour les métadonnées Open Graph pour le partage
     useEffect(() => {
-        const getMetaType = () => {
-            switch (type) {
-                case MediaType.Movie:
-                    return 'video.movie';
-                case MediaType.Series:
-                    return 'video.tv_show';
-                case MediaType.Podcast:
-                    return 'video.tv_show';
-                default:
-                    return 'website';
-            }
-        };
+        const contentType = type === MediaType.Movie ? 'movie' : 
+                          type === MediaType.Series ? 'series' : 
+                          type === MediaType.Podcast ? 'podcast' : 'movie';
 
-        updateMetaTags({
+        updateMetaTagsWithContent({
             title: title,
             description: description || `Découvrez "${title}" sur CMFI Replay`,
             image: imageUrl,
-            url: window.location.href,
-            type: getMetaType()
+            type: contentType
         });
 
         // Nettoyer les métadonnées lors du démontage

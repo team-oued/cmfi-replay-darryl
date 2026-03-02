@@ -2,6 +2,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { initializeMetaTagsFromURL } from './lib/initialMetaTags';
+
+// Initialiser les meta tags dès le chargement pour les crawlers
+initializeMetaTagsFromURL();
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
