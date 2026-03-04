@@ -1,0 +1,66 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # ===================================================================
+    # Détection des crawlers de réseaux sociaux
+    # ===================================================================
+    # Si le User-Agent correspond à un bot de réseau social
+    # ET que l'URL correspond à une page de contenu media
+    # → Rediriger vers og.php pour servir les balises Open Graph
+    # Cela permet d'afficher les miniatures lors du partage de liens
+    # ===================================================================
+
+    RewriteCond %{HTTP_USER_AGENT} (facebookexternalhit|Facebot|Twitterbot|WhatsApp|TelegramBot|LinkedInBot|Slackbot|Discordbot|Pinterest|vkShare|W3C_Validator|Embedly|showyoubot|outbrain|quora|rogerbot|Iframely|curl/og) [NC]
+    RewriteCond %{REQUEST_URI} ^/(movie|serie|podcast|watch)/.+ [NC]
+    RewriteRule ^(.*)$ og.php?path=$1 [L,QSA]
+
+    # ===================================================================
+    # SPA Fallback (Single Page Application)
+    # ===================================================================
+    # Pour les vrais utilisateurs : servir index.html pour toutes
+    # les routes qui ne correspondent pas à un fichier ou dossier réel
+    # ===================================================================
+
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.html [L]
+</IfModule>
+
+# Empêcher le listing des répertoires
+Options -Indexes
+
+# Empêcher l'accès aux fichiers sensibles
+<FilesMatch "\.(env|env\.local)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+</FilesMatch>
+
+# Types MIME corrects
+<IfModule mod_mime.c>
+    AddType application/javascript .js .mjs
+    AddType text/css .css
+    AddType image/svg+xml .svg
+    AddType image/webp .webp
+    AddType application/json .json
+</IfModule>
+
+# Cache des assets statiques (fichiers dans /assets/ sont hashés par Vite)
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/jpeg "access plus 1 month"
+    ExpiresByType image/png "access plus 1 month"
+    ExpiresByType image/svg+xml "access plus 1 month"
+    ExpiresByType image/webp "access plus 1 month"
+    ExpiresByType text/css "access plus 1 week"
+    ExpiresByType application/javascript "access plus 1 week"
+    ExpiresByType font/woff2 "access plus 1 month"
+</IfModule>
+
+# Compression Gzip
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/css
+    AddOutputFilterByType DEFLATE application/javascript application/json
+    AddOutputFilterByType DEFLATE image/svg+xml
+</IfModule>
