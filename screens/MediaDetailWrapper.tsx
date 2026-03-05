@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { MediaContent, MediaType } from '../types';
 import { movieService, serieService } from '../lib/firestore';
 import MediaDetailScreen from './MediaDetailScreen';
@@ -14,6 +14,7 @@ const MediaDetailWrapper: React.FC<MediaDetailWrapperProps> = ({ onPlay, playing
     const { t } = useAppContext();
     const { uid } = useParams<{ uid: string }>();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const [media, setMedia] = useState<MediaContent | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -124,6 +125,7 @@ const MediaDetailWrapper: React.FC<MediaDetailWrapperProps> = ({ onPlay, playing
             onPlay={onPlay}
             playingItem={playingItem}
             onSelectMedia={handleSelectMedia}
+            initialSeasonUid={searchParams.get('season') || undefined}
         />
     );
 };
