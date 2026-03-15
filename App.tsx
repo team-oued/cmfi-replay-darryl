@@ -12,6 +12,9 @@ import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
 import ForgotPasswordScreen from './screens/ForgotPasswordScreen';
 
+// Public Screens
+import PrivacyScreen from './screens/PrivacyScreen';
+
 // Main Screens
 import HomeScreen from './screens/HomeScreen';
 import SearchScreen from './screens/SearchScreen';
@@ -291,7 +294,7 @@ const AppContent: React.FC = () => {
         navigate(-1);
     };
 
-    if (!hasStarted) {
+    if (!hasStarted && location.pathname !== '/privacy') {
         return <GetStartedScreen onGetStarted={() => setHasStarted(true)} />;
     }
 
@@ -323,6 +326,7 @@ const AppContent: React.FC = () => {
                 <Route path="/login" element={<LoginScreen />} />
                 <Route path="/register" element={<RegisterScreen />} />
                 <Route path="/forgot-password" element={<ForgotPasswordScreen />} />
+                <Route path="/privacy" element={<PrivacyScreen />} />
                 <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
         );
@@ -378,6 +382,9 @@ const AppContent: React.FC = () => {
 
             <div className={`page-transition fadeIn min-h-screen ${showBottomNav ? 'pb-20' : ''} ${!location.pathname.startsWith('/watch/') ? 'pt-16 md:pt-16' : 'pt-0'} transition-all duration-300 ease-in-out ${contextIsSidebarCollapsed ? 'lg:pl-16' : 'lg:pl-64'}`}>
                 <Routes>
+                    {/* Routes publiques - Accessibles sans authentification */}
+                    <Route path="/privacy" element={<PrivacyScreen />} />
+
                     {/* Watch Route - Maintenant protégée par authentification */}
                     <Route path="/watch/:uid" element={
                         <WatchScreen onReturnHome={handleReturnHome} />
