@@ -272,7 +272,7 @@ const translations = {
         // Privacy Policy
         privacyPolicy: 'Privacy Policy',
         privacyTitle: 'Privacy Policy and Data Protection',
-        privacySubtitle: 'CMFI Replay is committed to protecting your personal data in accordance with the General Data Protection Regulation (GDPR). Please read this policy carefully.',
+        privacySubtitle: 'is committed to protecting your personal data in accordance with the General Data Protection Regulation (GDPR). Please read this policy carefully.',
         privacySummary: 'Summary',
         privacySummary1: 'We only collect data necessary for the platform to function',
         privacySummary2: 'Your data is secure and never shared with third parties without your consent',
@@ -556,7 +556,7 @@ const translations = {
         // Privacy Policy
         privacyPolicy: 'Politique de Confidentialité',
         privacyTitle: 'Politique de Confidentialité et Protection des Données',
-        privacySubtitle: 'CMFI Replay s\'engage à protéger vos données personnelles conformément au Règlement Général sur la Protection des Données (RGPD). Veuillez lire attentivement cette politique.',
+        privacySubtitle: 's\'engage à protéger vos données personnelles conformément au Règlement Général sur la Protection des Données (RGPD). Veuillez lire attentivement cette politique.',
         privacySummary: 'Résumé',
         privacySummary1: 'Nous collectons uniquement les données nécessaires au fonctionnement de la plateforme',
         privacySummary2: 'Vos données sont sécurisées et ne sont jamais partagées avec des tiers sans votre consentement',

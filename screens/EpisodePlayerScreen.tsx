@@ -39,6 +39,44 @@ const formatTime = (seconds: number) => {
     return `${mm}:${ss}`;
 };
 
+// Helper function to format timestamps from Firestore
+const formatTimestamp = (timestamp: any): string => {
+    if (typeof timestamp === 'string') {
+        return timestamp;
+    } else if (timestamp && typeof timestamp === 'object' && 'seconds' in timestamp) {
+        // Firestore Timestamp object
+        return new Date(timestamp.seconds * 1000).toLocaleString('fr-FR', {
+            day: '2-digit',
+            month: '2-digit', 
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    } else if (timestamp instanceof Date) {
+        return timestamp.toLocaleString('fr-FR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
+    return 'Date inconnue';
+};
+
+// Helper function to get timestamp in milliseconds
+const getTimestampMillis = (timestamp: any): number => {
+    if (typeof timestamp === 'string') {
+        return new Date(timestamp).getTime();
+    } else if (timestamp && typeof timestamp === 'object' && 'seconds' in timestamp) {
+        // Firestore Timestamp object
+        return timestamp.seconds * 1000;
+    } else if (timestamp instanceof Date) {
+        return timestamp.getTime();
+    }
+    return 0;
+};
+
 // --- Video Player Component ---
 const VideoPlayer: React.FC<{ 
     src?: string, 
@@ -692,7 +730,7 @@ const CommentItem: React.FC<{ comment: Comment }> = ({ comment }) => (
                 <p className="text-gray-700 dark:text-gray-300 leading-relaxed break-words">{comment.comment}</p>
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 ml-1">
-                {comment.created_at}
+                {formatTimestamp(comment.created_at)}
             </p>
         </div>
     </div>
@@ -710,8 +748,8 @@ const CommentSection: React.FC<{ itemUid: string, onAuthRequired: (action: strin
             const fetchedComments = await commentService.getComments(itemUid);
             // Tri par date décroissante
             const sortedComments = [...fetchedComments].sort((a, b) => {
-                const dateA = new Date(a.created_at).getTime();
-                const dateB = new Date(b.created_at).getTime();
+                const dateA = getTimestampMillis(a.created_at);
+                const dateB = getTimestampMillis(b.created_at);
                 return dateB - dateA; // Tri décroissant
             });
             setComments(sortedComments);
@@ -1411,7 +1449,12 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                             {episodesInSeason
                                 .filter(e => e.uid_episode !== episode.uid_episode) // Exclure l'épisode actuel
-                                .sort((a, b) => (a.episode_numero || 0) - (b.episode_numero || 0)) // Trier par numéro d'épisode
+                                .sort((a, b) => {
+                                    // Use episodeSerieService.getEpisodeNumberForSeason to get correct episode number for current season
+                                    const episodeANumber = episodeSerieService.getEpisodeNumberForSeason(a, currentSeason?.uid_season || '');
+                                    const episodeBNumber = episodeSerieService.getEpisodeNumberForSeason(b, currentSeason?.uid_season || '');
+                                    return episodeANumber - episodeBNumber;
+                                }) // Trier par numéro d'épisode
                                 .map(otherEpisode => (
                                     <div
                                         key={otherEpisode.uid_episode}
@@ -1450,7 +1493,7 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
                                         </div>
                                         <div className="p-3">
                                             <h4 className="font-semibold text-gray-900 dark:text-white text-sm md:text-base truncate">
-                                                {otherEpisode.episode_numero}. {otherEpisode.title}
+                                                {episodeSerieService.getEpisodeNumberForSeason(otherEpisode, currentSeason?.uid_season || '')}. {otherEpisode.title}
                                             </h4>
                                         </div>
                                     </div>

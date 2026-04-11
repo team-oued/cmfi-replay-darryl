@@ -112,6 +112,7 @@ export interface EpisodeSerie {
     video_path_hd: string;
     video_path_sd: string;
     views?: number;
+    other_seasons?: { [seasonUid: string]: number }; // Maps season UIDs to episode numbers for additional seasons
 }
 
 export interface Movie {
@@ -1321,9 +1322,36 @@ export const seasonSerieService = {
             throw error;
         }
     },
+
+    /**
+     * Gets all episodes for a season including cross-season assignments
+     * This is a convenience method that delegates to episodeSerieService.getEpisodesBySeason
+     */
+    async getEpisodesForSeason(uid_season: string): Promise<EpisodeSerie[]> {
+        try {
+            // Import episodeSerieService to avoid circular dependency
+            const { episodeSerieService } = await import('./firestore');
+            return await episodeSerieService.getEpisodesBySeason(uid_season);
+        } catch (error) {
+            console.error('Error getting episodes for season:', error);
+            return [];
+        }
+    },
+
+    /**
+     * Gets the actual episode count for a season including cross-season assignments
+     */
+    async getActualEpisodeCount(uid_season: string): Promise<number> {
+        try {
+            const episodes = await this.getEpisodesForSeason(uid_season);
+            return episodes.length;
+        } catch (error) {
+            console.error('Error getting actual episode count:', error);
+            return 0;
+        }
+    },
 };
 
-// Fonction utilitaire pour calculer et mettre à jour les vues des épisodes
 /**
  * Récupère la dernière position de lecture d'un épisode pour un utilisateur donné
  * @param userId ID de l'utilisateur
@@ -1564,6 +1592,7 @@ export const episodeSerieService = {
 
     async getEpisodesBySeason(uid_season: string): Promise<EpisodeSerie[]> {
         try {
+            // Get episodes directly assigned to this season
             const q = query(
                 collection(db, EPISODES_SERIES_COLLECTION),
                 where('uid_season', '==', uid_season),
@@ -1571,7 +1600,32 @@ export const episodeSerieService = {
                 orderBy('episode_numero', 'asc')
             );
             const querySnapshot = await getDocs(q);
-            return querySnapshot.docs.map(doc => doc.data() as EpisodeSerie);
+            const directEpisodes = querySnapshot.docs.map(doc => doc.data() as EpisodeSerie);
+
+            // Get all episodes to check for other_seasons assignments
+            const allEpisodesQuery = query(
+                collection(db, EPISODES_SERIES_COLLECTION),
+                where('hidden', '==', false)
+            );
+            const allSnapshot = await getDocs(allEpisodesQuery);
+            const allEpisodes = allSnapshot.docs.map(doc => doc.data() as EpisodeSerie);
+
+            // Filter episodes that have this season in their other_seasons
+            const crossSeasonEpisodes = allEpisodes.filter(episode => {
+                if (episode.other_seasons && episode.other_seasons[uid_season]) {
+                    return true;
+                }
+                return false;
+            });
+
+            // Combine and sort episodes by their episode number for this season
+            const combinedEpisodes = [...directEpisodes, ...crossSeasonEpisodes].sort((a, b) => {
+                const episodeANumber = a.uid_season === uid_season ? a.episode_numero : (a.other_seasons?.[uid_season] || 0);
+                const episodeBNumber = b.uid_season === uid_season ? b.episode_numero : (b.other_seasons?.[uid_season] || 0);
+                return episodeANumber - episodeBNumber;
+            });
+
+            return combinedEpisodes;
         } catch (error) {
             console.error('Error getting episodes by season:', error);
             return [];
@@ -1580,6 +1634,7 @@ export const episodeSerieService = {
 
     async getEpisodeBySeasonAndNumber(uid_season: string, episode_numero: number): Promise<EpisodeSerie | null> {
         try {
+            // First check for direct assignment
             const q = query(
                 collection(db, EPISODES_SERIES_COLLECTION),
                 where('uid_season', '==', uid_season),
@@ -1590,7 +1645,24 @@ export const episodeSerieService = {
             if (!querySnapshot.empty) {
                 return querySnapshot.docs[0].data() as EpisodeSerie;
             }
-            return null;
+
+            // If not found directly, check other_seasons assignments
+            const allEpisodesQuery = query(
+                collection(db, EPISODES_SERIES_COLLECTION),
+                where('hidden', '==', false)
+            );
+            const allSnapshot = await getDocs(allEpisodesQuery);
+            const allEpisodes = allSnapshot.docs.map(doc => doc.data() as EpisodeSerie);
+
+            // Find episode with this season in other_seasons and matching episode number
+            const crossSeasonEpisode = allEpisodes.find(episode => {
+                if (episode.other_seasons && episode.other_seasons[uid_season] === episode_numero) {
+                    return true;
+                }
+                return false;
+            });
+
+            return crossSeasonEpisode || null;
         } catch (error) {
             console.error('Error getting episode by season and number:', error);
             return null;
@@ -1672,6 +1744,111 @@ export const episodeSerieService = {
             console.error('Error updating episode by UID:', error);
             throw error;
         }
+    },
+
+    /**
+     * Adds an episode to another season with automatic episode numbering
+     */
+    async addEpisodeToSeason(uid_episode: string, targetSeasonUid: string): Promise<void> {
+        try {
+            // Get the episode to check if it already exists in the target season
+            const episode = await this.getEpisodeByUid(uid_episode);
+            if (!episode) {
+                throw new Error(`Épisode avec UID ${uid_episode} non trouvé`);
+            }
+
+            // Check if episode is already in the target season
+            if (episode.uid_season === targetSeasonUid) {
+                throw new Error('L\'épisode est déjà dans cette saison');
+            }
+
+            if (episode.other_seasons && episode.other_seasons[targetSeasonUid]) {
+                throw new Error('L\'épisode est déjà assigné à cette saison');
+            }
+
+            // Get the highest episode number in the target season
+            const targetSeasonEpisodes = await this.getEpisodesBySeason(targetSeasonUid);
+            const maxEpisodeNumber = Math.max(...targetSeasonEpisodes.map(ep => {
+                if (ep.uid_season === targetSeasonUid) {
+                    return ep.episode_numero;
+                } else if (ep.other_seasons && ep.other_seasons[targetSeasonUid]) {
+                    return ep.other_seasons[targetSeasonUid];
+                }
+                return 0;
+            }), 0);
+
+            // Calculate new episode number (max + 1)
+            const newEpisodeNumber = maxEpisodeNumber + 1;
+
+            // Update the episode's other_seasons field
+            const currentOtherSeasons = episode.other_seasons || {};
+            const updatedOtherSeasons = {
+                ...currentOtherSeasons,
+                [targetSeasonUid]: newEpisodeNumber
+            };
+
+            await this.updateEpisodeByUid(uid_episode, {
+                other_seasons: updatedOtherSeasons
+            });
+
+            console.log(`Épisode ${uid_episode} ajouté à la saison ${targetSeasonUid} avec le numéro ${newEpisodeNumber}`);
+        } catch (error) {
+            console.error('Error adding episode to season:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Removes an episode from a season (from other_seasons only, not the primary season)
+     */
+    async removeEpisodeFromSeason(uid_episode: string, seasonUid: string): Promise<void> {
+        try {
+            const episode = await this.getEpisodeByUid(uid_episode);
+            if (!episode) {
+                throw new Error(`Épisode avec UID ${uid_episode} non trouvé`);
+            }
+
+            if (!episode.other_seasons || !episode.other_seasons[seasonUid]) {
+                throw new Error('L\'épisode n\'est pas assigné à cette saison via other_seasons');
+            }
+
+            // Remove the season from other_seasons
+            const updatedOtherSeasons = { ...episode.other_seasons };
+            delete updatedOtherSeasons[seasonUid];
+
+            await this.updateEpisodeByUid(uid_episode, {
+                other_seasons: Object.keys(updatedOtherSeasons).length > 0 ? updatedOtherSeasons : null
+            });
+
+            console.log(`Épisode ${uid_episode} retiré de la saison ${seasonUid}`);
+        } catch (error) {
+            console.error('Error removing episode from season:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Gets the episode number for a specific season (handles both primary and other seasons)
+     */
+    getEpisodeNumberForSeason(episode: EpisodeSerie, seasonUid: string): number {
+        if (episode.uid_season === seasonUid) {
+            return episode.episode_numero;
+        }
+        if (episode.other_seasons && episode.other_seasons[seasonUid]) {
+            return episode.other_seasons[seasonUid];
+        }
+        return 0;
+    },
+
+    /**
+     * Gets all seasons an episode belongs to (primary + other seasons)
+     */
+    getEpisodeSeasons(episode: EpisodeSerie): string[] {
+        const seasons = [episode.uid_season];
+        if (episode.other_seasons) {
+            seasons.push(...Object.keys(episode.other_seasons));
+        }
+        return seasons;
     },
 };
 

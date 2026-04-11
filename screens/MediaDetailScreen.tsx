@@ -40,8 +40,13 @@ interface MediaDetailScreenProps {
 
 
 
-const EpisodeListItem: React.FC<{ episode: Episode | EpisodeSerie, onClick: () => void, isPlaying: boolean }> = ({ episode, onClick, isPlaying }) => {
-
+const EpisodeListItem: React.FC<{ 
+    episode: Episode | EpisodeSerie, 
+    onClick: () => void, 
+    isPlaying: boolean,
+    currentSeasonUid?: string,
+    currentSerieTitle?: string
+}> = ({ episode, onClick, isPlaying, currentSeasonUid, currentSerieTitle }) => {
     const playingClasses = isPlaying ? 'bg-amber-100 dark:bg-amber-900/40' : 'hover:bg-gray-100/50 dark:hover:bg-gray-800/50';
 
 
@@ -50,13 +55,23 @@ const EpisodeListItem: React.FC<{ episode: Episode | EpisodeSerie, onClick: () =
 
     const isEpisodeSerie = 'uid_episode' in episode;
 
-    const episodeNumber = isEpisodeSerie ? episode.episode_numero : episode.episodeNumber;
+    // Utiliser le numéro d'épisode approprié selon la saison actuelle
+    const episodeNumber = isEpisodeSerie && currentSeasonUid && episode.other_seasons && episode.other_seasons[currentSeasonUid]
+        ? episode.other_seasons[currentSeasonUid]
+        : (isEpisodeSerie ? episode.episode_numero : episode.episodeNumber);
 
     const episodeTitle = isEpisodeSerie ? episode.title : episode.title;
 
     const episodeDuration = isEpisodeSerie ? episode.runtime_h_m : episode.duration;
 
     const thumbnailUrl = isEpisodeSerie ? episode.picture_path : episode.thumbnailUrl;
+
+    // Check if episode comes from another series via other_seasons
+    const isFromOtherSeries = isEpisodeSerie && 
+        currentSeasonUid && 
+        episode.other_seasons && 
+        episode.other_seasons[currentSeasonUid] &&
+        episode.uid_season !== currentSeasonUid;
 
 
 
@@ -88,11 +103,16 @@ const EpisodeListItem: React.FC<{ episode: Episode | EpisodeSerie, onClick: () =
 
             <div className="flex-1 min-w-0 py-1">
 
-                <h4 className={`font-semibold text-xs sm:text-sm ${isPlaying ? 'text-amber-800 dark:text-amber-300' : 'text-gray-900 dark:text-white'} leading-snug line-clamp-2 sm:line-clamp-1 mb-1`}>
-
-                    {episodeNumber}. {episodeTitle}
-
-                </h4>
+                <div className="flex items-center gap-2 mb-1">
+                    <h4 className={`font-semibold text-xs sm:text-sm ${isPlaying ? 'text-amber-800 dark:text-amber-300' : 'text-gray-900 dark:text-white'} leading-snug line-clamp-2 sm:line-clamp-1`}>
+                        {episodeNumber}. {episodeTitle}
+                    </h4>
+                    {isFromOtherSeries && (
+                        <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 text-xs rounded-full font-medium">
+                            Autre série
+                        </span>
+                    )}
+                </div>
 
                 <p className="text-gray-500 dark:text-gray-400 text-xs sm:text-sm">{episodeDuration}</p>
 
@@ -1040,7 +1060,14 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
 
                                                         const isPlaying = selectedSeason.season_number === playingEpisodeSeasonNumber && episode.uid_episode === playingItem?.episode?.uid_episode;
 
-                                                        return <EpisodeListItem key={episode.uid_episode} episode={episode} onClick={() => onPlay(item, episode)} isPlaying={isPlaying} />;
+                                                        return <EpisodeListItem 
+                                                            key={episode.uid_episode} 
+                                                            episode={episode} 
+                                                            onClick={() => onPlay(item, episode)} 
+                                                            isPlaying={isPlaying} 
+                                                            currentSeasonUid={selectedSeasonUid}
+                                                            currentSerieTitle={title}
+                                                        />;
 
                                                     })
 
@@ -1098,7 +1125,14 @@ const MediaDetailScreen: React.FC<MediaDetailScreenProps> = ({ item, onBack, onP
 
                                                                     const isPlaying = season.seasonNumber === playingEpisodeSeasonNumber && episode.episodeNumber === playingItem?.episode?.episodeNumber;
 
-                                                                    return <EpisodeListItem key={episode.episodeNumber} episode={episode} onClick={() => onPlay(item, episode)} isPlaying={isPlaying} />;
+                                                                    return <EpisodeListItem 
+                                                                    key={episode.episodeNumber} 
+                                                                    episode={episode} 
+                                                                    onClick={() => onPlay(item, episode)} 
+                                                                    isPlaying={isPlaying} 
+                                                                    currentSeasonUid={undefined}
+                                                                    currentSerieTitle={title}
+                                                                />;
 
                                                                 })}
 

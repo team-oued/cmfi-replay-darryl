@@ -196,10 +196,20 @@ const AppVideosTab: React.FC = () => {
     const [editingSerie, setEditingSerie] = useState<any | null>(null);
     const [editSerieForm, setEditSerieForm] = useState<any>({});
     const [categories, setCategories] = useState<SerieCategory[]>([]);
+    const [allSeries, setAllSeries] = useState<any[]>([]);
+    const [allSeasons, setAllSeasons] = useState<any[]>([]);
+    const [otherSeasonsForm, setOtherSeasonsForm] = useState<{
+        selectedSerieUid: string;
+        selectedSeasonUid: string;
+    }>({
+        selectedSerieUid: '',
+        selectedSeasonUid: ''
+    });
 
     useEffect(() => {
         loadData();
         loadCategories();
+        loadAllSeriesAndSeasons();
     }, []);
     
     // S'assurer que les épisodes sont chargés quand on édite un épisode
@@ -219,6 +229,28 @@ const AppVideosTab: React.FC = () => {
             setCategories(cats);
         } catch (error) {
             console.error('Erreur lors du chargement des catégories:', error);
+        }
+    };
+
+    const loadAllSeriesAndSeasons = async () => {
+        try {
+            // Charger toutes les séries
+            const seriesSnapshot = await getDocs(collection(db, 'series'));
+            const allSeriesData = seriesSnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            setAllSeries(allSeriesData);
+
+            // Charger toutes les saisons
+            const seasonsSnapshot = await getDocs(collection(db, 'seasonsSeries'));
+            const allSeasonsData = seasonsSnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            setAllSeasons(allSeasonsData);
+        } catch (error) {
+            console.error('Erreur lors du chargement des séries et saisons:', error);
         }
     };
 
@@ -405,7 +437,8 @@ const AppVideosTab: React.FC = () => {
             video_path_sd: video.video_path_sd || '',
             title_serie: video.title_serie || '',
             hidden: video.hidden || false,
-            uid_season: video.uid_season || ''
+            uid_season: video.uid_season || '',
+            other_seasons: video.other_seasons || {}
             // Ne pas inclure uid_serie dans editForm car ce n'est pas un champ de l'épisode
         });
         
@@ -631,6 +664,69 @@ const AppVideosTab: React.FC = () => {
             console.error('Erreur lors de la mise à jour de la saison:', error);
             toast.error(error.message || 'Erreur lors de la mise à jour');
         }
+    };
+
+    // Other seasons management functions
+    const handleAddOtherSeason = async () => {
+        if (!editingVideo || !otherSeasonsForm.selectedSeasonUid) {
+            toast.error('Veuillez sélectionner une saison');
+            return;
+        }
+
+        try {
+            await episodeSerieService.addEpisodeToSeason(
+                editingVideo.uid_episode,
+                otherSeasonsForm.selectedSeasonUid
+            );
+            toast.success('Épisode ajouté à la saison avec succès');
+            
+            // Reset form
+            setOtherSeasonsForm({ selectedSerieUid: '', selectedSeasonUid: '' });
+            
+            // Update the episode data
+            const updatedEpisode = await episodeSerieService.getEpisodeByUid(editingVideo.uid_episode);
+            if (updatedEpisode) {
+                setEditingVideo({ ...editingVideo, ...updatedEpisode });
+                setEditForm(prev => ({ ...prev, other_seasons: updatedEpisode.other_seasons }));
+            }
+        } catch (error: any) {
+            console.error('Erreur lors de l\'ajout à la saison:', error);
+            toast.error(error.message || 'Erreur lors de l\'ajout à la saison');
+        }
+    };
+
+    const handleRemoveOtherSeason = async (seasonUid: string) => {
+        if (!editingVideo) return;
+
+        try {
+            await episodeSerieService.removeEpisodeFromSeason(editingVideo.uid_episode, seasonUid);
+            toast.success('Épisode retiré de la saison avec succès');
+            
+            // Update the episode data
+            const updatedEpisode = await episodeSerieService.getEpisodeByUid(editingVideo.uid_episode);
+            if (updatedEpisode) {
+                setEditingVideo({ ...editingVideo, ...updatedEpisode });
+                setEditForm(prev => ({ ...prev, other_seasons: updatedEpisode.other_seasons }));
+            }
+        } catch (error: any) {
+            console.error('Erreur lors du retrait de la saison:', error);
+            toast.error(error.message || 'Erreur lors du retrait de la saison');
+        }
+    };
+
+    const getSeasonInfo = (seasonUid: string) => {
+        const season = allSeasons.find(s => s.uid_season === seasonUid);
+        if (!season) return null;
+        
+        const serie = allSeries.find(s => s.uid_serie === season.uid_serie);
+        return {
+            season,
+            serie: serie || { title_serie: 'Série inconnue' }
+        };
+    };
+
+    const getSeasonsForSerie = (serieUid: string) => {
+        return allSeasons.filter(season => season.uid_serie === serieUid);
     };
 
     // Filtrer les séries selon la recherche
@@ -1085,6 +1181,104 @@ const AppVideosTab: React.FC = () => {
                                     className="mr-2"
                                 />
                                 <label className="text-sm text-gray-700 dark:text-gray-300">Masquer l'épisode</label>
+                            </div>
+                            
+                            {/* Other Seasons Management */}
+                            <div className="border-t pt-4 mt-4">
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Autres saisons</h3>
+                                
+                                {/* Current other_seasons assignments */}
+                                {editingVideo?.other_seasons && Object.keys(editingVideo.other_seasons).length > 0 && (
+                                    <div className="mb-4">
+                                        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Saisons actuelles:</h4>
+                                        <div className="space-y-2">
+                                            {Object.entries(editingVideo.other_seasons).map(([seasonUid, episodeNumber]) => {
+                                                const seasonInfo = getSeasonInfo(seasonUid);
+                                                if (!seasonInfo) return null;
+                                                
+                                                return (
+                                                    <div key={seasonUid} className="flex items-center justify-between p-2 bg-gray-100 dark:bg-gray-700 rounded">
+                                                        <div className="text-sm">
+                                                            <span className="font-medium">{seasonInfo.serie.title_serie}</span>
+                                                            <span className="text-gray-500 dark:text-gray-400 ml-2">
+                                                                - Saison {seasonInfo.season?.season_number} (Épisode {episodeNumber})
+                                                            </span>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => handleRemoveOtherSeason(seasonUid)}
+                                                            className="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
+                                                        >
+                                                            Retirer
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                {/* Add new season assignment */}
+                                <div className="space-y-3">
+                                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Ajouter à une saison:</h4>
+                                    
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Série</label>
+                                            <select
+                                                value={otherSeasonsForm.selectedSerieUid}
+                                                onChange={(e) => {
+                                                    const newSerieUid = e.target.value;
+                                                    setOtherSeasonsForm({
+                                                        selectedSerieUid: newSerieUid,
+                                                        selectedSeasonUid: '' // Reset season when series changes
+                                                    });
+                                                }}
+                                                className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white text-sm rounded"
+                                            >
+                                                <option value="">Sélectionner une série</option>
+                                                {allSeries
+                                                    .filter(serie => serie.uid_serie !== editingVideo?.uid_serie) // Exclude current series
+                                                    .map(serie => (
+                                                    <option key={serie.uid_serie} value={serie.uid_serie}>
+                                                        {serie.title_serie}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Saison</label>
+                                            <select
+                                                value={otherSeasonsForm.selectedSeasonUid}
+                                                onChange={(e) => setOtherSeasonsForm({
+                                                    ...otherSeasonsForm,
+                                                    selectedSeasonUid: e.target.value
+                                                })}
+                                                disabled={!otherSeasonsForm.selectedSerieUid}
+                                                className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white text-sm rounded disabled:opacity-50"
+                                            >
+                                                <option value="">Sélectionner une saison</option>
+                                                {otherSeasonsForm.selectedSerieUid && 
+                                                    getSeasonsForSerie(otherSeasonsForm.selectedSerieUid)
+                                                        .filter(season => season.uid_season !== editingVideo?.uid_season) // Exclude current season
+                                                        .map(season => (
+                                                        <option key={season.uid_season} value={season.uid_season}>
+                                                            Saison {season.season_number} {season.title_season ? `- ${season.title_season}` : ''}
+                                                        </option>
+                                                    ))
+                                                }
+                                            </select>
+                                        </div>
+                                    </div>
+                                    
+                                    <button
+                                        onClick={handleAddOtherSeason}
+                                        disabled={!otherSeasonsForm.selectedSeasonUid}
+                                        className="px-4 py-2 bg-green-500 text-white text-sm rounded hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        Ajouter à la saison
+                                    </button>
+                                </div>
                             </div>
                             <div className="flex gap-2">
                                 <button
