@@ -633,7 +633,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                                         title: serie.title_serie,
                                         author: '',
                                         theme: '',
-                                        imageUrl: serie.back_path || serie.image_path,
+                                        imageUrl: serie.image_path || serie.back_path,
                                         duration: serie.runtime_h_m,
                                         description: serie.overview_serie,
                                         languages: [],
@@ -693,7 +693,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                                         title: podcast.title_serie,
                                         author: '',
                                         theme: '',
-                                        imageUrl: podcast.back_path || podcast.image_path,
+                                        imageUrl: podcast.image_path || podcast.back_path,
                                         duration: podcast.runtime_h_m,
                                         description: podcast.overview_serie,
                                         languages: [],
@@ -845,8 +845,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                             </div>
                             <div className="flex space-x-3 md:space-x-4 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-4">
                                 {continueWatchingItems.slice(0, 10).map((item) => (
-                                    <div key={item.id} className="flex-shrink-0 w-56 md:w-64 lg:w-72 group cursor-pointer" onClick={() => handleContinueWatchingClick(item)}>
-                                        <div className="relative aspect-video rounded-lg overflow-hidden mb-3 transition-transform duration-300 group-hover:scale-105">
+                                    <div key={item.id} className="flex-shrink-0 w-36 md:w-48 group cursor-pointer" onClick={() => handleContinueWatchingClick(item)}>
+                                        <div className="relative aspect-[2/3] rounded-lg overflow-hidden mb-3 transition-transform duration-300 group-hover:scale-105">
                                             <img
                                                 src={item.imageUrl}
                                                 alt={item.title}
@@ -909,7 +909,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                                         <div key={movie.uid} className="flex-shrink-0">
                                             <MediaCard
                                                 item={mediaContent}
-                                                variant="thumbnail"
+                                                variant="poster"
                                                 onSelect={onSelectMedia}
                                                 onPlay={onPlay}
                                             />
@@ -944,7 +944,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                                         title: serie.title_serie,
                                         author: '',
                                         theme: '',
-                                        imageUrl: serie.back_path || serie.image_path,
+                                        imageUrl: serie.image_path || serie.back_path,
                                         duration: serie.runtime_h_m,
                                         description: serie.overview_serie,
                                         languages: [],
@@ -954,7 +954,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                                         <div key={serie.uid_serie} className="flex-shrink-0">
                                             <MediaCard
                                                 item={mediaContent}
-                                                variant="thumbnail"
+                                                variant="poster"
                                                 onSelect={onSelectMedia}
                                                 onPlay={onPlay}
                                             />
@@ -1026,7 +1026,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                                                         title: serie.title_serie,
                                                         author: '',
                                                         theme: '',
-                                                        imageUrl: serie.back_path || serie.image_path,
+                                                        imageUrl: serie.image_path || serie.back_path,
                                                         duration: serie.runtime_h_m,
                                                         description: serie.overview_serie,
                                                         languages: [],
@@ -1036,7 +1036,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                                                         <div key={serie.uid_serie} className="flex-shrink-0">
                                                             <MediaCard
                                                                 item={mediaContent}
-                                                                variant="thumbnail"
+                                                                variant="poster"
                                                                 onSelect={onSelectMedia}
                                                                 onPlay={onPlay}
                                                             />
@@ -1080,7 +1080,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                                         title: podcast.title_serie,
                                         author: '',
                                         theme: '',
-                                        imageUrl: podcast.back_path || podcast.image_path,
+                                        imageUrl: podcast.image_path || podcast.back_path,
                                         duration: podcast.runtime_h_m,
                                         description: podcast.overview_serie,
                                         languages: [],
@@ -1090,7 +1090,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                                         <div key={podcast.uid_serie} className="flex-shrink-0">
                                             <MediaCard
                                                 item={mediaContent}
-                                                variant="thumbnail"
+                                                variant="poster"
                                                 onSelect={onSelectMedia}
                                                 onPlay={onPlay}
                                             />
@@ -1131,7 +1131,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                                     <div key={item.content.id} className="flex-shrink-0">
                                         <MediaCard
                                             item={item.content}
-                                            variant="thumbnail"
+                                            variant="poster"
                                             onSelect={onSelectMedia}
                                             onPlay={onPlay}
                                         />
@@ -1171,7 +1171,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                                     <div key={item.content.id} className="flex-shrink-0">
                                         <MediaCard
                                             item={item.content}
-                                            variant="thumbnail"
+                                            variant="poster"
                                             onSelect={onSelectMedia}
                                             onPlay={onPlay}
                                         />
@@ -1341,7 +1341,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                                     title: serie.title_serie,
                                     author: '',
                                     theme: '',
-                                    imageUrl: serie.back_path || serie.image_path,
+                                    imageUrl: serie.image_path || serie.back_path,
                                     duration: serie.runtime_h_m,
                                     description: serie.overview_serie,
                                     languages: [],
@@ -1420,7 +1420,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                                                     title: serie.title_serie,
                                                     author: '',
                                                     theme: '',
-                                                    imageUrl: serie.back_path || serie.image_path,
+                                                    imageUrl: serie.image_path || serie.back_path,
                                                     duration: serie.runtime_h_m,
                                                     description: serie.overview_serie,
                                                     languages: [],
@@ -1490,7 +1490,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                                     title: podcast.title_serie,
                                     author: '',
                                     theme: '',
-                                    imageUrl: podcast.back_path || podcast.image_path,
+                                    imageUrl: podcast.image_path || podcast.back_path,
                                     duration: podcast.runtime_h_m,
                                     description: podcast.overview_serie,
                                     languages: [],

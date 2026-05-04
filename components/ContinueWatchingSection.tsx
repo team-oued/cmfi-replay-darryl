@@ -26,7 +26,7 @@ const ContinueWatchingCard: React.FC<ContinueWatchingCardProps> = ({ item, onCli
         >
             <div className="group cursor-pointer transition-all duration-500 hover:scale-105 flex flex-col">
                 {/* Image container avec meilleur design */}
-                <div className="relative w-full aspect-video rounded-lg md:rounded-xl overflow-hidden bg-gray-800 dark:bg-gray-900 shadow-xl group-hover:shadow-2xl mb-3 transition-all duration-500">
+                <div className="relative w-full aspect-[2/3] rounded-lg md:rounded-xl overflow-hidden bg-gray-800 dark:bg-gray-900 shadow-xl group-hover:shadow-2xl mb-3 transition-all duration-500">
                     <img
                         src={item.imageUrl}
                         alt={item.title}
@@ -142,7 +142,7 @@ const ContinueWatchingSection: React.FC<ContinueWatchingSectionProps> = ({
                         >
                             <div className="flex space-x-4 md:space-x-6">
                                 {items.map((item) => (
-                                    <div key={item.id} className="flex-none w-48 sm:w-56 md:w-64 lg:w-72 snap-start">
+                                    <div key={item.id} className="flex-none w-36 md:w-48 snap-start">
                                         <ContinueWatchingCard
                                             item={item}
                                             onClick={() => onItemClick(item)}

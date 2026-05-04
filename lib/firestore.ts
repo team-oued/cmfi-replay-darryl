@@ -69,6 +69,11 @@ export interface Serie {
     is_hidden: boolean;
     serie_type?: 'serie' | 'podcast';
     categoryId?: string; // ID de la catégorie
+    // Stats pré-calculées pour éviter les N+1 queries
+    seasonsCount?: number;
+    episodesCount?: number;
+    totalDuration?: number; // En secondes
+    statsUpdatedAt?: Timestamp; // Pour savoir quand les stats ont été calculées
 }
 
 // Interface pour la collection seasonsSeries
@@ -1189,10 +1194,101 @@ export const serieService = {
             throw error;
         }
     },
+
+    /**
+     * Calcule et met à jour les statistiques pré-calculées pour une série
+     * Évite les N+1 queries en stockant seasonsCount, episodesCount et totalDuration
+     */
+    async calculateAndUpdateSeriesStats(uid_serie: string): Promise<void> {
+        try {
+            // Récupérer toutes les saisons de la série
+            const seasons = await seasonSerieService.getSeasonsBySerie(uid_serie);
+            const seasonsCount = seasons.length;
+            
+            // Récupérer tous les épisodes de toutes les saisons
+            let episodesCount = 0;
+            let totalDuration = 0;
+            
+            for (const season of seasons) {
+                const episodes = await episodeSerieService.getEpisodesBySeason(season.uid_season);
+                episodesCount += episodes.length;
+                
+                // Calculer la durée totale (en secondes)
+                for (const episode of episodes) {
+                    if (episode.runtime) {
+                        totalDuration += episode.runtime;
+                    }
+                }
+            }
+            
+            // Mettre à jour la série avec les stats pré-calculées
+            const q = query(
+                collection(db, SERIES_COLLECTION),
+                where('uid_serie', '==', uid_serie),
+                limit(1)
+            );
+            const snapshot = await getDocs(q);
+            
+            if (snapshot.empty) {
+                console.warn(`Série avec UID ${uid_serie} non trouvée pour mise à jour des stats`);
+                return;
+            }
+            
+            const serieRef = doc(db, SERIES_COLLECTION, snapshot.docs[0].id);
+            await updateDoc(serieRef, {
+                seasonsCount,
+                episodesCount,
+                totalDuration,
+                statsUpdatedAt: Timestamp.now()
+            });
+            
+            console.log(`✅ Stats mises à jour pour la série ${uid_serie}: ${seasonsCount} saisons, ${episodesCount} épisodes, ${totalDuration}s total`);
+        } catch (error) {
+            console.error('Error calculating series stats:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Calcule et met à jour les stats pour toutes les séries (batch)
+     * Utiliser cette fonction pour migrer toutes les séries existantes
+     */
+    async updateAllSeriesStats(): Promise<void> {
+        try {
+            console.log('🔄 Début de la mise à jour des stats pour toutes les séries...');
+            
+            const allSeries = await this.getAllSeriesOnly();
+            const batchSize = 10; // Limiter pour éviter l'overload
+            
+            for (let i = 0; i < allSeries.length; i += batchSize) {
+                const batch = allSeries.slice(i, i + batchSize);
+                
+                await Promise.all(
+                    batch.map(serie => 
+                        this.calculateAndUpdateSeriesStats(serie.uid_serie)
+                        .catch(error => console.error(`Erreur pour la série ${serie.uid_serie}:`, error))
+                    )
+                );
+                
+                console.log(`✅ Batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(allSeries.length / batchSize)} terminé`);
+                
+                // Pause entre les batches pour éviter de surcharger Firestore
+                if (i + batchSize < allSeries.length) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            }
+            
+            console.log('🎉 Mise à jour des stats terminée pour toutes les séries!');
+        } catch (error) {
+            console.error('Error updating all series stats:', error);
+            throw error;
+        }
+    },
 };
 
 // Services pour les saisons de séries
 export const seasonSerieService = {
+    // ...
     async getAllSeasons(): Promise<SeasonSerie[]> {
         try {
             const seasonsSnapshot = await getDocs(collection(db, SEASONS_SERIES_COLLECTION));

@@ -139,7 +139,7 @@ const SeriesCard: React.FC<{
 
     // Variant poster
     return (
-        <div onClick={handleSelect} className="flex-shrink-0 w-36 md:w-48 space-y-2.5 cursor-pointer group">
+        <div onClick={handleSelect} className="flex-shrink-0 w-24 sm:w-32 md:w-40 lg:w-44 xl:w-48 space-y-1.5 sm:space-y-2 cursor-pointer group">
             <div
                 className={`relative aspect-[2/3] bg-gray-200 dark:bg-gray-700 rounded-lg md:rounded-xl overflow-hidden shadow-xl transform transition-all duration-500 group-hover:scale-105 group-hover:shadow-2xl group-hover:-translate-y-2 ${
                     serie.is_premium ? 'ring-2 ring-amber-400/60 shadow-amber-400/30' : ''
@@ -150,9 +150,9 @@ const SeriesCard: React.FC<{
                         <div className="absolute inset-0 rounded-lg md:rounded-xl border-2 border-transparent bg-gradient-to-br from-amber-300 via-yellow-400 to-amber-500 opacity-60 pointer-events-none" style={{ padding: '2px' }}>
                             <div className="w-full h-full bg-gray-900 dark:bg-black rounded-lg md:rounded-xl"></div>
                         </div>
-                        <div className="absolute top-2 right-2 z-10 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-black/90 backdrop-blur-sm border border-amber-400/50 shadow-lg">
+                        <div className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2 z-10 flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-md bg-black/90 backdrop-blur-sm border border-amber-400/50 shadow-lg">
                             <CrownIcon />
-                            <span className="text-xs font-semibold text-amber-300">Premium</span>
+                            <span className="text-[9px] sm:text-xs font-semibold text-amber-300">Premium</span>
                         </div>
                     </>
                 )}
@@ -165,20 +165,20 @@ const SeriesCard: React.FC<{
                     onClick={handleSelect}
                     className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-500 z-10 cursor-pointer"
                 >
-                    <div className="flex items-center gap-2 px-4 py-2 bg-white/20 backdrop-blur-md rounded-lg border border-white/30 shadow-xl">
-                        <svg className="w-5 h-5 md:w-6 md:h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span className="text-white text-xs md:text-sm font-medium">Voir détails</span>
-                    </div>
+                        <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-2 bg-white/20 backdrop-blur-md rounded-lg border border-white/30 shadow-xl">
+                            <svg className="w-3.5 sm:w-5 sm:h-5 h-3.5 md:w-6 md:h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span className="text-white text-[10px] sm:text-xs md:text-sm font-medium">Voir détails</span>
+                        </div>
                 </div>
                 {/* Badge avec stats en bas */}
                 {(serie.seasonsCount !== undefined || serie.episodesCount !== undefined) && (
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent p-2 z-20">
-                        <div className="flex items-center justify-center gap-3 text-xs text-white/90">
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent p-1.5 sm:p-2 z-20">
+                        <div className="flex items-center justify-center gap-1.5 sm:gap-3 text-[10px] sm:text-xs text-white/90">
                             {serie.seasonsCount !== undefined && (
                                 <span className="flex items-center gap-1">
-                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <svg className="w-2.5 sm:w-3.5 h-2.5 sm:h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                                     </svg>
                                     {serie.seasonsCount}
@@ -186,7 +186,7 @@ const SeriesCard: React.FC<{
                             )}
                             {serie.episodesCount !== undefined && (
                                 <span className="flex items-center gap-1">
-                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <svg className="w-2.5 sm:w-3.5 h-2.5 sm:h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                                     </svg>
                                     {serie.episodesCount}
@@ -196,10 +196,7 @@ const SeriesCard: React.FC<{
                     </div>
                 )}
             </div>
-            <h3 className="text-gray-900 dark:text-white text-sm font-bold truncate group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors duration-300">
-                {serie.title}
-            </h3>
-            {serie.author && <p className="text-gray-500 dark:text-gray-400 text-xs truncate">{serie.author}</p>}
+            {serie.author && <p className="text-gray-500 dark:text-gray-400 text-[10px] sm:text-xs truncate">{serie.author}</p>}
         </div>
     );
 };
@@ -217,24 +214,37 @@ const SeriesScreen: React.FC<SeriesScreenProps> = ({ onSelectMedia, onPlay }) =>
     const [categories, setCategories] = useState<SerieCategory[]>([]);
     const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
 
-    // Convertir une Serie en MediaContent avec stats
+    // Convertir une Serie en MediaContent avec stats (optimisé - utilise les stats pré-calculées)
     const convertSerieToMediaContent = async (serie: Serie): Promise<SerieWithStats> => {
-        // Récupérer les saisons et épisodes pour calculer les stats
-        let seasonsCount = 0;
-        let episodesCount = 0;
+        // Utiliser les stats pré-calculées si elles existent
+        let seasonsCount = serie.seasonsCount;
+        let episodesCount = serie.episodesCount;
+        
+        // Fallback: calculer les stats uniquement si elles ne sont pas pré-calculées
+        if (seasonsCount === undefined || episodesCount === undefined) {
+            console.warn(`⚠️ Stats non pré-calculées pour la série ${serie.uid_serie}, calcul en cours...`);
+            try {
+                const seasons = await seasonSerieService.getSeasonsBySerie(serie.uid_serie);
+                seasonsCount = seasons.length;
 
-        try {
-            const seasons = await seasonSerieService.getSeasonsBySerie(serie.uid_serie);
-            seasonsCount = seasons.length;
-
-            // Compter les épisodes pour toutes les saisons
-            const episodesPromises = seasons.map(season =>
-                episodeSerieService.getEpisodesBySeason(season.uid_season)
-            );
-            const episodesArrays = await Promise.all(episodesPromises);
-            episodesCount = episodesArrays.reduce((total, episodes) => total + episodes.length, 0);
-        } catch (error) {
-            console.error('Error loading series stats:', error);
+                // Compter les épisodes pour toutes les saisons
+                const episodesPromises = seasons.map(season =>
+                    episodeSerieService.getEpisodesBySeason(season.uid_season)
+                );
+                const episodesArrays = await Promise.all(episodesPromises);
+                episodesCount = episodesArrays.reduce((total, episodes) => total + episodes.length, 0);
+                
+                // Mettre à jour la série avec les stats calculées pour la prochaine fois
+                try {
+                    await serieService.calculateAndUpdateSeriesStats(serie.uid_serie);
+                } catch (updateError) {
+                    console.error('Error updating series stats:', updateError);
+                }
+            } catch (error) {
+                console.error('Error loading series stats:', error);
+                seasonsCount = 0;
+                episodesCount = 0;
+            }
         }
 
         return {
@@ -250,8 +260,23 @@ const SeriesScreen: React.FC<SeriesScreenProps> = ({ onSelectMedia, onPlay }) =>
             is_premium: serie.premium_text !== undefined && serie.premium_text !== '',
             premium_text: serie.premium_text || '',
             seasonsCount,
-            episodesCount
+            episodesCount,
+            totalDuration: serie.totalDuration ? formatDuration(serie.totalDuration) : undefined
         };
+    };
+
+    // Formater la durée en secondes en format lisible
+    const formatDuration = (seconds: number): string => {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        
+        if (hours > 0) {
+            return `${hours}h ${minutes}min`;
+        } else if (minutes > 0) {
+            return `${minutes}min`;
+        } else {
+            return `${seconds}s`;
+        }
     };
 
     // Charger les séries depuis Firestore avec leurs stats
@@ -573,7 +598,7 @@ const SeriesScreen: React.FC<SeriesScreenProps> = ({ onSelectMedia, onPlay }) =>
 
                         {/* Grille ou Liste selon le mode */}
                         {viewMode === 'grid' ? (
-                            <div className="relative grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6 z-0">
+                            <div className="relative grid grid-cols-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-4 md:gap-6 z-0">
                                 {filteredAndSortedSeries.map((serie) => (
                                     <SeriesCard
                                         key={serie.id}

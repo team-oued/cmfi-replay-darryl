@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MediaContent, MediaType } from '../types';
-import MediaCard from '../components/MediaCard';
+import MovieCard from '../components/MovieCard';
 import { movieService, Movie } from '../lib/firestore';
 import { useAppContext } from '../context/AppContext';
 import { ArrowLeftIcon } from '../components/icons';
@@ -304,11 +304,11 @@ const MoviesScreen: React.FC<MoviesScreenProps> = ({ onSelectMedia, onPlay }) =>
 
                         {/* Grille ou Liste selon le mode */}
                         {viewMode === 'grid' ? (
-                            <div className="relative grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6 z-0">
+                            <div className="relative grid grid-cols-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-4 md:gap-6 z-0">
                                 {filteredAndSortedMovies.map((movie) => (
-                                    <MediaCard
+                                    <MovieCard
                                         key={movie.id}
-                                        item={movie}
+                                        movie={movie}
                                         variant="poster"
                                         onSelect={onSelectMedia}
                                         onPlay={onPlay}
@@ -318,9 +318,9 @@ const MoviesScreen: React.FC<MoviesScreenProps> = ({ onSelectMedia, onPlay }) =>
                         ) : (
                             <div className="relative space-y-2 z-0">
                                 {filteredAndSortedMovies.map((movie) => (
-                                    <MediaCard
+                                    <MovieCard
                                         key={movie.id}
-                                        item={movie}
+                                        movie={movie}
                                         variant="list"
                                         onSelect={onSelectMedia}
                                         onPlay={onPlay}
