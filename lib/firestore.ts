@@ -2648,38 +2648,82 @@ export const statsVuesService = {
         }
     },
 
-    async getAllHistory(userUid: string): Promise<ContinueWatchingItem[]> {
+    async getAllHistory(userUid: string, limitCount: number = 50): Promise<ContinueWatchingItem[]> {
         try {
             const userRef = doc(db, USERS_COLLECTION, userUid);
             const q = query(
                 collection(db, STATS_VUES_COLLECTION),
                 where('user', '==', userRef),
-                orderBy('dateDernierUpdate', 'desc')
+                orderBy('dateDernierUpdate', 'desc'),
+                limit(limitCount)
             );
 
             const querySnapshot = await getDocs(q);
-            const historyItems: ContinueWatchingItem[] = [];
+            
+            // Séparer les épisodes et les films pour les récupérer en batch
+            const episodeRefs: DocumentReference[] = [];
+            const movieUids: string[] = [];
+            const historyData: Array<{ docSnapshot: QueryDocumentSnapshot; data: StatsVues; isEpisode: boolean }> = [];
 
             for (const docSnapshot of querySnapshot.docs) {
                 const data = docSnapshot.data() as StatsVues;
-
-                // Vérifier si c'est un épisode ou un film
                 const isEpisode = !!data.idEpisodeSerie;
+                
+                historyData.push({ docSnapshot, data, isEpisode });
 
                 if (isEpisode && data.idEpisodeSerie) {
-                    // C'est un épisode de série
-                    const episodeDoc = await getDoc(data.idEpisodeSerie);
+                    episodeRefs.push(data.idEpisodeSerie);
+                } else if (!isEpisode && data.uid) {
+                    movieUids.push(data.uid);
+                }
+            }
+
+            // Récupérer tous les épisodes en parallèle
+            const episodesMap = new Map<string, EpisodeSerie>();
+            if (episodeRefs.length > 0) {
+                const episodePromises = episodeRefs.map(ref => getDoc(ref));
+                const episodeDocs = await Promise.all(episodePromises);
+                
+                for (const episodeDoc of episodeDocs) {
                     if (episodeDoc.exists()) {
-                        const episode = episodeDoc.data() as EpisodeSerie;
+                        episodesMap.set(episodeDoc.id, episodeDoc.data() as EpisodeSerie);
+                    }
+                }
+            }
+
+            // Récupérer tous les films en batch (max 10 par requête Firestore)
+            const moviesMap = new Map<string, Movie>();
+            if (movieUids.length > 0) {
+                const batchSize = 10;
+                for (let i = 0; i < movieUids.length; i += batchSize) {
+                    const batch = movieUids.slice(i, i + batchSize);
+                    const moviesQuery = query(
+                        collection(db, MOVIES_COLLECTION),
+                        where('uid', 'in', batch)
+                    );
+                    const moviesSnapshot = await getDocs(moviesQuery);
+                    
+                    for (const movieDoc of moviesSnapshot.docs) {
+                        const movie = movieDoc.data() as Movie;
+                        moviesMap.set(movie.uid, movie);
+                    }
+                }
+            }
+
+            // Construire les résultats
+            const historyItems: ContinueWatchingItem[] = [];
+
+            for (const { docSnapshot, data, isEpisode } of historyData) {
+                if (isEpisode && data.idEpisodeSerie) {
+                    const episode = episodesMap.get(data.idEpisodeSerie.id);
+                    if (episode) {
                         const runtime = episode.runtime || 0;
                         const progress = runtime > 0 ? Math.min((data.tempsRegarde / runtime) * 100, 100) : 0;
-
-                        // Utiliser le titre de l'épisode comme titre principal
                         const displayTitle = episode.title || `${episode.title_serie} - Épisode ${episode.episode_numero}`;
 
                         historyItems.push({
                             id: docSnapshot.id,
-                            uid: data.uid || episode.uid_episode || episodeDoc.id,
+                            uid: data.uid || episode.uid_episode || data.idEpisodeSerie.id,
                             title: displayTitle,
                             imageUrl: episode.backdrop_path || episode.picture_path,
                             progress,
@@ -2689,16 +2733,14 @@ export const statsVuesService = {
                             episodeNumber: episode.episode_numero,
                             episodeTitle: episode.title,
                             serieTitle: episode.title_serie,
-                            uid_episode: episode.uid_episode || episodeDoc.id,
-                            episodeId: episodeDoc.id,
+                            uid_episode: episode.uid_episode || data.idEpisodeSerie.id,
+                            episodeId: data.idEpisodeSerie.id,
                             dateDernierUpdate: data.dateDernierUpdate
                         });
                     }
-                } else {
-                    // C'est un film
-                    const movie = await movieService.getMovieByUid(data.uid);
+                } else if (data.uid) {
+                    const movie = moviesMap.get(data.uid);
                     if (movie) {
-                        // Convertir runtime_h_m (ex: "2h 30min") en secondes
                         const runtimeMatch = movie.runtime?.match(/(\d+)h?\s*(\d+)?/);
                         let runtime = 0;
                         if (runtimeMatch) {
@@ -2834,17 +2876,35 @@ export const searchService = {
     },
 
     /**
-     * Recherche dans les séries/podcasts (title_serie, overview_serie)
+     * Recherche dans les séries/podcasts (title_serie, overview_serie, et aussi dans les épisodes)
      */
     async searchSeries(searchTerm: string): Promise<SearchResult[]> {
         try {
-            const seriesSnapshot = await getDocs(collection(db, SERIES_COLLECTION));
+            const [seriesSnapshot, seasonsSnapshot, episodesSnapshot] = await Promise.all([
+                getDocs(collection(db, SERIES_COLLECTION)),
+                getDocs(collection(db, SEASONS_SERIES_COLLECTION)),
+                getDocs(collection(db, EPISODES_SERIES_COLLECTION))
+            ]);
             const results: SearchResult[] = [];
+            const seriesMap = new Map<string, Serie>();
+            const seasonToSerieMap = new Map<string, string>(); // uid_season -> uid_serie
 
+            // Indexer les séries
+            seriesSnapshot.docs.forEach(doc => {
+                const serie = doc.data() as Serie;
+                seriesMap.set(serie.uid_serie, serie);
+            });
+
+            // Mapper les saisons aux séries
+            seasonsSnapshot.docs.forEach(doc => {
+                const season = doc.data() as SeasonSerie;
+                seasonToSerieMap.set(season.uid_season, season.uid_serie);
+            });
+
+            // Recherche dans les séries (title_serie, overview_serie)
             seriesSnapshot.docs.forEach(doc => {
                 const serie = doc.data() as Serie;
 
-                // Ignorer les séries cachées
                 if (serie.is_hidden) return;
 
                 const titleMatch = serie.title_serie?.toLowerCase().includes(searchTerm);
@@ -2863,6 +2923,50 @@ export const searchService = {
                 }
             });
 
+            // Recherche dans les épisodes et retourner les séries correspondantes
+            const matchedSeriesUids = new Set<string>();
+            
+            episodesSnapshot.docs.forEach(doc => {
+                const episode = doc.data() as EpisodeSerie;
+
+                if (episode.hidden) return;
+
+                const titleMatch = episode.title?.toLowerCase().includes(searchTerm);
+                const overviewMatch = episode.overview?.toLowerCase().includes(searchTerm);
+                const overviewFrMatch = episode.overviewFr?.toLowerCase().includes(searchTerm);
+                const keywordsMatch = episode.search_keywords?.some(
+                    keyword => keyword.toLowerCase().includes(searchTerm)
+                );
+
+                if (titleMatch || overviewMatch || overviewFrMatch || keywordsMatch) {
+                    // Récupérer le uid_serie à partir de la saison
+                    const uidSerie = seasonToSerieMap.get(episode.uid_season);
+                    if (uidSerie) {
+                        matchedSeriesUids.add(uidSerie);
+                    }
+                }
+            });
+
+            // Ajouter les séries correspondantes aux épisodes trouvés
+            matchedSeriesUids.forEach(uidSerie => {
+                const serie = seriesMap.get(uidSerie);
+                if (serie && !serie.is_hidden) {
+                    // Vérifier si cette série n'est pas déjà dans les résultats
+                    const alreadyExists = results.some(r => r.uid_serie === serie.uid_serie);
+                    if (!alreadyExists) {
+                        results.push({
+                            id: serie.id || uidSerie,
+                            uid: serie.uid_serie,
+                            uid_serie: serie.uid_serie,
+                            title: serie.title_serie,
+                            description: serie.overview_serie || '',
+                            imageUrl: serie.image_path || serie.back_path,
+                            type: serie.serie_type === 'podcast' ? 'podcast' : 'serie'
+                        });
+                    }
+                }
+            });
+
             return results;
         } catch (error) {
             console.error('Error searching series:', error);
@@ -2871,13 +2975,24 @@ export const searchService = {
     },
 
     /**
-     * Recherche dans les saisons (title_season, overview)
+     * Recherche dans les saisons (title_season, overview, et aussi dans les épisodes)
      */
     async searchSeasons(searchTerm: string): Promise<SearchResult[]> {
         try {
-            const seasonsSnapshot = await getDocs(collection(db, SEASONS_SERIES_COLLECTION));
+            const [seasonsSnapshot, episodesSnapshot] = await Promise.all([
+                getDocs(collection(db, SEASONS_SERIES_COLLECTION)),
+                getDocs(collection(db, EPISODES_SERIES_COLLECTION))
+            ]);
             const results: SearchResult[] = [];
+            const seasonsMap = new Map<string, SeasonSerie>();
 
+            // Indexer les saisons
+            seasonsSnapshot.docs.forEach(doc => {
+                const season = doc.data() as SeasonSerie;
+                seasonsMap.set(season.uid_season, season);
+            });
+
+            // Recherche dans les saisons (title_season, overview)
             seasonsSnapshot.docs.forEach(doc => {
                 const season = doc.data() as SeasonSerie;
 
@@ -2897,6 +3012,49 @@ export const searchService = {
                         serieTitle: season.title_serie,
                         seasonNumber: season.season_number
                     });
+                }
+            });
+
+            // Recherche dans les épisodes et retourner les saisons correspondantes
+            const matchedSeasonUids = new Set<string>();
+            
+            episodesSnapshot.docs.forEach(doc => {
+                const episode = doc.data() as EpisodeSerie;
+
+                if (episode.hidden) return;
+
+                const titleMatch = episode.title?.toLowerCase().includes(searchTerm);
+                const overviewMatch = episode.overview?.toLowerCase().includes(searchTerm);
+                const overviewFrMatch = episode.overviewFr?.toLowerCase().includes(searchTerm);
+                const keywordsMatch = episode.search_keywords?.some(
+                    keyword => keyword.toLowerCase().includes(searchTerm)
+                );
+
+                if (titleMatch || overviewMatch || overviewFrMatch || keywordsMatch) {
+                    matchedSeasonUids.add(episode.uid_season);
+                }
+            });
+
+            // Ajouter les saisons correspondantes aux épisodes trouvés
+            matchedSeasonUids.forEach(uidSeason => {
+                const season = seasonsMap.get(uidSeason);
+                if (season) {
+                    // Vérifier si cette saison n'est pas déjà dans les résultats
+                    const alreadyExists = results.some(r => r.uid_season === season.uid_season);
+                    if (!alreadyExists) {
+                        results.push({
+                            id: season.id || uidSeason,
+                            uid: season.uid_season,
+                            uid_serie: season.uid_serie,
+                            uid_season: season.uid_season,
+                            title: season.title_season,
+                            description: season.overview || '',
+                            imageUrl: season.poster_path || season.backdrop_path,
+                            type: 'season',
+                            serieTitle: season.title_serie,
+                            seasonNumber: season.season_number
+                        });
+                    }
                 }
             });
 

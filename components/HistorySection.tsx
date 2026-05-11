@@ -9,7 +9,7 @@ interface HistoryCardProps {
     onClick: () => void;
 }
 
-export const HistoryCard: React.FC<HistoryCardProps> = ({ item, onClick }) => {
+export const HistoryCard: React.FC<HistoryCardProps> = React.memo(({ item, onClick }) => {
     return (
         <div className="h-full flex flex-col">
             <div 
@@ -60,7 +60,7 @@ export const HistoryCard: React.FC<HistoryCardProps> = ({ item, onClick }) => {
             </div>
         </div>
     );
-};
+});
 
 interface HistorySectionProps {
     items: ContinueWatchingItem[];

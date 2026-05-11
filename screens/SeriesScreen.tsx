@@ -172,28 +172,24 @@ const SeriesCard: React.FC<{
                             <span className="text-white text-[10px] sm:text-xs md:text-sm font-medium">Voir détails</span>
                         </div>
                 </div>
-                {/* Badge avec stats en bas */}
-                {(serie.seasonsCount !== undefined || serie.episodesCount !== undefined) && (
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent p-1.5 sm:p-2 z-20">
-                        <div className="flex items-center justify-center gap-1.5 sm:gap-3 text-[10px] sm:text-xs text-white/90">
-                            {serie.seasonsCount !== undefined && (
-                                <span className="flex items-center gap-1">
-                                    <svg className="w-2.5 sm:w-3.5 h-2.5 sm:h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                    </svg>
-                                    {serie.seasonsCount}
-                                </span>
-                            )}
-                            {serie.episodesCount !== undefined && (
-                                <span className="flex items-center gap-1">
-                                    <svg className="w-2.5 sm:w-3.5 h-2.5 sm:h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                    </svg>
-                                    {serie.episodesCount}
-                                </span>
-                            )}
-                        </div>
-                    </div>
+            </div>
+            {/* Stats sous le poster */}
+            <div className="flex items-center gap-2 text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">
+                {serie.seasonsCount !== undefined && (
+                    <span className="flex items-center gap-1" title="Saisons">
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        {serie.seasonsCount}
+                    </span>
+                )}
+                {serie.episodesCount !== undefined && (
+                    <span className="flex items-center gap-1" title="Épisodes">
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        {serie.episodesCount}
+                    </span>
                 )}
             </div>
             {serie.author && <p className="text-gray-500 dark:text-gray-400 text-[10px] sm:text-xs truncate">{serie.author}</p>}
@@ -550,6 +546,25 @@ const SeriesScreen: React.FC<SeriesScreenProps> = ({ onSelectMedia, onPlay }) =>
                             </div>
                         </div>
                     )}
+
+                    {/* Légende des icônes de stats */}
+                    <div className="pt-2 pb-2 border-t border-gray-200 dark:border-gray-700">
+                        <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+                            <span className="font-medium">Légende:</span>
+                            <div className="flex items-center gap-1">
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                </svg>
+                                <span>Saisons</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                                <span>Épisodes</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 

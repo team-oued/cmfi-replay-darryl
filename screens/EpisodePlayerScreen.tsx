@@ -93,6 +93,8 @@ const VideoPlayer: React.FC<{
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
+    const [seekFeedback, setSeekFeedback] = useState<null | 'rewind' | 'forward'>(null);
+    const seekFeedbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const [progress, setProgress] = useState(0);
     const [duration, setDuration] = useState(0);
     const [currentTime, setCurrentTime] = useState(0);
@@ -392,6 +394,52 @@ const VideoPlayer: React.FC<{
         resetControlsTimeout();
         if (videoRef.current) videoRef.current.currentTime += 10;
     };
+
+    const showSeekFeedback = (type: 'rewind' | 'forward') => {
+        setSeekFeedback(type);
+        if (seekFeedbackTimeoutRef.current) {
+            clearTimeout(seekFeedbackTimeoutRef.current);
+        }
+        seekFeedbackTimeoutRef.current = setTimeout(() => {
+            setSeekFeedback(null);
+        }, 450);
+    };
+
+    const lastTapRef = useRef<{ time: number; x: number } | null>(null);
+    const ignoreClickUntilRef = useRef(0);
+
+    const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+        const container = containerRef.current;
+        if (!container) return;
+
+        const touch = e.changedTouches?.[0];
+        if (!touch) return;
+
+        const rect = container.getBoundingClientRect();
+        const x = touch.clientX - rect.left;
+        const now = Date.now();
+        const prev = lastTapRef.current;
+
+        const DOUBLE_TAP_DELAY_MS = 300;
+        const DOUBLE_TAP_MAX_DISTANCE_PX = 60;
+
+        if (prev && now - prev.time <= DOUBLE_TAP_DELAY_MS && Math.abs(x - prev.x) <= DOUBLE_TAP_MAX_DISTANCE_PX) {
+            const isLeft = x < rect.width / 2;
+            if (isLeft) {
+                handleRewind();
+                showSeekFeedback('rewind');
+            } else {
+                handleFastForward();
+                showSeekFeedback('forward');
+            }
+            lastTapRef.current = null;
+            ignoreClickUntilRef.current = now + 500;
+            e.preventDefault();
+            return;
+        }
+
+        lastTapRef.current = { time: now, x };
+    };
     const handlePlaybackRateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newRate = parseFloat(e.target.value);
         if (videoRef.current) {
@@ -414,7 +462,19 @@ const VideoPlayer: React.FC<{
         if (!video || !video.duration) return;
         const pct = parseFloat(e.target.value);
         setProgress(pct);
-        video.currentTime = (pct / 100) * video.duration;
+        const nextTime = (pct / 100) * video.duration;
+        video.currentTime = nextTime;
+        setCurrentTime(nextTime);
+    };
+
+    const handleSliderInput = (e: React.FormEvent<HTMLInputElement>) => {
+        const video = videoRef.current;
+        if (!video || !video.duration) return;
+        const pct = parseFloat((e.currentTarget as HTMLInputElement).value);
+        setProgress(pct);
+        const nextTime = (pct / 100) * video.duration;
+        video.currentTime = nextTime;
+        setCurrentTime(nextTime);
     };
 
     const handleSliderMouseDown = () => {
@@ -437,6 +497,11 @@ const VideoPlayer: React.FC<{
     // Keyboard shortcuts
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
+            // Empêcher les raccourcis si l'utilisateur est en train de taper dans un champ de saisie
+            if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') {
+                return;
+            }
+
             const v = videoRef.current;
             if (!v) return;
             if (e.code === 'Space') {
@@ -574,12 +639,24 @@ const VideoPlayer: React.FC<{
         }
     };
 
+    const handleVideoClick = () => {
+        if (Date.now() < ignoreClickUntilRef.current) {
+            return;
+        }
+        if (!showControls) {
+            resetControlsTimeout();
+            return;
+        }
+        togglePlay();
+    };
+
     return (
         <div
             ref={containerRef}
             className="relative w-full aspect-video bg-black group overflow-hidden"
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
+            onTouchEnd={handleTouchEnd}
         >
             {/* Glide Loading Spinner */}
             <div className={`absolute inset-0 flex flex-col items-center justify-center bg-black/90 z-10 transition-all duration-500 ${isLoading ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
@@ -593,8 +670,21 @@ const VideoPlayer: React.FC<{
                     <div className="glide-spinner__label text-amber-400 text-sm font-medium mt-6">{t('loadingInProgress') || 'Chargement en cours'}</div>
                 </div>
             </div>
-            <video ref={videoRef} src={src} poster={poster} className="w-full h-full" onClick={togglePlay} onError={() => setUnavailable(true)} />
-            <div className={`absolute inset-0 bg-black/30 transition-opacity flex flex-col justify-between ${showControls ? 'opacity-100' : 'opacity-0'}`}>
+            <video ref={videoRef} src={src} poster={poster} className="w-full h-full" onClick={handleVideoClick} onError={() => setUnavailable(true)} />
+
+            <div className="absolute inset-0 pointer-events-none">
+                <div className={`absolute left-4 top-1/2 -translate-y-1/2 transition-all duration-150 ${seekFeedback === 'rewind' ? 'opacity-100 scale-100' : 'opacity-0 scale-90'}`}>
+                    <div className="px-3 py-2 rounded-xl bg-black/60 text-white font-semibold text-sm backdrop-blur-sm border border-white/10 shadow-lg">
+                        -10s
+                    </div>
+                </div>
+                <div className={`absolute right-4 top-1/2 -translate-y-1/2 transition-all duration-150 ${seekFeedback === 'forward' ? 'opacity-100 scale-100' : 'opacity-0 scale-90'}`}>
+                    <div className="px-3 py-2 rounded-xl bg-black/60 text-white font-semibold text-sm backdrop-blur-sm border border-white/10 shadow-lg">
+                        +10s
+                    </div>
+                </div>
+            </div>
+            <div className={`absolute inset-0 bg-black/30 transition-opacity flex flex-col justify-between ${showControls ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
                 <div className="flex justify-end p-2 sm:p-4">
                     <div className="flex items-center space-x-2 bg-black/60 p-2 rounded-lg backdrop-blur-sm">
                         <span className="text-white font-semibold text-sm w-12 text-center">{playbackRate.toFixed(2)}x</span>
@@ -643,6 +733,7 @@ const VideoPlayer: React.FC<{
                                 step={0.1}
                                 value={progress}
                                 onChange={handleSliderChange}
+                                onInput={handleSliderInput}
                                 onMouseDown={handleSliderMouseDown}
                                 onMouseUp={handleSliderMouseUp}
                                 onTouchStart={handleSliderMouseDown}
@@ -1427,8 +1518,8 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
 
                     {/* Colonne de droite - Section des commentaires améliorée */}
                     <div className="lg:col-span-1">
-                        <div className="sticky top-4 h-[calc(100vh-2rem)] overflow-hidden flex flex-col">
-                            <div className="flex-1 overflow-y-auto pb-4 pr-2 -mr-2 scrollbar-thin scrollbar-thumb-amber-500 scrollbar-track-gray-200 dark:scrollbar-track-gray-800">
+                        <div className="lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)] lg:overflow-hidden flex flex-col">
+                            <div className="lg:flex-1 lg:overflow-y-auto lg:pb-4 pr-2 -mr-2 scrollbar-thin scrollbar-thumb-amber-500 scrollbar-track-gray-200 dark:scrollbar-track-gray-800">
                                 <div className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-md rounded-2xl p-6 border border-gray-200/50 dark:border-gray-800/50 shadow-xl">
                                     <CommentSection
                                         itemUid={episode.uid_episode}
@@ -1442,7 +1533,7 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
 
                 {/* Section des autres épisodes de la saison */}
                 {episodesInSeason.length > 0 && (
-                    <div className="mt-0 md:mt-4 lg:mt-6 space-y-2 md:space-y-4">
+                    <div className="mt-6 md:mt-4 lg:mt-6 pt-6 md:pt-0 border-t border-gray-200 dark:border-gray-700 md:border-t-0 space-y-2 md:space-y-4">
                         <h3 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">
                             {t('otherEpisodes') || 'Autres épisodes de la saison'}
                         </h3>

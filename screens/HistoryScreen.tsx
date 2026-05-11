@@ -1,6 +1,6 @@
 // screens/HistoryScreen.tsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { statsVuesService, ContinueWatchingItem, movieService, episodeSerieService } from '../lib/firestore';
@@ -28,7 +28,7 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ onSelectMedia, onPlay, on
             }
 
             try {
-                const items = await statsVuesService.getAllHistory(user.uid);
+                const items = await statsVuesService.getAllHistory(user.uid, 50);
                 setHistoryItems(items);
             } catch (error) {
                 console.error('Error fetching history:', error);
@@ -40,7 +40,7 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ onSelectMedia, onPlay, on
         fetchHistory();
     }, [user]);
 
-    const handleItemClick = async (item: ContinueWatchingItem) => {
+    const handleItemClick = useCallback(async (item: ContinueWatchingItem) => {
         if (item.type === 'movie') {
             // C'est un film
             const movie = await movieService.getMovieByUid(item.uid);
@@ -95,7 +95,7 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ onSelectMedia, onPlay, on
                 onPlay(mediaContent, episode);
             }
         }
-    };
+    }, [onPlay]);
 
     return (
         <div className="bg-[#FBF9F3] dark:bg-black min-h-screen animate-fadeIn">

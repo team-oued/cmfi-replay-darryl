@@ -227,9 +227,6 @@ const HeroPrimeVideo: React.FC<HeroPrimeVideoProps> = ({ items: propItems, onSel
             className="w-full h-full object-cover object-left transition-opacity duration-1000"
           />
         )}
-        {/* Gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/60" />
       </div>
 
       {/* Contenu principal - Layout Prime Video */}
@@ -318,17 +315,8 @@ const HeroPrimeVideo: React.FC<HeroPrimeVideoProps> = ({ items: propItems, onSel
               </div>
             </div>
 
-            {/* Colonne droite - Image principale (visible sur desktop) */}
-            <div className="hidden lg:block relative">
-              <div className="relative aspect-[16/9] rounded-2xl overflow-hidden shadow-2xl ring-4 ring-white/10">
-                <img
-                  src={currentItem.imageUrl}
-                  alt={currentItem.title}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-              </div>
-            </div>
+            {/* Colonne droite - (Espace vide pour laisser la vidéo/image de fond visible) */}
+            <div className="hidden lg:block relative" />
           </div>
         </div>
       </div>
