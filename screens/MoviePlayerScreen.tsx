@@ -1,6 +1,6 @@
 // screens/MoviePlayerScreen.tsx
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { MediaType } from '../types';
 import { Movie, movieService, likeService, commentService, Comment, generateDefaultAvatar, viewService, getLastWatchedPositionForMovie, statsVuesService } from '../lib/firestore';
 import { appSettingsService } from '../lib/appSettingsService';
@@ -843,13 +843,6 @@ const MoviePlayerScreen: React.FC<MoviePlayerScreenProps> = ({ item, onBack }) =
         if (item.type === MediaType.Movie) {
             fetchMovieData();
         }
-
-        // Ne pas relancer la pub si elle a déjà été vue pour ce film dans cette session
-        const adKey = `ad_shown_movie_${item.id}`;
-        const wasAdShown = sessionStorage.getItem(adKey) === 'true';
-        if (!wasAdShown) {
-            setShowAd(true);
-        }
     }, [item.id, item.type]);
 
     // Fetch like data
@@ -1119,6 +1112,17 @@ const MoviePlayerScreen: React.FC<MoviePlayerScreenProps> = ({ item, onBack }) =
         </button>
     );
 
+    // Créer des callbacks mémorisés pour la publicité
+    const handleAdEnd = useCallback(() => {
+        setShowAd(false);
+        sessionStorage.setItem(getAdStateKey(), 'true');
+    }, []);
+
+    const handleAdSkip = useCallback(() => {
+        setShowAd(false);
+        sessionStorage.setItem(getAdStateKey(), 'true');
+    }, []);
+
     const [premiumForAll, setPremiumForAll] = useState(false);
 
     // Mettre à jour le titre de la page avec le nom du film
@@ -1193,16 +1197,8 @@ const MoviePlayerScreen: React.FC<MoviePlayerScreenProps> = ({ item, onBack }) =
                         <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl ring-2 ring-black/20 dark:ring-white/5">
                             {showAd && (
                                 <PromotionPlayer
-                                    onPromotionEnd={() => {
-                                        setShowAd(false);
-                                        // Sauvegarder que la pub a été vue pour cette session
-                                        sessionStorage.setItem(getAdStateKey(), 'true');
-                                    }}
-                                    onSkip={() => {
-                                        setShowAd(false);
-                                        // Sauvegarder que la pub a été vue pour cette session
-                                        sessionStorage.setItem(getAdStateKey(), 'true');
-                                    }}
+                                    onPromotionEnd={handleAdEnd}
+                                    onSkip={handleAdSkip}
                                 />
                             )}
                             {!showAd && (

@@ -1,6 +1,6 @@
 // screens/EpisodePlayerScreen.tsx
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MediaContent } from '../types';
 import { EpisodeSerie, episodeSerieService, seasonSerieService, serieService, likeService, commentService, Comment, generateDefaultAvatar, viewService, getLastWatchedPosition, statsVuesService, SeasonSerie } from '../lib/firestore';
@@ -1071,13 +1071,6 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
         };
 
         fetchLikeData();
-
-        // Ne pas relancer la pub si elle a déjà été vue pour cet épisode dans cette session
-        const adKey = `ad_shown_${episode.uid_episode}`;
-        const wasAdShown = sessionStorage.getItem(adKey) === 'true';
-        if (!wasAdShown) {
-            setShowAd(true);
-        }
     }, [episode.uid_episode, userProfile]);
 
     // Mettre à jour le titre de la page avec le nom de l'épisode
@@ -1357,6 +1350,17 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
         </button>
     );
 
+    // Créer des callbacks mémorisés pour la publicité
+    const handleAdEnd = useCallback(() => {
+        setShowAd(false);
+        sessionStorage.setItem(getAdStateKey(), 'true');
+    }, []);
+
+    const handleAdSkip = useCallback(() => {
+        setShowAd(false);
+        sessionStorage.setItem(getAdStateKey(), 'true');
+    }, []);
+
     // Afficher un indicateur de chargement pendant la vérification du statut premium
     if (isCheckingPremium) {
         return (
@@ -1432,16 +1436,8 @@ const EpisodePlayerScreen: React.FC<EpisodePlayerScreenProps> = ({ item, episode
                         <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl ring-2 ring-black/20 dark:ring-white/5">
                             {showAd && (
                                 <PromotionPlayer
-                                    onPromotionEnd={() => {
-                                        setShowAd(false);
-                                        // Sauvegarder que la pub a été vue pour cette session
-                                        sessionStorage.setItem(getAdStateKey(), 'true');
-                                    }}
-                                    onSkip={() => {
-                                        setShowAd(false);
-                                        // Sauvegarder que la pub a été vue pour cette session
-                                        sessionStorage.setItem(getAdStateKey(), 'true');
-                                    }}
+                                    onPromotionEnd={handleAdEnd}
+                                    onSkip={handleAdSkip}
                                 />
                             )}
                             {!showAd && (
