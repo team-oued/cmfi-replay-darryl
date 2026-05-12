@@ -535,11 +535,20 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                         <div className="flex space-x-3 md:space-x-4 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-4">
                             {continueWatchingItems.slice(0, 10).map((item) => (
                                 <div key={item.id} className="flex-shrink-0 w-36 md:w-48 group cursor-pointer" onClick={() => handleContinueWatchingClick(item)}>
-                                    <div className="relative aspect-[2/3] rounded-lg overflow-hidden mb-3 transition-transform duration-300 group-hover:scale-105">
+                                    <div className="relative aspect-[2/3] rounded-lg border-2 border-gray-300 dark:border-gray-600 overflow-hidden mb-3 transition-colors duration-300 group-hover:border-blue-500 dark:group-hover:border-blue-400">
+                                        {/* Fond qui prolonge l'image avec effet de flou */}
+                                        <div className="absolute inset-0 w-full h-full">
+                                            <img
+                                                src={item.imageUrl}
+                                                alt={item.title}
+                                                className="w-full h-full object-cover blur-xl scale-110 opacity-30 dark:opacity-20"
+                                            />
+                                            <div className="absolute inset-0 bg-gradient-to-t from-gray-900/40 via-gray-900/20 to-gray-900/30 dark:from-black/60 dark:via-black/30 dark:to-black/40"></div>
+                                        </div>
                                         <img
                                             src={item.imageUrl}
                                             alt={item.title}
-                                            className="w-full h-full object-cover"
+                                            className="w-full h-full object-contain relative z-10 transition-transform duration-300 group-hover:scale-105"
                                         />
                                         {/* Progress bar */}
                                         <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-black/60">

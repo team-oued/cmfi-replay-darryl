@@ -32,15 +32,21 @@ const MediaCard: React.FC<MediaCardProps> = ({ item, variant = 'thumbnail', onSe
   if (variant === 'poster') {
     return (
       <div onClick={handleSelect} className="flex-shrink-0 w-36 md:w-48 space-y-2.5 cursor-pointer group relative">
-        <div className={`relative aspect-[2/3] bg-gray-200 dark:bg-gray-700 rounded-lg md:rounded-xl overflow-hidden ${
+        <div className={`relative aspect-[2/3] rounded-lg border-2 border-gray-300 dark:border-gray-600 overflow-hidden transition-colors duration-300 group-hover:border-blue-500 dark:group-hover:border-blue-400 ${
           is_premium ? 'ring-2 ring-amber-400/60' : ''
         }`}>
+          {/* Fond qui prolonge l'image avec effet de flou */}
+          <div className="absolute inset-0 w-full h-full">
+            <img 
+              src={imageUrl} 
+              alt={title} 
+              className="w-full h-full object-cover blur-xl scale-110 opacity-30 dark:opacity-20"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-gray-900/40 via-gray-900/20 to-gray-900/30 dark:from-black/60 dark:via-black/30 dark:to-black/40"></div>
+          </div>
+          
           {is_premium && (
             <>
-              {/* Effet de brillance sur la bordure */}
-              <div className="absolute inset-0 z-0 rounded-lg md:rounded-xl border-2 border-transparent bg-gradient-to-br from-amber-300 via-yellow-400 to-amber-500 opacity-60 pointer-events-none">
-                <div className="w-full h-full bg-gray-900 dark:bg-black rounded-lg md:rounded-xl"></div>
-              </div>
               {/* Badge Premium */}
               <div className="absolute top-2 right-2 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-black/90 border border-amber-400/50 backdrop-blur-sm">
                 <CrownIcon />
@@ -51,7 +57,7 @@ const MediaCard: React.FC<MediaCardProps> = ({ item, variant = 'thumbnail', onSe
           <img 
             src={imageUrl} 
             alt={title} 
-            className="w-full h-full object-cover relative z-10 transition-transform duration-700 group-hover:scale-110" 
+            className="w-full h-full object-contain relative z-10 transition-transform duration-300 group-hover:scale-105" 
           />
           <div
             onClick={handlePlay}
@@ -62,7 +68,7 @@ const MediaCard: React.FC<MediaCardProps> = ({ item, variant = 'thumbnail', onSe
             </div>
           </div>
         </div>
-        <h3 className="text-gray-900 dark:text-white text-sm font-bold break-words group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors duration-300">{title}</h3>
+        <h3 className="text-gray-900 dark:text-white text-sm font-bold break-words group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-300">{title}</h3>
         {author && <p className="text-gray-500 dark:text-gray-400 text-xs break-words">{author}</p>}
       </div>
     );

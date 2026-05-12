@@ -16,10 +16,36 @@ const HeroPrimeVideo: React.FC<HeroPrimeVideoProps> = ({ items: propItems, onSel
   const [movies, setMovies] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(true);
   const [videoError, setVideoError] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const randomStartTimeRef = React.useRef<number>(0);
   const isSeekingRef = React.useRef<boolean>(false);
   const { t, bookmarkedIds, toggleBookmark, isPremium } = useAppContext();
+
+  // Détecter la taille d'écran pour une gestion précise des titres
+  useEffect(() => {
+    const checkScreenSize = () => {
+      const width = window.innerWidth;
+      setIsMobile(width < 768);
+    };
+    
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
+
+  // Calculer le nombre de lignes selon la taille d'écran
+  const getLineClamp = () => {
+    if (typeof window !== 'undefined') {
+      const width = window.innerWidth;
+      if (width < 640) return 4;      // mobile petit
+      if (width < 768) return 3;      // mobile grand
+      if (width < 1024) return 3;     // tablette
+      if (width < 1280) return 2;     // desktop petit
+      return 2;                        // desktop grand
+    }
+    return 2;
+  };
 
   // Récupérer les films populaires
   useEffect(() => {
@@ -211,7 +237,7 @@ const HeroPrimeVideo: React.FC<HeroPrimeVideoProps> = ({ items: propItems, onSel
             ref={videoRef}
             key={currentItem.id}
             src={videoUrl}
-            className="w-full h-full object-cover object-left transition-opacity duration-1000"
+            className="absolute inset-0 w-full h-full object-cover object-left transition-opacity duration-1000"
             muted
             playsInline
             loop
@@ -220,18 +246,36 @@ const HeroPrimeVideo: React.FC<HeroPrimeVideoProps> = ({ items: propItems, onSel
             style={{ objectFit: 'cover' }}
           />
         ) : (
-          <img
-            key={currentItem.id}
-            src={currentItem.imageUrl}
-            alt={currentItem.title}
-            className="w-full h-full object-cover object-left transition-opacity duration-1000"
-          />
+          <>
+            {/* Fond flou dynamique */}
+            <div className="absolute inset-0">
+              <img
+                src={currentItem.imageUrl}
+                alt=""
+                className="w-full h-full object-cover blur-2xl scale-110 opacity-40"
+              />
+              <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
+            </div>
+            
+            {/* Image principale centrée */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <img
+                key={currentItem.id}
+                src={currentItem.imageUrl}
+                alt={currentItem.title}
+                className="h-full w-auto max-w-full object-contain transition-opacity duration-1000 z-10"
+              />
+            </div>
+          </>
         )}
       </div>
 
       {/* Contenu principal - Layout Prime Video */}
       <div className="relative z-10 h-full flex items-center w-full max-w-[100vw] overflow-hidden">
-        <div className="w-full max-w-[100%] px-4 md:px-8 lg:px-12 mx-auto">
+        {/* Dégradé sombre pour améliorer le contraste du texte */}
+        <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/60 to-transparent lg:from-black/70 lg:via-black/50 lg:to-transparent"></div>
+        
+        <div className="w-full max-w-[100%] px-4 md:px-8 lg:px-12 mx-auto relative z-10">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
             {/* Colonne gauche - Contenu textuel */}
             <div className="space-y-6 md:space-y-8">
@@ -245,22 +289,25 @@ const HeroPrimeVideo: React.FC<HeroPrimeVideoProps> = ({ items: propItems, onSel
                 </div>
               )}
 
-              {/* Titre principal */}
-              <div className="w-full max-w-4xl overflow-hidden">
+              {/* Titre principal adaptatif */}
+              <div className="w-full max-w-4xl lg:max-w-5xl xl:max-w-6xl overflow-hidden">
                 <h1 
-                  className="text-4xl md:text-5xl lg:text-5xl xl:text-6xl 2xl:text-6xl font-black text-white leading-tight break-words overflow-visible"
+                  className="font-black text-white leading-tight break-words transition-all duration-300"
                   style={{
+                    fontSize: 'clamp(1.1rem, 3.2vw, 2.8rem)',
+                    lineHeight: 'clamp(1.3rem, 3.8vw, 3.2rem)',
                     display: '-webkit-box',
-                    WebkitLineClamp: 2,
+                    WebkitLineClamp: getLineClamp(),
                     WebkitBoxOrient: 'vertical',
                     textOverflow: 'ellipsis',
-                    maxHeight: '3.5em',
-                    lineHeight: '1.2',
                     overflow: 'hidden',
-                    wordBreak: 'break-word'
+                    wordBreak: 'break-word',
+                    letterSpacing: '-0.005em',
+                    textTransform: 'uppercase',
+                    hyphens: 'auto'
                   }}
                 >
-                  {currentItem.title.toUpperCase()}
+                  {currentItem.title}
                 </h1>
               </div>
 
@@ -323,42 +370,44 @@ const HeroPrimeVideo: React.FC<HeroPrimeVideoProps> = ({ items: propItems, onSel
 
       {/* Contrôles de navigation et indicateurs de carrousel */}
       {items.length > 1 && (
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex items-center gap-4">
+        <>
+          {/* Contrôles latéraux */}
           <button
             onClick={handlePrev}
-            className="p-2.5 bg-black/60 hover:bg-black/80 backdrop-blur-sm rounded-full border border-white/20 transition-all duration-300 hover:scale-110"
+            className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 z-20 p-3 md:p-4 bg-black/60 hover:bg-black/80 backdrop-blur-sm rounded-full border border-white/20 transition-all duration-300 hover:scale-110 opacity-0 md:opacity-100 group-hover:opacity-100"
             aria-label="Précédent"
           >
-            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-5 h-5 md:w-6 md:h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
 
-          <div className="flex items-center gap-2">
+          <button
+            onClick={handleNext}
+            className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 z-20 p-3 md:p-4 bg-black/60 hover:bg-black/80 backdrop-blur-sm rounded-full border border-white/20 transition-all duration-300 hover:scale-110 opacity-0 md:opacity-100 group-hover:opacity-100"
+            aria-label="Suivant"
+          >
+            <svg className="w-5 h-5 md:w-6 md:h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+
+          {/* Indicateurs en bas */}
+          <div className="absolute bottom-6 md:bottom-8 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 md:gap-3 px-4 py-2 bg-black/40 backdrop-blur-md rounded-full border border-white/10">
             {items.map((_, index) => (
               <button
                 key={index}
                 onClick={() => setCurrentIndex(index)}
-                className={`h-2 rounded-full transition-all duration-300 ${
+                className={`transition-all duration-300 ${
                   index === currentIndex
-                    ? 'w-6 bg-white'
-                    : 'w-2 bg-white/40 hover:bg-white/60'
+                    ? 'w-8 h-2 bg-white rounded-full'
+                    : 'w-2 h-2 bg-white/40 hover:bg-white/60 rounded-full'
                 }`}
                 aria-label={`Aller à la slide ${index + 1}`}
               />
             ))}
           </div>
-
-          <button
-            onClick={handleNext}
-            className="p-2.5 bg-black/60 hover:bg-black/80 backdrop-blur-sm rounded-full border border-white/20 transition-all duration-300 hover:scale-110"
-            aria-label="Suivant"
-          >
-            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        </div>
+        </>
       )}
     </div>
   );
