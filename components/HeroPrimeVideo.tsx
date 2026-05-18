@@ -459,10 +459,10 @@ const HeroPrimeVideo: React.FC<HeroPrimeVideoProps> = ({ items: propItems, onSel
       {/* Contrôles de navigation et indicateurs de carrousel */}
       {items.length > 1 && (
         <>
-          {/* Contrôles latéraux */}
+          {/* Contrôles de navigation en bas */}
           <button
             onClick={handlePrev}
-            className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 z-20 p-3 md:p-4 bg-black/60 hover:bg-black/80 backdrop-blur-sm rounded-full border border-white/20 transition-all duration-300 hover:scale-110 opacity-0 md:opacity-100 group-hover:opacity-100"
+            className="absolute left-4 md:left-8 bottom-6 md:bottom-8 z-20 p-3 md:p-4 bg-black/60 hover:bg-black/80 backdrop-blur-sm rounded-full border border-white/20 transition-all duration-300 hover:scale-110"
             aria-label="Précédent"
           >
             <svg className="w-5 h-5 md:w-6 md:h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -472,7 +472,7 @@ const HeroPrimeVideo: React.FC<HeroPrimeVideoProps> = ({ items: propItems, onSel
 
           <button
             onClick={handleNext}
-            className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 z-20 p-3 md:p-4 bg-black/60 hover:bg-black/80 backdrop-blur-sm rounded-full border border-white/20 transition-all duration-300 hover:scale-110 opacity-0 md:opacity-100 group-hover:opacity-100"
+            className="absolute right-4 md:right-8 bottom-6 md:bottom-8 z-20 p-3 md:p-4 bg-black/60 hover:bg-black/80 backdrop-blur-sm rounded-full border border-white/20 transition-all duration-300 hover:scale-110"
             aria-label="Suivant"
           >
             <svg className="w-5 h-5 md:w-6 md:h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -480,29 +480,29 @@ const HeroPrimeVideo: React.FC<HeroPrimeVideoProps> = ({ items: propItems, onSel
             </svg>
           </button>
 
-          {/* Indicateurs en bas */}
-          <div className="absolute bottom-6 md:bottom-8 left-1/2 -translate-x-1/2 z-20 px-4 py-2 bg-black/40 backdrop-blur-md rounded-full border border-white/10 relative">
-            <div className="absolute left-4 right-4 top-2 h-1 bg-white/20 rounded-full overflow-hidden">
-              <div className="h-full bg-white/80 transition-[width] duration-100" style={{ width: `${slideProgress * 100}%` }} />
-            </div>
-            <div className="flex items-center gap-2 md:gap-3 pt-3">
-              {items.map((_, index) => (
-                <button
-                  key={index}
-                  onClick={() => {
-                    restartCarouselTimer();
-                    setCurrentIndex(index);
-                    setVideoError(false);
-                  }}
-                  className={`transition-all duration-300 ${
-                    index === currentIndex
-                      ? 'w-8 h-2 bg-white rounded-full'
-                      : 'w-2 h-2 bg-white/40 hover:bg-white/60 rounded-full'
-                  }`}
-                  aria-label={`Aller à la slide ${index + 1}`}
-                />
-              ))}
-            </div>
+          {/* Barre de progression séparée */}
+          <div className="absolute bottom-14 md:bottom-16 left-1/2 -translate-x-1/2 z-20 w-32 md:w-48 h-1 bg-white/20 rounded-full overflow-hidden">
+            <div className="h-full bg-white/80 transition-[width] duration-100" style={{ width: `${slideProgress * 100}%` }} />
+          </div>
+
+          {/* Indicateurs centrés entre les flèches */}
+          <div className="absolute bottom-6 md:bottom-8 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 md:gap-3">
+            {items.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => {
+                  restartCarouselTimer();
+                  setCurrentIndex(index);
+                  setVideoError(false);
+                }}
+                className={`transition-all duration-300 ${
+                  index === currentIndex
+                    ? 'w-8 h-2 bg-white rounded-full'
+                    : 'w-2 h-2 bg-white/40 hover:bg-white/60 rounded-full'
+                }`}
+                aria-label={`Aller à la slide ${index + 1}`}
+              />
+            ))}
           </div>
         </>
       )}

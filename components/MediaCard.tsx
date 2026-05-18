@@ -41,6 +41,7 @@ const MediaCard: React.FC<MediaCardProps> = React.memo(({ item, variant = 'thumb
               src={imageUrl} 
               alt={title} 
               className="w-full h-full object-cover blur-xl scale-110 opacity-30 dark:opacity-20"
+              loading="lazy"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-gray-900/40 via-gray-900/20 to-gray-900/30 dark:from-black/60 dark:via-black/30 dark:to-black/40"></div>
           </div>

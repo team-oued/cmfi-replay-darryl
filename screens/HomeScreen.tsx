@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Hero from '../components/Hero';
 import HeroPrimeVideo from '../components/HeroPrimeVideo';
 import HeroNetflix from '../components/HeroNetflix';
@@ -6,7 +6,7 @@ import MediaCard from '../components/MediaCard';
 import RankedMediaCard from '../components/RankedMediaCard';
 import UserAvatar from '../components/UserAvatar';
 import CategoryTiles from '../components/CategoryTiles';
-import { MediaCardSkeleton, UserAvatarSkeleton, HeroSkeleton, ContinueWatchingSkeleton, CategoryTilesSkeleton, MostLikedSkeleton } from '../components/Skeleton';
+import { MediaCardSkeleton, UserAvatarSkeleton, ContinueWatchingSkeleton, CategoryTilesSkeleton, MostLikedSkeleton } from '../components/Skeleton';
 import { featuredContent } from '../data/mockData';
 import { PlayIcon } from '../components/icons';
 
@@ -16,6 +16,13 @@ import { userService, generateDefaultAvatar, likeService, movieService, episodeS
 import ContinueWatchingSection from '../components/ContinueWatchingSection';
 import InfoBar from '../components/InfoBar';
 import ProfileCompletionModal from '../components/ProfileCompletionModal';
+import MoviesSection from '../components/sections/MoviesSection';
+import SeriesSection from '../components/sections/SeriesSection';
+import PodcastsSection from '../components/sections/PodcastsSection';
+import MostWatchedSection from '../components/sections/MostWatchedSection';
+import MostLikedSection from '../components/sections/MostLikedSection';
+import CategorySections from '../components/sections/CategorySections';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 const MediaRow: React.FC<{ title: string; items: MediaContent[]; onSelectMedia: (item: MediaContent) => void; onPlay: (item: MediaContent) => void; variant?: 'poster' | 'thumbnail' | 'list' }> = ({ title, items, onSelectMedia, onPlay, variant }) => {
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
@@ -26,16 +33,23 @@ const MediaRow: React.FC<{ title: string; items: MediaContent[]; onSelectMedia: 
         const container = scrollContainerRef.current;
         if (!container) return;
 
+        let timeoutId: NodeJS.Timeout | null = null;
         const checkScroll = () => {
-            const { scrollLeft, scrollWidth, clientWidth } = container;
-            setShowLeftGradient(scrollLeft > 10);
-            setShowRightGradient(scrollLeft < scrollWidth - clientWidth - 10);
+            if (timeoutId) return;
+            
+            timeoutId = setTimeout(() => {
+                const { scrollLeft, scrollWidth, clientWidth } = container;
+                setShowLeftGradient(scrollLeft > 10);
+                setShowRightGradient(scrollLeft < scrollWidth - clientWidth - 10);
+                timeoutId = null;
+            }, 100);
         };
 
         checkScroll();
         container.addEventListener('scroll', checkScroll);
         window.addEventListener('resize', checkScroll);
         return () => {
+            if (timeoutId) clearTimeout(timeoutId);
             container.removeEventListener('scroll', checkScroll);
             window.removeEventListener('resize', checkScroll);
         };
@@ -140,35 +154,16 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
 
     // Vérifier si le profil doit être complété
     useEffect(() => {
-        console.log('🔍 Vérification profil:', {
-            userProfile: !!userProfile,
-            user: !!user,
-            country: userProfile?.country,
-            phoneNumber: userProfile?.phoneNumber,
-            shouldShow: userProfile && user && (!userProfile.country || !userProfile.phoneNumber)
-        });
-        
         if (userProfile && user) {
             // Vérifier si le pays est manquant (seul champ obligatoire)
             const countryMissing = !userProfile.country || userProfile.country.trim() === '';
             const needsCompletion = countryMissing; // Seul le pays est obligatoire
             
-            console.log('📋 Profil à compléter?', {
-                countryMissing,
-                needsCompletion,
-                country: userProfile.country,
-                phoneNumber: userProfile.phoneNumber
-            });
-            
             if (needsCompletion) {
-                console.log('✅ Affichage du modal');
                 setShowProfileModal(true);
             } else {
-                console.log('❌ Profil complet, pas de modal');
                 setShowProfileModal(false);
             }
-        } else {
-            console.log('⏳ En attente du chargement du profil ou de l\'utilisateur');
         }
     }, [userProfile, user]);
     const [loadingMostLiked, setLoadingMostLiked] = useState(true);
@@ -182,37 +177,34 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
     const [loadingSeries, setLoadingSeries] = useState(true);
     const [podcasts, setPodcasts] = useState<Serie[]>([]);
     const [loadingPodcasts, setLoadingPodcasts] = useState(true);
-    const [loadingHero, setLoadingHero] = useState(true);
-    const [loadingCategories, setLoadingCategories] = useState(true);
     const [serieCategories, setSerieCategories] = useState<SerieCategory[]>([]);
     const [seriesByCategory, setSeriesByCategory] = useState<Record<string, Serie[]>>({});
     const [loadingSeriesByCategory, setLoadingSeriesByCategory] = useState(true);
 
-    // Simuler le chargement du Hero
+    // Combined data fetching for independent data sources
     useEffect(() => {
-        const timer = setTimeout(() => {
-            setLoadingHero(false);
-        }, 1500);
-        return () => clearTimeout(timer);
-    }, []);
-
-    // Simuler le chargement des catégories
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            setLoadingCategories(false);
-        }, 1000);
-        return () => clearTimeout(timer);
-    }, []);
-
-    useEffect(() => {
-        const fetchMostLikedItems = async () => {
+        const fetchAllData = async () => {
             try {
-                const likedItems = await likeService.getMostLikedItems(10);
+                // Fetch all independent data sources in parallel
+                const [
+                    likedItems,
+                    watchedItems,
+                    moviesData,
+                    seriesData,
+                    podcastsData,
+                    categories
+                ] = await Promise.all([
+                    likeService.getMostLikedItems(10),
+                    viewService.getMostWatchedItems(10),
+                    movieService.getTenHomeMovies(),
+                    serieService.getTenHomeSeries(),
+                    serieService.getTenHomePodcasts(),
+                    serieCategoryService.getAllCategories()
+                ]);
 
-                // Récupérer les détails de chaque item (film ou épisode)
+                // Process most liked items
                 const itemsWithDetails = await Promise.all(
                     likedItems.map(async (item) => {
-                        // Essayer de récupérer comme film
                         let movie = await movieService.getMovieByUid(item.uid);
                         if (movie && !movie.hidden) {
                             const mediaContent: MediaContent = {
@@ -230,7 +222,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                             return { content: mediaContent, likeCount: item.likeCount };
                         }
 
-                        // Sinon essayer comme épisode
                         let episode = await episodeSerieService.getEpisodeByUid(item.uid);
                         if (episode && !episode.hidden) {
                             const mediaContent: MediaContent = {
@@ -251,30 +242,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                         return null;
                     })
                 );
-
-                // Filtrer les items null
-                const validItems = itemsWithDetails.filter((item): item is { content: MediaContent; likeCount: number; viewCount?: number } => item !== null);
-                setMostLikedItems(validItems);
-            } catch (error) {
-                console.error('Error fetching most liked items:', error);
-            } finally {
+                const validLikedItems = itemsWithDetails.filter((item): item is { content: MediaContent; likeCount: number; viewCount?: number } => item !== null);
+                setMostLikedItems(validLikedItems);
                 setLoadingMostLiked(false);
-            }
-        };
 
-        fetchMostLikedItems();
-    }, []);
-
-    useEffect(() => {
-        const fetchMostWatchedItems = async () => {
-            try {
-                const watchedItems = await viewService.getMostWatchedItems(10);
-
-                // Récupérer les détails de chaque item (film ou épisode)
-                const itemsWithDetails = await Promise.all(
+                // Process most watched items
+                const watchedWithDetails = await Promise.all(
                     watchedItems.map(async (item) => {
                         if (item.type === 'movie') {
-                            // Récupérer le film
                             let movie = await movieService.getMovieByUid(item.uid);
                             if (movie && !movie.hidden) {
                                 const mediaContent: MediaContent = {
@@ -292,7 +267,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                                 return { content: mediaContent, likeCount: item.viewCount, viewCount: item.viewCount };
                             }
                         } else {
-                            // Récupérer l'épisode
                             let episode = await episodeSerieService.getEpisodeByUid(item.uid);
                             if (episode && !episode.hidden) {
                                 const mediaContent: MediaContent = {
@@ -310,26 +284,51 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                                 return { content: mediaContent, likeCount: item.viewCount, viewCount: item.viewCount };
                             }
                         }
-
                         return null;
                     })
                 );
-
-                // Filtrer les items null
-                const validItems = itemsWithDetails
-                    .filter((item): item is { content: MediaContent; likeCount: number; viewCount: number } => item !== null);
-                setMostWatchedItems(validItems);
-            } catch (error) {
-                console.error('Error fetching most watched items:', error);
-            } finally {
+                const validWatchedItems = watchedWithDetails.filter((item): item is { content: MediaContent; likeCount: number; viewCount: number } => item !== null);
+                setMostWatchedItems(validWatchedItems);
                 setLoadingMostWatched(false);
+
+                // Set basic data
+                setMovies(moviesData);
+                setLoadingMovies(false);
+
+                setSeries(seriesData);
+                setLoadingSeries(false);
+
+                setPodcasts(podcastsData);
+                setLoadingPodcasts(false);
+
+                // Process categories and series by category
+                setSerieCategories(categories);
+                const seriesByCat: Record<string, Serie[]> = {};
+                for (const category of categories) {
+                    const categorySeries = await serieCategoryService.getSeriesByCategory(category.id);
+                    if (categorySeries.length > 0) {
+                        seriesByCat[category.id] = categorySeries;
+                    }
+                }
+                setSeriesByCategory(seriesByCat);
+                setLoadingSeriesByCategory(false);
+
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                // Set loading states to false even on error
+                setLoadingMostLiked(false);
+                setLoadingMostWatched(false);
+                setLoadingMovies(false);
+                setLoadingSeries(false);
+                setLoadingPodcasts(false);
+                setLoadingSeriesByCategory(false);
             }
         };
 
-        fetchMostWatchedItems();
+        fetchAllData();
     }, []);
 
-    // Récupérer les éléments "Continuer la lecture"
+    // Récupérer les éléments "Continuer la lecture" (depends on user state)
     useEffect(() => {
         const fetchContinueWatching = async () => {
             if (!user) {
@@ -350,88 +349,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
         fetchContinueWatching();
     }, [user]);
 
-    // Récupérer les films
-    useEffect(() => {
-        const fetchMovies = async () => {
-            try {
-                const moviesData = await movieService.getTenHomeMovies();
-                setMovies(moviesData);
-            } catch (error) {
-                console.error('Error fetching movies:', error);
-            } finally {
-                setLoadingMovies(false);
-            }
-        };
-
-        fetchMovies();
-    }, []);
-
-    // Récupérer les séries
-    useEffect(() => {
-        const fetchSeries = async () => {
-            try {
-                const seriesData = await serieService.getTenHomeSeries();
-                setSeries(seriesData);
-            } catch (error) {
-                console.error('Error fetching series:', error);
-            } finally {
-                setLoadingSeries(false);
-            }
-        };
-
-        fetchSeries();
-    }, []);
-
-    // Charger les catégories et les séries par catégorie
-    useEffect(() => {
-        const fetchCategoriesAndSeries = async () => {
-            setLoadingSeriesByCategory(true);
-            try {
-                // Charger toutes les catégories
-                const categories = await serieCategoryService.getAllCategories();
-                console.log('📁 Catégories chargées:', categories);
-                setSerieCategories(categories);
-
-                // Charger les séries pour chaque catégorie
-                const seriesByCat: Record<string, Serie[]> = {};
-                for (const category of categories) {
-                    const categorySeries = await serieCategoryService.getSeriesByCategory(category.id);
-                    console.log(`📺 Séries pour la catégorie "${category.name}" (ID: ${category.id}):`, categorySeries.length, categorySeries);
-                    if (categorySeries.length > 0) {
-                        seriesByCat[category.id] = categorySeries;
-                    } else {
-                        console.log(`⚠️ Aucune série trouvée pour la catégorie "${category.name}". Assurez-vous que les séries ont un champ "categoryId" avec la valeur "${category.id}"`);
-                    }
-                }
-                console.log('📊 Séries par catégorie:', seriesByCat);
-                console.log('📊 Nombre total de catégories avec séries:', Object.keys(seriesByCat).length);
-                setSeriesByCategory(seriesByCat);
-            } catch (error) {
-                console.error('Error fetching categories and series:', error);
-            } finally {
-                setLoadingSeriesByCategory(false);
-            }
-        };
-        fetchCategoriesAndSeries();
-    }, []);
-
-    // Récupérer les podcasts
-    useEffect(() => {
-        const fetchPodcasts = async () => {
-            try {
-                const podcastsData = await serieService.getTenHomePodcasts();
-                setPodcasts(podcastsData);
-            } catch (error) {
-                console.error('Error fetching podcasts:', error);
-            } finally {
-                setLoadingPodcasts(false);
-            }
-        };
-
-        fetchPodcasts();
-    }, []);
-
-    const handleContinueWatchingClick = async (item: ContinueWatchingItem) => {
+    const handleContinueWatchingClick = useCallback(async (item: ContinueWatchingItem) => {
         if (item.type === 'movie') {
             // C'est un film
             const movie = await movieService.getMovieByUid(item.uid);
@@ -488,18 +406,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                 onPlay(mediaContent, episode);
             }
         }
-    };
+    }, [onPlay]);
 
     return (
         <div className="min-h-screen bg-[#FBF9F3] dark:bg-black">
 
             {/* Hero Section Prime Video */}
             <div className="animate-fadeIn">
-                {loadingHero ? (
-                    <HeroSkeleton />
-                ) : (
-                    <HeroPrimeVideo items={featuredContent} onSelectMedia={onSelectMedia} onPlay={onPlay} />
-                )}
+                <HeroPrimeVideo items={featuredContent} onSelectMedia={onSelectMedia} onPlay={onPlay} />
             </div>
 
             {/* Barre d'information déroulante */}
@@ -574,310 +488,58 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                 )}
 
                 {/* Section Films */}
-                {movies.length > 0 && (
-                    <div className="py-6 md:py-8 lg:py-10 mt-4 md:mt-6">
-                        <div className="px-4 md:px-6 lg:px-8 mb-6">
-                            <div className="flex items-center justify-between">
-                                <h3 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
-                                    {t('films') || 'Films'}
-                                </h3>
-                                <button
-                                    onClick={() => navigateToCategory(MediaType.Movie)}
-                                    className="text-sm md:text-base text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold transition-colors"
-                                >
-                                    {t('viewAll') || 'Voir plus'} →
-                                </button>
-                            </div>
-                        </div>
-                        <div className="flex space-x-3 md:space-x-4 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-4">
-                            {movies.map((movie) => {
-                                const mediaContent: MediaContent = {
-                                    id: movie.uid,
-                                    type: MediaType.Movie,
-                                    title: movie.title,
-                                    author: undefined,
-                                    theme: '',
-                                    imageUrl: movie.picture_path || movie.backdrop_path || movie.poster_path,
-                                    duration: movie.runtime_h_m,
-                                    description: movie.overview,
-                                    languages: [movie.original_language],
-                                    video_path_hd: movie.video_path_hd
-                                };
-                                return (
-                                    <div key={movie.uid} className="flex-shrink-0">
-                                        <MediaCard
-                                            item={mediaContent}
-                                            variant="poster"
-                                            onSelect={onSelectMedia}
-                                            onPlay={onPlay}
-                                        />
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                )}
+                <MoviesSection
+                    movies={movies}
+                    onSelectMedia={onSelectMedia}
+                    onPlay={onPlay}
+                    navigateToCategory={navigateToCategory}
+                    t={t}
+                />
 
                 {/* Section Séries */}
-                {series.length > 0 && (
-                    <div className="py-6 md:py-8 lg:py-10 mt-4 md:mt-6">
-                        <div className="px-4 md:px-6 lg:px-8 mb-6">
-                            <div className="flex items-center justify-between">
-                                <h3 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
-                                    {t('seriesTitle') || 'Séries'}
-                                </h3>
-                                <button
-                                    onClick={() => navigateToCategory(MediaType.Series)}
-                                    className="text-sm md:text-base text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold transition-colors"
-                                >
-                                    {t('viewAll') || 'Voir plus'} →
-                                </button>
-                            </div>
-                        </div>
-                        <div className="flex space-x-3 md:space-x-4 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-4">
-                            {series.map((serie) => {
-                                const mediaContent: MediaContent = {
-                                    id: serie.uid_serie,
-                                    type: MediaType.Series,
-                                    title: serie.title_serie,
-                                    author: '',
-                                    theme: '',
-                                    imageUrl: serie.image_path || serie.back_path,
-                                    duration: serie.runtime_h_m,
-                                    description: serie.overview_serie,
-                                    languages: [],
-                                    video_path_hd: ''
-                                };
-                                return (
-                                    <div key={serie.uid_serie} className="flex-shrink-0">
-                                        <MediaCard
-                                            item={mediaContent}
-                                            variant="poster"
-                                            onSelect={onSelectMedia}
-                                            onPlay={onPlay}
-                                        />
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                )}
+                <SeriesSection
+                    series={series}
+                    onSelectMedia={onSelectMedia}
+                    onPlay={onPlay}
+                    navigateToCategory={navigateToCategory}
+                    t={t}
+                />
 
                 {/* Sections par catégorie */}
-                {!loadingSeriesByCategory && (
-                    <>
-                        {serieCategories.length === 0 ? (
-                            <div className="px-4 md:px-6 lg:px-8 py-4 text-sm text-gray-500 dark:text-gray-400">
-                                💡 Aucune catégorie créée. Créez des catégories dans la page Admin pour organiser vos séries.
-                            </div>
-                        ) : (
-                            serieCategories.map((category) => {
-                                const categorySeries = seriesByCategory[category.id] || [];
-                                
-                                // Afficher la catégorie même si elle est vide
-                                if (categorySeries.length === 0) {
-                                    return (
-                                        <div key={category.id} className="py-6 md:py-8 lg:py-10 mt-4 md:mt-6">
-                                            <div className="px-4 md:px-6 lg:px-8 mb-6">
-                                                <div className="flex items-center gap-3">
-                                                    <div
-                                                        className="w-1 h-8 rounded-full"
-                                                        style={{ backgroundColor: category.color || '#3B82F6' }}
-                                                    />
-                                                    <h3 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
-                                                        {category.name}
-                                                    </h3>
-                                                </div>
-                                            </div>
-                                            <div className="px-4 md:px-6 lg:px-8">
-                                                <p className="text-sm text-gray-500 dark:text-gray-400 italic">
-                                                    Aucune série dans cette catégorie. Assignez des séries à cette catégorie dans la page Admin.
-                                                </p>
-                                            </div>
-                                        </div>
-                                    );
-                                }
-
-                                return (
-                                    <div key={category.id} className="py-6 md:py-8 lg:py-10 mt-4 md:mt-6">
-                                        <div className="px-4 md:px-6 lg:px-8 mb-6">
-                                            <div className="flex items-center gap-3">
-                                                <div
-                                                    className="w-1 h-8 rounded-full"
-                                                    style={{ backgroundColor: category.color || '#3B82F6' }}
-                                                />
-                                                <h3 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
-                                                    {category.name}
-                                                </h3>
-                                            </div>
-                                            {category.description && (
-                                                <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 ml-4">
-                                                    {category.description}
-                                                </p>
-                                            )}
-                                        </div>
-                                        <div className="flex space-x-3 md:space-x-4 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-4">
-                                            {categorySeries.map((serie) => {
-                                                const mediaContent: MediaContent = {
-                                                    id: serie.uid_serie,
-                                                    type: MediaType.Series,
-                                                    title: serie.title_serie,
-                                                    author: '',
-                                                    theme: '',
-                                                    imageUrl: serie.image_path || serie.back_path,
-                                                    duration: serie.runtime_h_m,
-                                                    description: serie.overview_serie,
-                                                    languages: [],
-                                                    video_path_hd: ''
-                                                };
-                                                return (
-                                                    <div key={serie.uid_serie} className="flex-shrink-0">
-                                                        <MediaCard
-                                                            item={mediaContent}
-                                                            variant="poster"
-                                                            onSelect={onSelectMedia}
-                                                            onPlay={onPlay}
-                                                        />
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                );
-                            })
-                        )}
-                    </>
-                )}
+                <CategorySections
+                    serieCategories={serieCategories}
+                    seriesByCategory={seriesByCategory}
+                    loading={loadingSeriesByCategory}
+                    onSelectMedia={onSelectMedia}
+                    onPlay={onPlay}
+                />
 
                 {/* Section Podcasts */}
-                {podcasts.length > 0 && (
-                    <div className="py-6 md:py-8 lg:py-10 mt-4 md:mt-6">
-                        <div className="px-4 md:px-6 lg:px-8 mb-6">
-                            <div className="flex items-center justify-between">
-                                <h3 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
-                                    {t('podcastsTitle') || 'Podcasts'}
-                                </h3>
-                                <button
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        console.log('🔍 Clic sur bouton Podcasts (Prime), navigation vers /podcasts');
-                                        navigateToCategory(MediaType.Podcast);
-                                    }}
-                                    className="text-sm md:text-base text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold transition-colors"
-                                >
-                                    {t('viewAll') || 'Voir plus'} →
-                                </button>
-                            </div>
-                        </div>
-                        <div className="flex space-x-3 md:space-x-4 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-4">
-                            {podcasts.map((podcast) => {
-                                const mediaContent: MediaContent = {
-                                    id: podcast.uid_serie,
-                                    type: MediaType.Podcast,
-                                    title: podcast.title_serie,
-                                    author: '',
-                                    theme: '',
-                                    imageUrl: podcast.image_path || podcast.back_path,
-                                    duration: podcast.runtime_h_m,
-                                    description: podcast.overview_serie,
-                                    languages: [],
-                                    video_path_hd: ''
-                                };
-                                return (
-                                    <div key={podcast.uid_serie} className="flex-shrink-0">
-                                        <MediaCard
-                                            item={mediaContent}
-                                            variant="poster"
-                                            onSelect={onSelectMedia}
-                                            onPlay={onPlay}
-                                        />
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                )}
+                <PodcastsSection
+                    podcasts={podcasts}
+                    onSelectMedia={onSelectMedia}
+                    onPlay={onPlay}
+                    navigateToCategory={navigateToCategory}
+                    t={t}
+                />
 
                 {/* Section Most Watched */}
-                {loadingMostWatched && (
-                    <div className="py-6 md:py-8 lg:py-10 mt-4 md:mt-6">
-                        <div className="px-4 md:px-6 lg:px-8 mb-6">
-                            <div className="h-8 w-64 bg-gray-200 dark:bg-gray-800 rounded animate-pulse"></div>
-                        </div>
-                        <div className="flex space-x-3 md:space-x-4 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-4">
-                            {[...Array(5)].map((_, i) => (
-                                <div key={i} className="flex-shrink-0 w-40 md:w-48 lg:w-52">
-                                    <div className="aspect-[2/3] bg-gray-200 dark:bg-gray-800 rounded animate-pulse mb-3"></div>
-                                    <div className="h-4 w-3/4 bg-gray-200 dark:bg-gray-800 rounded animate-pulse"></div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-                {mostWatchedItems.length > 0 && (
-                    <div className="py-6 md:py-8 lg:py-10 mt-4 md:mt-6">
-                        <div className="px-4 md:px-6 lg:px-8 mb-6">
-                            <div className="flex items-center justify-between">
-                                <h3 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
-                                    {t('mostWatched') || 'Les plus regardés'}
-                                </h3>
-                            </div>
-                        </div>
-                        <div className="flex space-x-3 md:space-x-4 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-4">
-                            {mostWatchedItems.slice(0, 10).map((item, index) => (
-                                <div key={item.content.id} className="flex-shrink-0">
-                                    <MediaCard
-                                        item={item.content}
-                                        variant="poster"
-                                        onSelect={onSelectMedia}
-                                        onPlay={onPlay}
-                                    />
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
+                <MostWatchedSection
+                    items={mostWatchedItems}
+                    onSelectMedia={onSelectMedia}
+                    onPlay={onPlay}
+                    loading={loadingMostWatched}
+                    t={t}
+                />
 
                 {/* Section Most Liked */}
-                {loadingMostLiked && (
-                    <div className="py-6 md:py-8 lg:py-10 mt-4 md:mt-6">
-                        <div className="px-4 md:px-6 lg:px-8 mb-6">
-                            <div className="h-8 w-64 bg-gray-200 dark:bg-gray-800 rounded animate-pulse"></div>
-                        </div>
-                        <div className="flex space-x-3 md:space-x-4 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-4">
-                            {[...Array(5)].map((_, i) => (
-                                <div key={i} className="flex-shrink-0 w-40 md:w-48 lg:w-52">
-                                    <div className="aspect-[2/3] bg-gray-200 dark:bg-gray-800 rounded animate-pulse mb-3"></div>
-                                    <div className="h-4 w-3/4 bg-gray-200 dark:bg-gray-800 rounded animate-pulse"></div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-                {mostLikedItems.length > 0 && (
-                    <div className="py-6 md:py-8 lg:py-10 mt-4 md:mt-6">
-                        <div className="px-4 md:px-6 lg:px-8 mb-6">
-                            <div className="flex items-center justify-between">
-                                <h3 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
-                                    {t('mostLiked') || 'Les plus aimés'}
-                                </h3>
-                            </div>
-                        </div>
-                        <div className="flex space-x-3 md:space-x-4 overflow-x-auto px-4 md:px-6 lg:px-8 scrollbar-hide pb-4">
-                            {mostLikedItems.slice(0, 10).map((item, index) => (
-                                <div key={item.content.id} className="flex-shrink-0">
-                                    <MediaCard
-                                        item={item.content}
-                                        variant="poster"
-                                        onSelect={onSelectMedia}
-                                        onPlay={onPlay}
-                                    />
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
+                <MostLikedSection
+                    items={mostLikedItems}
+                    onSelectMedia={onSelectMedia}
+                    onPlay={onPlay}
+                    loading={loadingMostLiked}
+                    t={t}
+                />
             </div>
 
             {/* Modal de complétion du profil */}
@@ -885,7 +547,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
                 <ProfileCompletionModal
                     userProfile={userProfile}
                     onComplete={(updatedProfile) => {
-                        console.log('✅ Profil complété:', updatedProfile);
                         setUserProfile(updatedProfile);
                         setShowProfileModal(false);
                     }}
@@ -893,7 +554,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectMedia, onPlay, navigate
             )}
         </div>
     );
-
 };
 
-export default HomeScreen;
+const HomeScreenWithErrorBoundary: React.FC<HomeScreenProps> = (props) => (
+    <ErrorBoundary>
+        <HomeScreen {...props} />
+    </ErrorBoundary>
+);
+
+export default HomeScreenWithErrorBoundary;
