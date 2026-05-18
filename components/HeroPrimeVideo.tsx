@@ -310,13 +310,13 @@ const HeroPrimeVideo: React.FC<HeroPrimeVideoProps> = ({ items: propItems, onSel
             ref={videoRef}
             key={currentItem.id}
             src={videoUrl}
-            className="absolute inset-0 w-full h-full object-cover object-left transition-opacity duration-1000"
+            className="absolute inset-0 w-full h-full object-contain md:object-cover object-center md:object-left transition-opacity duration-1000"
             muted={isMuted}
             playsInline
             loop
             autoPlay
             preload="auto"
-            style={{ objectFit: 'cover' }}
+            style={{ objectFit: 'contain' }}
           />
         ) : (
           <>
